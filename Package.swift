@@ -4,6 +4,9 @@ import PackageDescription
 
 let package = Package(
     name: "TerminalKit",
+    platforms: [
+        .macOS(.v27),
+    ],
     products: [
         .library(
             name: "TerminalKit",
