@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and Test
+    if: github.event.pull_request.draft != true
+    runs-on: xcode-27
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Report the toolchain
+        run: |
+          xcodebuild -version
+          swift format --version
+
+      - name: Lint the sources
+        run: swift format lint --recursive --strict Sources Tests
+
+      - name: Run the tests
+        timeout-minutes: 15
+        run: |
+          xcodebuild test \
+            -scheme TerminalKit \
+            -destination 'platform=macOS' \
+            -resultBundlePath TestResults.xcresult
+
+      - name: Upload the test results
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: TestResults
+          path: TestResults.xcresult
