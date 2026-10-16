@@ -21,7 +21,7 @@ package struct Terminal: Sendable {
         precondition(columns > 0 && rows > 0)
         self.columns = columns
         self.rows = rows
-        screen = Array(repeating: Array(repeating: Cell(), count: columns), count: rows)
+        screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
     }
 
     package mutating func receive(_ bytes: some Sequence<UInt8>) {
@@ -54,11 +54,20 @@ package struct Terminal: Sendable {
 
     private mutating func lineFeed() {
         isWrapPending = false
-        cursor.row = min(cursor.row + 1, rows - 1)
+        if cursor.row == rows - 1 {
+            screen.removeFirst()
+            screen.append(Self.blankLine(columns: columns))
+        } else {
+            cursor.row += 1
+        }
     }
 
     private mutating func carriageReturn() {
         isWrapPending = false
         cursor.column = 0
+    }
+
+    private static func blankLine(columns: Int) -> [Cell] {
+        Array(repeating: Cell(), count: columns)
     }
 }

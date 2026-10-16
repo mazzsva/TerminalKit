@@ -46,6 +46,19 @@ struct TerminalTests {
         terminal.receive("abc\rd".utf8)
         #expect(lines(terminal) == ["dbc ", "    "])
     }
+
+    @Test func scrollsAtTheBottomOfTheScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\r\ncd\r\nef".utf8)
+        #expect(lines(terminal) == ["cd  ", "ef  "])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
+    }
+
+    @Test func scrollsWhenTheLastLineWraps() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcdefghij".utf8)
+        #expect(lines(terminal) == ["efgh", "ij  "])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
