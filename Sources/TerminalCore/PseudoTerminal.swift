@@ -44,8 +44,8 @@ package final class PseudoTerminal: Sendable {
         guard openpty(&primary, &secondary, nil, nil, &size) == 0 else {
             throw POSIXError(errno)
         }
-        defer { close(secondary) }
         _ = fcntl(primary, F_SETFD, FD_CLOEXEC)
+        _ = fcntl(secondary, F_SETFD, FD_CLOEXEC)
         _ = fcntl(primary, F_SETFL, fcntl(primary, F_GETFL) | O_NONBLOCK)
 
         do {
@@ -58,6 +58,7 @@ package final class PseudoTerminal: Sendable {
             )
         } catch {
             close(primary)
+            close(secondary)
             throw error
         }
         fileDescriptor = primary
@@ -70,7 +71,7 @@ package final class PseudoTerminal: Sendable {
             close(primary)
         }
         readSource.activate()
-        monitorExit()
+        monitorExit(secondary: secondary)
     }
 
     deinit {
@@ -124,11 +125,12 @@ package final class PseudoTerminal: Sendable {
         }
     }
 
-    private func monitorExit() {
+    private func monitorExit(secondary: Int32) {
         let processIdentifier = processIdentifier
         Thread { [weak self] in
             var status: Int32 = 0
             while waitpid(processIdentifier, &status, 0) == -1 && errno == EINTR {}
+            close(secondary)
             let termination = Termination(status: status)
             guard let self else {
                 return
