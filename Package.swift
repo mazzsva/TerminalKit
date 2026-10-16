@@ -14,8 +14,10 @@ let package = Package(
         ),
     ],
     targets: [
+        .target(name: "CTerminalCore"),
         .target(
             name: "TerminalCore",
+            dependencies: ["CTerminalCore"],
             swiftSettings: [
                 .enableUpcomingFeature("ApproachableConcurrency"),
             ],
