@@ -77,6 +77,18 @@ struct TerminalTests {
         terminal.receive("abcd\u{8}e".utf8)
         #expect(lines(terminal) == ["abed", "    "])
     }
+
+    @Test func movesToTheNextTabStop() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("a\tb\tc".utf8)
+        #expect(lines(terminal) == ["a       b       c   "])
+    }
+
+    @Test func stopsTabsAtTheLastColumn() {
+        var terminal = Terminal(columns: 10, rows: 1)
+        terminal.receive("\t\ta".utf8)
+        #expect(lines(terminal) == ["         a"])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {

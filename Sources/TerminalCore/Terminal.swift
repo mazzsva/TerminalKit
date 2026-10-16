@@ -8,6 +8,8 @@ package struct Terminal: Sendable {
         package var column: Int
     }
 
+    private static let tabWidth = 8
+
     package let columns: Int
     package let rows: Int
     package private(set) var screen: [[Cell]]
@@ -35,6 +37,8 @@ package struct Terminal: Sendable {
                 carriageReturn()
             case .execute("\u{8}"):
                 moveCursor(row: cursor.row, column: cursor.column - 1)
+            case .execute("\t"):
+                cursor.column = min((cursor.column / Self.tabWidth + 1) * Self.tabWidth, columns - 1)
             default:
                 break
             }
