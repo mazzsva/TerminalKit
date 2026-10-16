@@ -5,6 +5,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct TerminalContentViewTests {
     @Test func fitsTheScreenToTheView() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))

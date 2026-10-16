@@ -4,6 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct TerminalSessionTests {
     @Test func keepsTheConfiguration() {
         let configuration = TerminalSession.Configuration(
