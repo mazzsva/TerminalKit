@@ -10,4 +10,17 @@ struct TerminalSessionTests {
         let session = TerminalSession(configuration: configuration)
         #expect(session.configuration == configuration)
     }
+
+    @Test func startsTheLoginShellInTheHomeDirectory() {
+        let configuration = TerminalSession.Configuration.loginShell
+        #expect(configuration.executableURL.path(percentEncoded: false).hasPrefix("/"))
+        #expect(configuration.arguments == ["-l"])
+        #expect(configuration.currentDirectoryURL == .homeDirectory)
+    }
+
+    @Test func describesTheTerminalToTheLoginShell() {
+        let environment = TerminalSession.Configuration.loginShell.environment
+        #expect(environment["TERM"] == "xterm-256color")
+        #expect(environment["LANG"] != nil)
+    }
 }
