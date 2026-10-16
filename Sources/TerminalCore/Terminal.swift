@@ -28,6 +28,10 @@ package struct Terminal: Sendable {
             switch action {
             case .print(let scalar):
                 print(Character(scalar))
+            case .execute("\n"):
+                lineFeed()
+            case .execute("\r"):
+                carriageReturn()
             default:
                 break
             }
@@ -37,5 +41,13 @@ package struct Terminal: Sendable {
     private mutating func print(_ character: Character) {
         screen[cursor.row][cursor.column].character = character
         cursor.column = min(cursor.column + 1, columns - 1)
+    }
+
+    private mutating func lineFeed() {
+        cursor.row = min(cursor.row + 1, rows - 1)
+    }
+
+    private mutating func carriageReturn() {
+        cursor.column = 0
     }
 }

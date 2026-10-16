@@ -20,6 +20,24 @@ struct TerminalTests {
         terminal.receive("abcdef".utf8)
         #expect(lines(terminal) == ["abcf", "    "])
     }
+
+    @Test func movesToANewLine() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\r\ncd".utf8)
+        #expect(lines(terminal) == ["ab  ", "cd  "])
+    }
+
+    @Test func keepsTheColumnOnALineFeed() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\ncd".utf8)
+        #expect(lines(terminal) == ["ab  ", "  cd"])
+    }
+
+    @Test func returnsToTheFirstColumn() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abc\rd".utf8)
+        #expect(lines(terminal) == ["dbc ", "    "])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
