@@ -165,6 +165,20 @@ struct TerminalTests {
         #expect(lines(terminal) == screen)
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
     }
+
+    @Test(arguments: ["0", "2"])
+    func setsTheTitle(command: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}]\(command);~/Developer — zsh\u{7}".utf8)
+        #expect(terminal.title == "~/Developer — zsh")
+        #expect(lines(terminal) == ["    ", "    "])
+    }
+
+    @Test func ignoresOtherOperatingSystemCommands() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}]1;Icon\u{7}\u{1B}]2\u{7}".utf8)
+        #expect(terminal.title.isEmpty)
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
