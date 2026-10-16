@@ -15,6 +15,7 @@ package struct Terminal: Sendable {
 
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
+    private var isWrapPending = false
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -39,15 +40,25 @@ package struct Terminal: Sendable {
     }
 
     private mutating func print(_ character: Character) {
+        if isWrapPending {
+            carriageReturn()
+            lineFeed()
+        }
         screen[cursor.row][cursor.column].character = character
-        cursor.column = min(cursor.column + 1, columns - 1)
+        if cursor.column == columns - 1 {
+            isWrapPending = true
+        } else {
+            cursor.column += 1
+        }
     }
 
     private mutating func lineFeed() {
+        isWrapPending = false
         cursor.row = min(cursor.row + 1, rows - 1)
     }
 
     private mutating func carriageReturn() {
+        isWrapPending = false
         cursor.column = 0
     }
 }

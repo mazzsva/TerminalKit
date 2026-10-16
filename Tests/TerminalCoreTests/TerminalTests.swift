@@ -15,10 +15,18 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
-    @Test func overwritesTheLastColumn() {
+    @Test func wrapsAtTheEndOfALine() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("abcdef".utf8)
-        #expect(lines(terminal) == ["abcf", "    "])
+        #expect(lines(terminal) == ["abcd", "ef  "])
+    }
+
+    @Test func waitsForTheNextCharacterToWrap() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd".utf8)
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
+        terminal.receive("\r\nef".utf8)
+        #expect(lines(terminal) == ["abcd", "ef  "])
     }
 
     @Test func movesToANewLine() {
