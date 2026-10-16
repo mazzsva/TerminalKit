@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 package final class PseudoTerminal: Sendable {
     package enum Event: Equatable, Sendable {
@@ -21,6 +22,12 @@ package final class PseudoTerminal: Sendable {
     private let continuation: AsyncStream<Event>.Continuation
     private let queue = DispatchQueue(label: "PseudoTerminal")
     private let readSource: any DispatchSourceRead
+    private let input = Mutex(Input())
+
+    private struct Input {
+        var bytes: [UInt8] = []
+        var writeSource: (any DispatchSourceWrite)?
+    }
 
     package init(
         executableURL: URL,
@@ -30,12 +37,7 @@ package final class PseudoTerminal: Sendable {
         columns: Int,
         rows: Int
     ) throws(POSIXError) {
-        var size = winsize(
-            ws_row: UInt16(clamping: rows),
-            ws_col: UInt16(clamping: columns),
-            ws_xpixel: 0,
-            ws_ypixel: 0
-        )
+        var size = winsize(columns: columns, rows: rows)
         var primary: Int32 = -1
         var secondary: Int32 = -1
         guard openpty(&primary, &secondary, nil, nil, &size) == 0 else {
@@ -71,8 +73,54 @@ package final class PseudoTerminal: Sendable {
     }
 
     deinit {
+        input.withLock { $0.writeSource?.cancel() }
         readSource.cancel()
         continuation.finish()
+    }
+
+    package func write(_ bytes: [UInt8]) {
+        queue.async { [weak self] in
+            guard let self else {
+                return
+            }
+            input.withLock { $0.bytes += bytes }
+            writeInput()
+        }
+    }
+
+    package func resize(columns: Int, rows: Int) {
+        queue.async { [weak self] in
+            guard let self, !readSource.isCancelled else {
+                return
+            }
+            var size = winsize(columns: columns, rows: rows)
+            _ = ioctl(fileDescriptor, TIOCSWINSZ, &size)
+        }
+    }
+
+    private func writeInput() {
+        input.withLock { input in
+            while !input.bytes.isEmpty, !readSource.isCancelled {
+                let count = input.bytes.withUnsafeBytes { Darwin.write(fileDescriptor, $0.baseAddress, $0.count) }
+                if count > 0 {
+                    input.bytes.removeFirst(count)
+                } else if errno == EAGAIN {
+                    if input.writeSource == nil {
+                        let writeSource = DispatchSource.makeWriteSource(fileDescriptor: fileDescriptor, queue: queue)
+                        writeSource.setEventHandler { [weak self] in
+                            self?.writeInput()
+                        }
+                        writeSource.activate()
+                        input.writeSource = writeSource
+                    }
+                    return
+                } else if errno != EINTR {
+                    input.bytes.removeAll()
+                }
+            }
+            input.writeSource?.cancel()
+            input.writeSource = nil
+        }
     }
 
     private func monitorExit() {
@@ -115,6 +163,7 @@ package final class PseudoTerminal: Sendable {
 
     private func finish(_ termination: Termination) {
         while readOutput() {}
+        input.withLock { $0.writeSource?.cancel() }
         readSource.cancel()
         continuation.yield(.exit(termination))
         continuation.finish()
@@ -173,6 +222,12 @@ extension PseudoTerminal.Termination {
     fileprivate init(status: Int32) {
         let signal = status & 0x7F
         self = signal == 0 ? .exit(status >> 8 & 0xFF) : .uncaughtSignal(signal)
+    }
+}
+
+extension winsize {
+    fileprivate init(columns: Int, rows: Int) {
+        self.init(ws_row: UInt16(clamping: rows), ws_col: UInt16(clamping: columns), ws_xpixel: 0, ws_ypixel: 0)
     }
 }
 
