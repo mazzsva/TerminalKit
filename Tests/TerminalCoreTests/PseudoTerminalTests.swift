@@ -47,6 +47,13 @@ struct PseudoTerminalTests {
         }
     }
 
+    @Test func sendsInput() async throws {
+        let output = try await output("read line; printf 'got:%s' \"$line\"") { pseudoTerminal in
+            pseudoTerminal.write(Array("abc\r".utf8))
+        }
+        #expect(output.hasSuffix("got:abc"))
+    }
+
     @Test func throwsWhenTheExecutableIsMissing() {
         #expect(throws: POSIXError(.ENOENT)) {
             try PseudoTerminal(executableURL: URL(filePath: "/missing"), environment: [:], columns: 80, rows: 24)
@@ -59,7 +66,8 @@ private func output(
     environment: [String: String] = [:],
     currentDirectoryURL: URL? = nil,
     columns: Int = 80,
-    rows: Int = 24
+    rows: Int = 24,
+    input: (PseudoTerminal) -> Void = { _ in }
 ) async throws -> String {
     let pseudoTerminal = try PseudoTerminal(
         executableURL: URL(filePath: "/bin/sh"),
@@ -69,6 +77,7 @@ private func output(
         columns: columns,
         rows: rows
     )
+    input(pseudoTerminal)
     var output: [UInt8] = []
     for await event in pseudoTerminal.events {
         if case .output(let bytes) = event {

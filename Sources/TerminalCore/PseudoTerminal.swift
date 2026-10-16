@@ -75,6 +75,24 @@ package final class PseudoTerminal: Sendable {
         continuation.finish()
     }
 
+    package func write(_ bytes: [UInt8]) {
+        queue.async { [weak self] in
+            self?.writeInput(bytes)
+        }
+    }
+
+    private func writeInput(_ bytes: [UInt8]) {
+        var bytes = bytes[...]
+        while !bytes.isEmpty, !readSource.isCancelled {
+            let count = bytes.withUnsafeBytes { Darwin.write(fileDescriptor, $0.baseAddress, $0.count) }
+            if count > 0 {
+                bytes = bytes.dropFirst(count)
+            } else if errno != EINTR {
+                return
+            }
+        }
+    }
+
     private func monitorExit() {
         let processIdentifier = processIdentifier
         Thread { [weak self] in
