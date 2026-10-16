@@ -31,6 +31,22 @@ struct PseudoTerminalTests {
         #expect(try await output("printf %s \"$NAME\"", environment: ["NAME": "value"]) == "value")
     }
 
+    @Test func startsInTheCurrentDirectory() async throws {
+        #expect(try await output("pwd", currentDirectoryURL: URL(filePath: "/usr/bin")) == "/usr/bin\r\n")
+    }
+
+    @Test func throwsWhenTheCurrentDirectoryIsMissing() {
+        #expect(throws: POSIXError(.ENOENT)) {
+            try PseudoTerminal(
+                executableURL: URL(filePath: "/bin/sh"),
+                environment: [:],
+                currentDirectoryURL: URL(filePath: "/missing"),
+                columns: 80,
+                rows: 24
+            )
+        }
+    }
+
     @Test func throwsWhenTheExecutableIsMissing() {
         #expect(throws: POSIXError(.ENOENT)) {
             try PseudoTerminal(executableURL: URL(filePath: "/missing"), environment: [:], columns: 80, rows: 24)
@@ -41,6 +57,7 @@ struct PseudoTerminalTests {
 private func output(
     _ script: String,
     environment: [String: String] = [:],
+    currentDirectoryURL: URL? = nil,
     columns: Int = 80,
     rows: Int = 24
 ) async throws -> String {
@@ -48,6 +65,7 @@ private func output(
         executableURL: URL(filePath: "/bin/sh"),
         arguments: ["-c", script],
         environment: environment,
+        currentDirectoryURL: currentDirectoryURL,
         columns: columns,
         rows: rows
     )

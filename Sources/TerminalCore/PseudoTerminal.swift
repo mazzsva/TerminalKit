@@ -26,6 +26,7 @@ package final class PseudoTerminal: Sendable {
         executableURL: URL,
         arguments: [String] = [],
         environment: [String: String],
+        currentDirectoryURL: URL? = nil,
         columns: Int,
         rows: Int
     ) throws(POSIXError) {
@@ -49,6 +50,7 @@ package final class PseudoTerminal: Sendable {
                 executableURL: executableURL,
                 arguments: arguments,
                 environment: environment,
+                currentDirectoryURL: currentDirectoryURL,
                 terminal: secondary
             )
         } catch {
@@ -122,6 +124,7 @@ package final class PseudoTerminal: Sendable {
         executableURL: URL,
         arguments: [String],
         environment: [String: String],
+        currentDirectoryURL: URL?,
         terminal: Int32
     ) throws(POSIXError) -> pid_t {
         var fileActions: posix_spawn_file_actions_t?
@@ -129,6 +132,9 @@ package final class PseudoTerminal: Sendable {
         defer { posix_spawn_file_actions_destroy(&fileActions) }
         for standardStream in [STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO] {
             posix_spawn_file_actions_adddup2(&fileActions, terminal, standardStream)
+        }
+        if let currentDirectoryURL {
+            posix_spawn_file_actions_addchdir(&fileActions, currentDirectoryURL.path(percentEncoded: false))
         }
 
         var attributes: posix_spawnattr_t?
