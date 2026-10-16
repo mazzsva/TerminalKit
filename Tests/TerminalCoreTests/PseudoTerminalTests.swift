@@ -61,6 +61,14 @@ struct PseudoTerminalTests {
         #expect(output.hasSuffix("2000\r\n"))
     }
 
+    @Test func resizesTheTerminal() async throws {
+        let output = try await output("read line; stty size") { pseudoTerminal in
+            pseudoTerminal.resize(columns: 120, rows: 40)
+            pseudoTerminal.write(Array("\r".utf8))
+        }
+        #expect(output.hasSuffix("40 120\r\n"))
+    }
+
     @Test func throwsWhenTheExecutableIsMissing() {
         #expect(throws: POSIXError(.ENOENT)) {
             try PseudoTerminal(executableURL: URL(filePath: "/missing"), environment: [:], columns: 80, rows: 24)

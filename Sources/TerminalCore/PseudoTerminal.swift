@@ -37,12 +37,7 @@ package final class PseudoTerminal: Sendable {
         columns: Int,
         rows: Int
     ) throws(POSIXError) {
-        var size = winsize(
-            ws_row: UInt16(clamping: rows),
-            ws_col: UInt16(clamping: columns),
-            ws_xpixel: 0,
-            ws_ypixel: 0
-        )
+        var size = winsize(columns: columns, rows: rows)
         var primary: Int32 = -1
         var secondary: Int32 = -1
         guard openpty(&primary, &secondary, nil, nil, &size) == 0 else {
@@ -90,6 +85,16 @@ package final class PseudoTerminal: Sendable {
             }
             input.withLock { $0.bytes += bytes }
             writeInput()
+        }
+    }
+
+    package func resize(columns: Int, rows: Int) {
+        queue.async { [weak self] in
+            guard let self, !readSource.isCancelled else {
+                return
+            }
+            var size = winsize(columns: columns, rows: rows)
+            _ = ioctl(fileDescriptor, TIOCSWINSZ, &size)
         }
     }
 
@@ -217,6 +222,12 @@ extension PseudoTerminal.Termination {
     fileprivate init(status: Int32) {
         let signal = status & 0x7F
         self = signal == 0 ? .exit(status >> 8 & 0xFF) : .uncaughtSignal(signal)
+    }
+}
+
+extension winsize {
+    fileprivate init(columns: Int, rows: Int) {
+        self.init(ws_row: UInt16(clamping: rows), ws_col: UInt16(clamping: columns), ws_xpixel: 0, ws_ypixel: 0)
     }
 }
 
