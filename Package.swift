@@ -15,6 +15,19 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "TerminalCore",
+            swiftSettings: [
+                .enableUpcomingFeature("ApproachableConcurrency"),
+            ],
+        ),
+        .testTarget(
+            name: "TerminalCoreTests",
+            dependencies: ["TerminalCore"],
+            swiftSettings: [
+                .enableUpcomingFeature("ApproachableConcurrency"),
+            ],
+        ),
+        .target(
             name: "TerminalKit",
             swiftSettings: [
                 .enableUpcomingFeature("ApproachableConcurrency"),
