@@ -10,8 +10,8 @@ package struct Terminal: Sendable {
 
     private static let tabWidth = 8
 
-    package let columns: Int
-    package let rows: Int
+    package private(set) var columns: Int
+    package private(set) var rows: Int
     package private(set) var screen: [[Cell]]
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var title = ""
@@ -25,6 +25,20 @@ package struct Terminal: Sendable {
         self.columns = columns
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
+    }
+
+    package mutating func resize(columns: Int, rows: Int) {
+        precondition(columns > 0 && rows > 0)
+        let removedRows = max(cursor.row + 1 - rows, 0)
+        screen.removeFirst(removedRows)
+        screen = screen.prefix(rows)
+            .map { line in
+                Array(line.prefix(columns)) + Self.blankLine(columns: max(columns - line.count, 0))
+            }
+        screen += Array(repeating: Self.blankLine(columns: columns), count: rows - screen.count)
+        self.columns = columns
+        self.rows = rows
+        moveCursor(row: cursor.row - removedRows, column: cursor.column)
     }
 
     package mutating func receive(_ bytes: some Sequence<UInt8>) {

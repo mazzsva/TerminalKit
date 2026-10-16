@@ -179,6 +179,38 @@ struct TerminalTests {
         terminal.receive("\u{1B}]1;Icon\u{7}\u{1B}]2\u{7}".utf8)
         #expect(terminal.title.isEmpty)
     }
+
+    @Test func growsTheScreen() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("ab\r\ncd".utf8)
+        terminal.resize(columns: 3, rows: 3)
+        #expect(lines(terminal) == ["ab ", "cd ", "   "])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+    }
+
+    @Test func cutsLinesWhenTheScreenGetsNarrower() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("abcd".utf8)
+        terminal.resize(columns: 2, rows: 1)
+        #expect(lines(terminal) == ["ab"])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+    }
+
+    @Test func keepsTheCursorLineWhenTheScreenGetsShorter() {
+        var terminal = Terminal(columns: 2, rows: 3)
+        terminal.receive("a\r\nb\r\nc".utf8)
+        terminal.resize(columns: 2, rows: 2)
+        #expect(lines(terminal) == ["b ", "c "])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+    }
+
+    @Test func removesLinesBelowTheCursorWhenTheScreenGetsShorter() {
+        var terminal = Terminal(columns: 2, rows: 3)
+        terminal.receive("a".utf8)
+        terminal.resize(columns: 2, rows: 2)
+        #expect(lines(terminal) == ["a ", "  "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
