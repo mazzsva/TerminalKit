@@ -75,18 +75,18 @@ package final class PseudoTerminal: Sendable {
 
     private func monitorExit() {
         let processIdentifier = processIdentifier
-        let source = DispatchSource.makeProcessSource(identifier: processIdentifier, eventMask: .exit, queue: queue)
-        let reap: @Sendable () -> Void = { [weak self] in
+        Thread { [weak self] in
             var status: Int32 = 0
-            guard waitpid(processIdentifier, &status, WNOHANG) == processIdentifier else {
+            while waitpid(processIdentifier, &status, 0) == -1 && errno == EINTR {}
+            let termination = Termination(status: status)
+            guard let self else {
                 return
             }
-            source.cancel()
-            self?.finish(Termination(status: status))
+            queue.async {
+                self.finish(termination)
+            }
         }
-        source.setEventHandler(handler: reap)
-        source.activate()
-        queue.async(execute: reap)
+        .start()
     }
 
     @discardableResult
