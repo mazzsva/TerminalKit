@@ -29,6 +29,7 @@ let package = Package(
         ),
         .target(
             name: "TerminalKit",
+            dependencies: ["TerminalCore"],
             swiftSettings: [
                 .enableUpcomingFeature("ApproachableConcurrency"),
             ],

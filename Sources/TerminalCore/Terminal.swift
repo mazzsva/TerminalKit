@@ -14,6 +14,7 @@ package struct Terminal: Sendable {
     package let rows: Int
     package private(set) var screen: [[Cell]]
     package private(set) var cursor = Position(row: 0, column: 0)
+    package private(set) var title = ""
 
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
@@ -41,6 +42,8 @@ package struct Terminal: Sendable {
                 cursor.column = min((cursor.column / Self.tabWidth + 1) * Self.tabWidth, columns - 1)
             case .controlSequence(let sequence):
                 perform(sequence)
+            case .operatingSystemCommand(let command):
+                perform(command)
             default:
                 break
             }
@@ -77,6 +80,13 @@ package struct Terminal: Sendable {
             eraseInLine(sequence.parameter(at: 0, default: 0))
         default:
             break
+        }
+    }
+
+    private mutating func perform(_ command: String) {
+        let parts = command.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
+        if parts.count == 2, parts[0] == "0" || parts[0] == "2" {
+            title = String(parts[1])
         }
     }
 
