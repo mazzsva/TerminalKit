@@ -3,18 +3,32 @@ package struct EscapeSequenceParser: Sendable {
         case print(Unicode.Scalar)
         case execute(Unicode.Scalar)
         case escape(intermediates: String, final: Unicode.Scalar)
+        case controlSequence(ControlSequence)
+    }
+
+    package struct ControlSequence: Equatable, Sendable {
+        package var privateMarker: Unicode.Scalar?
+        package var parameters: [Int]
+        package var intermediates: String
+        package var final: Unicode.Scalar
     }
 
     private enum State {
         case ground
         case escape
         case escapeIntermediate
+        case controlSequence
+        case ignoredControlSequence
     }
 
     private static let maximumIntermediates = 2
+    private static let maximumParameters = 32
+    private static let maximumParameterValue = 65_535
 
     private var state = State.ground
     private var intermediates = ""
+    private var privateMarker: Unicode.Scalar?
+    private var parameters: [Int] = []
 
     package init() {}
 
@@ -43,6 +57,10 @@ package struct EscapeSequenceParser: Sendable {
             return escape(scalar)
         case .escapeIntermediate:
             return escapeIntermediate(scalar)
+        case .controlSequence:
+            return controlSequence(scalar)
+        case .ignoredControlSequence:
+            return ignoredControlSequence(scalar)
         }
     }
 
@@ -60,6 +78,8 @@ package struct EscapeSequenceParser: Sendable {
         case " " ... "/":
             collect(scalar)
             state = .escapeIntermediate
+        case "[":
+            state = .controlSequence
         case "0" ... "~":
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)
@@ -82,9 +102,50 @@ package struct EscapeSequenceParser: Sendable {
         return nil
     }
 
+    private mutating func controlSequence(_ scalar: Unicode.Scalar) -> Action? {
+        switch scalar {
+        case "0" ... "9" where intermediates.isEmpty:
+            let value = (parameters.popLast() ?? 0) * 10 + Int(scalar.value - 0x30)
+            parameters.append(min(value, Self.maximumParameterValue))
+        case ";" where intermediates.isEmpty && parameters.count < Self.maximumParameters:
+            if parameters.isEmpty {
+                parameters.append(0)
+            }
+            parameters.append(0)
+        case "<" ... "?" where intermediates.isEmpty && parameters.isEmpty && privateMarker == nil:
+            privateMarker = scalar
+        case "0" ... "?":
+            state = .ignoredControlSequence
+        case " " ... "/":
+            collect(scalar)
+        case "@" ... "~":
+            state = .ground
+            return .controlSequence(
+                ControlSequence(
+                    privateMarker: privateMarker,
+                    parameters: parameters,
+                    intermediates: intermediates,
+                    final: scalar
+                )
+            )
+        default:
+            break
+        }
+        return nil
+    }
+
+    private mutating func ignoredControlSequence(_ scalar: Unicode.Scalar) -> Action? {
+        if ("@" ... "~").contains(scalar) {
+            state = .ground
+        }
+        return nil
+    }
+
     private mutating func enterEscape() {
         state = .escape
         intermediates = ""
+        privateMarker = nil
+        parameters = []
     }
 
     private mutating func collect(_ scalar: Unicode.Scalar) {

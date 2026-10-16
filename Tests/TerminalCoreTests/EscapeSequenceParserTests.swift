@@ -1,5 +1,6 @@
-import TerminalCore
 import Testing
+
+@testable import TerminalCore
 
 struct EscapeSequenceParserTests {
     @Test func printsText() {
@@ -32,9 +33,57 @@ struct EscapeSequenceParserTests {
         #expect(parser.parse("\u{1B}(".unicodeScalars).isEmpty)
         #expect(parser.parse("B".unicodeScalars) == [.escape(intermediates: "(", final: "B")])
     }
+
+    @Test func dispatchesControlSequences() {
+        #expect(parse("\u{1B}[H") == [controlSequence(final: "H")])
+        #expect(parse("\u{1B}[12;40H") == [controlSequence(parameters: [12, 40], final: "H")])
+    }
+
+    @Test func keepsEmptyParameters() {
+        #expect(parse("\u{1B}[;5H") == [controlSequence(parameters: [0, 5], final: "H")])
+        #expect(parse("\u{1B}[5;H") == [controlSequence(parameters: [5, 0], final: "H")])
+    }
+
+    @Test func collectsThePrivateMarker() {
+        #expect(parse("\u{1B}[?1049h") == [controlSequence(privateMarker: "?", parameters: [1049], final: "h")])
+    }
+
+    @Test func collectsIntermediates() {
+        #expect(parse("\u{1B}[2 q") == [controlSequence(parameters: [2], intermediates: " ", final: "q")])
+    }
+
+    @Test func limitsParameterValues() {
+        #expect(parse("\u{1B}[99999999A") == [controlSequence(parameters: [65_535], final: "A")])
+    }
+
+    @Test func ignoresMalformedControlSequences() {
+        #expect(parse("\u{1B}[1?hA") == [.print("A")])
+        #expect(parse("\u{1B}[ 1qA") == [.print("A")])
+        #expect(parse("\u{1B}[\(String(repeating: ";", count: 32))mA") == [.print("A")])
+    }
+
+    @Test func executesControlCharactersInsideControlSequences() {
+        #expect(parse("\u{1B}[1\r0H") == [.execute("\r"), controlSequence(parameters: [10], final: "H")])
+    }
 }
 
 private func parse(_ text: String) -> [EscapeSequenceParser.Action] {
     var parser = EscapeSequenceParser()
     return parser.parse(text.unicodeScalars)
+}
+
+private func controlSequence(
+    privateMarker: Unicode.Scalar? = nil,
+    parameters: [Int] = [],
+    intermediates: String = "",
+    final: Unicode.Scalar
+) -> EscapeSequenceParser.Action {
+    .controlSequence(
+        EscapeSequenceParser.ControlSequence(
+            privateMarker: privateMarker,
+            parameters: parameters,
+            intermediates: intermediates,
+            final: final
+        )
+    )
 }
