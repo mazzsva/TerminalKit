@@ -65,6 +65,12 @@ package struct Terminal: Sendable {
             moveCursor(row: cursor.row + count, column: 0)
         case "F":
             moveCursor(row: cursor.row - count, column: 0)
+        case "G":
+            moveCursor(row: cursor.row, column: count - 1)
+        case "H", "f":
+            moveCursor(row: count - 1, column: sequence.parameter(at: 1, default: 1) - 1)
+        case "d":
+            moveCursor(row: count - 1, column: cursor.column)
         default:
             break
         }

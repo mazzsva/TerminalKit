@@ -117,6 +117,22 @@ struct TerminalTests {
         terminal.receive("\u{1B}[99A\u{1B}[99D".utf8)
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
     }
+
+    @Test(arguments: [
+        ("\u{1B}[3;5H", Terminal.Position(row: 2, column: 4)),
+        ("\u{1B}[3;5f", Terminal.Position(row: 2, column: 4)),
+        ("\u{1B}[H", Terminal.Position(row: 0, column: 0)),
+        ("\u{1B}[3H", Terminal.Position(row: 2, column: 0)),
+        ("\u{1B}[;5H", Terminal.Position(row: 0, column: 4)),
+        ("\u{1B}[5G", Terminal.Position(row: 1, column: 4)),
+        ("\u{1B}[5d", Terminal.Position(row: 4, column: 1)),
+        ("\u{1B}[99;99H", Terminal.Position(row: 9, column: 9)),
+    ])
+    func movesTheCursorToAPosition(sequence: String, position: Terminal.Position) {
+        var terminal = Terminal(columns: 10, rows: 10)
+        terminal.receive("\n \(sequence)".utf8)
+        #expect(terminal.cursor == position)
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
