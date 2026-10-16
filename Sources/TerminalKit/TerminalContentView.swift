@@ -5,16 +5,14 @@ final class TerminalContentView: NSView {
 
     let session: TerminalSession
     let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-
-    var cellSize: CGSize {
-        CGSize(
-            width: ("M" as NSString).size(withAttributes: [.font: font]).width,
-            height: ceil(font.ascender - font.descender + font.leading)
-        )
-    }
+    let cellSize: CGSize
 
     init(session: TerminalSession) {
         self.session = session
+        cellSize = CGSize(
+            width: ("M" as NSString).size(withAttributes: [.font: font]).width,
+            height: ceil(font.ascender - font.descender + font.leading)
+        )
         super.init(frame: .zero)
     }
 
@@ -34,8 +32,20 @@ final class TerminalContentView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.textColor]
         for (row, line) in session.terminal.screen.enumerated() {
             let text = String(line.map(\.character))
-            let origin = CGPoint(x: Self.padding, y: Self.padding + CGFloat(row) * cellSize.height)
-            NSAttributedString(string: text, attributes: attributes).draw(at: origin)
+            NSAttributedString(string: text, attributes: attributes).draw(at: rect(row: row, column: 0).origin)
         }
+
+        let cursor = session.terminal.cursor
+        NSColor.textColor.withAlphaComponent(0.5).setFill()
+        rect(row: cursor.row, column: cursor.column).fill(using: .sourceOver)
+    }
+
+    private func rect(row: Int, column: Int) -> CGRect {
+        CGRect(
+            x: Self.padding + CGFloat(column) * cellSize.width,
+            y: Self.padding + CGFloat(row) * cellSize.height,
+            width: cellSize.width,
+            height: cellSize.height
+        )
     }
 }
