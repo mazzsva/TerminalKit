@@ -30,10 +30,11 @@ struct TerminalSessionTests {
         #expect(TerminalSession(configuration: shell("exit")).state == .idle)
     }
 
-    @Test func runsTheProcess() throws {
-        let session = TerminalSession(configuration: shell("sleep 1"))
+    @Test func runsTheProcess() async throws {
+        let session = TerminalSession(configuration: shell("exit"))
         try session.start()
         #expect(session.state == .running)
+        await waitForExit(of: session)
     }
 
     @Test func showsTheOutputOfTheProcess() async throws {
