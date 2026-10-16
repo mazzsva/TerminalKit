@@ -26,7 +26,7 @@ struct TerminalContentViewTests {
 
     @Test func drawsTheScreen() async throws {
         let session = TerminalSession(
-            configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "printf hello"])
+            configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "printf 'hello\\r'"])
         )
         let view = TerminalContentView(session: session)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
