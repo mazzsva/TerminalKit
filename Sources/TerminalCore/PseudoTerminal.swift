@@ -75,8 +75,7 @@ package final class PseudoTerminal: Sendable {
     }
 
     deinit {
-        input.withLock { $0.writeSource?.cancel() }
-        readSource.cancel()
+        cancelSources()
         continuation.finish()
     }
 
@@ -159,15 +158,22 @@ package final class PseudoTerminal: Sendable {
             return true
         }
         if result == 0 || error != EAGAIN && error != EINTR {
-            readSource.cancel()
+            cancelSources()
         }
         return false
     }
 
+    private func cancelSources() {
+        input.withLock { input in
+            input.writeSource?.cancel()
+            input.writeSource = nil
+        }
+        readSource.cancel()
+    }
+
     private func finish(_ termination: Termination) {
         while readOutput() {}
-        input.withLock { $0.writeSource?.cancel() }
-        readSource.cancel()
+        cancelSources()
         continuation.yield(.exit(termination))
         continuation.finish()
     }
