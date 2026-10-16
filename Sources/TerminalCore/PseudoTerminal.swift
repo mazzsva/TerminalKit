@@ -2,9 +2,21 @@ import Darwin
 import Foundation
 
 package final class PseudoTerminal: Sendable {
+    package enum Event: Equatable, Sendable {
+        case exit(Termination)
+    }
+
+    package enum Termination: Equatable, Sendable {
+        case exit(Int32)
+        case uncaughtSignal(Int32)
+    }
+
     package let processIdentifier: pid_t
+    package let events: AsyncStream<Event>
 
     private let fileDescriptor: Int32
+    private let continuation: AsyncStream<Event>.Continuation
+    private let queue = DispatchQueue(label: "PseudoTerminal")
 
     package init(
         executableURL: URL,
@@ -39,10 +51,34 @@ package final class PseudoTerminal: Sendable {
             throw error
         }
         fileDescriptor = primary
+        (events, continuation) = AsyncStream.makeStream(of: Event.self)
+        monitorExit()
     }
 
     deinit {
         close(fileDescriptor)
+        continuation.finish()
+    }
+
+    private func monitorExit() {
+        let processIdentifier = processIdentifier
+        let source = DispatchSource.makeProcessSource(identifier: processIdentifier, eventMask: .exit, queue: queue)
+        let reap: @Sendable () -> Void = { [weak self] in
+            var status: Int32 = 0
+            guard waitpid(processIdentifier, &status, WNOHANG) == processIdentifier else {
+                return
+            }
+            source.cancel()
+            self?.finish(Termination(status: status))
+        }
+        source.setEventHandler(handler: reap)
+        source.activate()
+        queue.async(execute: reap)
+    }
+
+    private func finish(_ termination: Termination) {
+        continuation.yield(.exit(termination))
+        continuation.finish()
     }
 
     private static func spawn(
@@ -87,6 +123,13 @@ package final class PseudoTerminal: Sendable {
             throw POSIXError(result)
         }
         return processIdentifier
+    }
+}
+
+extension PseudoTerminal.Termination {
+    fileprivate init(status: Int32) {
+        let signal = status & 0x7F
+        self = signal == 0 ? .exit(status >> 8 & 0xFF) : .uncaughtSignal(signal)
     }
 }
 
