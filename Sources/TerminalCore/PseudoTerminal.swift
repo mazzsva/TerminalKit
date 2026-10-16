@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 package final class PseudoTerminal: Sendable {
     package enum Event: Equatable, Sendable {
@@ -21,6 +22,12 @@ package final class PseudoTerminal: Sendable {
     private let continuation: AsyncStream<Event>.Continuation
     private let queue = DispatchQueue(label: "PseudoTerminal")
     private let readSource: any DispatchSourceRead
+    private let input = Mutex(Input())
+
+    private struct Input {
+        var bytes: [UInt8] = []
+        var writeSource: (any DispatchSourceWrite)?
+    }
 
     package init(
         executableURL: URL,
@@ -71,25 +78,43 @@ package final class PseudoTerminal: Sendable {
     }
 
     deinit {
+        input.withLock { $0.writeSource?.cancel() }
         readSource.cancel()
         continuation.finish()
     }
 
     package func write(_ bytes: [UInt8]) {
         queue.async { [weak self] in
-            self?.writeInput(bytes)
+            guard let self else {
+                return
+            }
+            input.withLock { $0.bytes += bytes }
+            writeInput()
         }
     }
 
-    private func writeInput(_ bytes: [UInt8]) {
-        var bytes = bytes[...]
-        while !bytes.isEmpty, !readSource.isCancelled {
-            let count = bytes.withUnsafeBytes { Darwin.write(fileDescriptor, $0.baseAddress, $0.count) }
-            if count > 0 {
-                bytes = bytes.dropFirst(count)
-            } else if errno != EINTR {
-                return
+    private func writeInput() {
+        input.withLock { input in
+            while !input.bytes.isEmpty, !readSource.isCancelled {
+                let count = input.bytes.withUnsafeBytes { Darwin.write(fileDescriptor, $0.baseAddress, $0.count) }
+                if count > 0 {
+                    input.bytes.removeFirst(count)
+                } else if errno == EAGAIN {
+                    if input.writeSource == nil {
+                        let writeSource = DispatchSource.makeWriteSource(fileDescriptor: fileDescriptor, queue: queue)
+                        writeSource.setEventHandler { [weak self] in
+                            self?.writeInput()
+                        }
+                        writeSource.activate()
+                        input.writeSource = writeSource
+                    }
+                    return
+                } else if errno != EINTR {
+                    input.bytes.removeAll()
+                }
             }
+            input.writeSource?.cancel()
+            input.writeSource = nil
         }
     }
 
@@ -133,6 +158,7 @@ package final class PseudoTerminal: Sendable {
 
     private func finish(_ termination: Termination) {
         while readOutput() {}
+        input.withLock { $0.writeSource?.cancel() }
         readSource.cancel()
         continuation.yield(.exit(termination))
         continuation.finish()

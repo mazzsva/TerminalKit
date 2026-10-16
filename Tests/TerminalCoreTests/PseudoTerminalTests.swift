@@ -54,6 +54,13 @@ struct PseudoTerminalTests {
         #expect(output.hasSuffix("got:abc"))
     }
 
+    @Test func sendsInputThatFillsTheTerminal() async throws {
+        let output = try await output("stty -echo; wc -l") { pseudoTerminal in
+            pseudoTerminal.write(Array((String(repeating: "abcdefghi\n", count: 2_000) + "\u{4}").utf8))
+        }
+        #expect(output.hasSuffix("2000\r\n"))
+    }
+
     @Test func throwsWhenTheExecutableIsMissing() {
         #expect(throws: POSIXError(.ENOENT)) {
             try PseudoTerminal(executableURL: URL(filePath: "/missing"), environment: [:], columns: 80, rows: 24)
