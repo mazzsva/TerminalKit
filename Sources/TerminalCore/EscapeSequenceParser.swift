@@ -12,6 +12,13 @@ package struct EscapeSequenceParser: Sendable {
         package var parameters: [Int]
         package var intermediates: String
         package var final: Unicode.Scalar
+
+        package func parameter(at index: Int, default defaultValue: Int) -> Int {
+            guard parameters.indices.contains(index), parameters[index] != 0 else {
+                return defaultValue
+            }
+            return parameters[index]
+        }
     }
 
     private enum State {
