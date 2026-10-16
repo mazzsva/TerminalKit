@@ -91,6 +91,12 @@ struct EscapeSequenceParserTests {
         let title = String(repeating: "A", count: 5_000)
         #expect(parse("\u{1B}]\(title)\u{7}") == [.operatingSystemCommand(String(title.prefix(4_096)))])
     }
+
+    @Test(arguments: ["P", "X", "^", "_"])
+    func ignoresStrings(introducer: String) {
+        #expect(
+            parse("\u{1B}\(introducer)1$q\n\u{7}\u{1B}\\A") == [.escape(intermediates: "", final: "\\"), .print("A")])
+    }
 }
 
 private func parse(_ text: String) -> [EscapeSequenceParser.Action] {
