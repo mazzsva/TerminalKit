@@ -27,4 +27,19 @@ struct UTF8DecoderTests {
         var decoder = UTF8Decoder()
         #expect(decoder.decode([0xE2, 0x82, 0x41]) == ["\u{FFFD}", "A"])
     }
+
+    @Test func replacesOverlongSequences() {
+        var decoder = UTF8Decoder()
+        #expect(decoder.decode([0xE0, 0x80, 0xAF]) == ["\u{FFFD}", "\u{FFFD}", "\u{FFFD}"])
+    }
+
+    @Test func replacesSurrogates() {
+        var decoder = UTF8Decoder()
+        #expect(decoder.decode([0xED, 0xA0, 0x80]) == ["\u{FFFD}", "\u{FFFD}", "\u{FFFD}"])
+    }
+
+    @Test func replacesScalarsAboveTheMaximum() {
+        var decoder = UTF8Decoder()
+        #expect(decoder.decode([0xF4, 0x90, 0x80, 0x80]) == ["\u{FFFD}", "\u{FFFD}", "\u{FFFD}", "\u{FFFD}"])
+    }
 }
