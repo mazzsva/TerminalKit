@@ -152,6 +152,19 @@ struct TerminalTests {
         terminal.receive("abcd\u{1B}[Ke".utf8)
         #expect(lines(terminal) == ["abce", "    "])
     }
+
+    @Test(arguments: [
+        ("\u{1B}[J", ["abcd", "e   ", "    "]),
+        ("\u{1B}[0J", ["abcd", "e   ", "    "]),
+        ("\u{1B}[1J", ["    ", "  gh", "ijkl"]),
+        ("\u{1B}[2J", ["    ", "    ", "    "]),
+    ])
+    func erasesInDisplay(sequence: String, screen: [String]) {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("abcdefghijkl\u{1B}[2;2H\(sequence)".utf8)
+        #expect(lines(terminal) == screen)
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {

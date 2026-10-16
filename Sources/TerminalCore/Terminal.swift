@@ -71,6 +71,8 @@ package struct Terminal: Sendable {
             moveCursor(row: count - 1, column: sequence.parameter(at: 1, default: 1) - 1)
         case "d":
             moveCursor(row: count - 1, column: cursor.column)
+        case "J":
+            eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
             eraseInLine(sequence.parameter(at: 0, default: 0))
         default:
@@ -109,6 +111,27 @@ package struct Terminal: Sendable {
     private mutating func moveCursor(row: Int, column: Int) {
         isWrapPending = false
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
+    }
+
+    private mutating func eraseInDisplay(_ mode: Int) {
+        switch mode {
+        case 0:
+            eraseInLine(0)
+            for row in cursor.row + 1 ..< rows {
+                erase(0 ..< columns, row: row)
+            }
+        case 1:
+            for row in 0 ..< cursor.row {
+                erase(0 ..< columns, row: row)
+            }
+            eraseInLine(1)
+        case 2:
+            for row in 0 ..< rows {
+                erase(0 ..< columns, row: row)
+            }
+        default:
+            break
+        }
     }
 
     private mutating func eraseInLine(_ mode: Int) {
