@@ -39,9 +39,34 @@ package struct Terminal: Sendable {
                 moveCursor(row: cursor.row, column: cursor.column - 1)
             case .execute("\t"):
                 cursor.column = min((cursor.column / Self.tabWidth + 1) * Self.tabWidth, columns - 1)
+            case .controlSequence(let sequence):
+                perform(sequence)
             default:
                 break
             }
+        }
+    }
+
+    private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
+        guard sequence.privateMarker == nil, sequence.intermediates.isEmpty else {
+            return
+        }
+        let count = sequence.parameter(at: 0, default: 1)
+        switch sequence.final {
+        case "A":
+            moveCursor(row: cursor.row - count, column: cursor.column)
+        case "B":
+            moveCursor(row: cursor.row + count, column: cursor.column)
+        case "C":
+            moveCursor(row: cursor.row, column: cursor.column + count)
+        case "D":
+            moveCursor(row: cursor.row, column: cursor.column - count)
+        case "E":
+            moveCursor(row: cursor.row + count, column: 0)
+        case "F":
+            moveCursor(row: cursor.row - count, column: 0)
+        default:
+            break
         }
     }
 

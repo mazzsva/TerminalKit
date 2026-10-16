@@ -89,6 +89,34 @@ struct TerminalTests {
         terminal.receive("\t\ta".utf8)
         #expect(lines(terminal) == ["         a"])
     }
+
+    @Test(arguments: [
+        ("A", Terminal.Position(row: 2, column: 4)),
+        ("B", Terminal.Position(row: 6, column: 4)),
+        ("C", Terminal.Position(row: 4, column: 6)),
+        ("D", Terminal.Position(row: 4, column: 2)),
+        ("E", Terminal.Position(row: 6, column: 0)),
+        ("F", Terminal.Position(row: 2, column: 0)),
+    ])
+    func movesTheCursorRelativeToItsPosition(final: String, position: Terminal.Position) {
+        var terminal = Terminal(columns: 10, rows: 10)
+        terminal.receive("\n\n\n\n    \u{1B}[2\(final)".utf8)
+        #expect(terminal.cursor == position)
+    }
+
+    @Test func movesTheCursorOneStepByDefault() {
+        var terminal = Terminal(columns: 10, rows: 10)
+        terminal.receive("\u{1B}[B\u{1B}[0C".utf8)
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+    }
+
+    @Test func keepsTheCursorOnTheScreen() {
+        var terminal = Terminal(columns: 10, rows: 10)
+        terminal.receive("\u{1B}[99B\u{1B}[99C".utf8)
+        #expect(terminal.cursor == Terminal.Position(row: 9, column: 9))
+        terminal.receive("\u{1B}[99A\u{1B}[99D".utf8)
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
