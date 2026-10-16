@@ -33,6 +33,8 @@ package struct Terminal: Sendable {
                 lineFeed()
             case .execute("\r"):
                 carriageReturn()
+            case .execute("\u{8}"):
+                moveCursor(row: cursor.row, column: cursor.column - 1)
             default:
                 break
             }
@@ -65,6 +67,11 @@ package struct Terminal: Sendable {
     private mutating func carriageReturn() {
         isWrapPending = false
         cursor.column = 0
+    }
+
+    private mutating func moveCursor(row: Int, column: Int) {
+        isWrapPending = false
+        cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
     }
 
     private static func blankLine(columns: Int) -> [Cell] {

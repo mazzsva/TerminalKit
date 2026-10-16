@@ -59,6 +59,24 @@ struct TerminalTests {
         terminal.receive("abcdefghij".utf8)
         #expect(lines(terminal) == ["efgh", "ij  "])
     }
+
+    @Test func movesBackOnBackspace() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{8}c".utf8)
+        #expect(lines(terminal) == ["ac  ", "    "])
+    }
+
+    @Test func stopsBackspaceAtTheFirstColumn() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{8}a".utf8)
+        #expect(lines(terminal) == ["a   ", "    "])
+    }
+
+    @Test func cancelsThePendingWrapOnBackspace() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\u{8}e".utf8)
+        #expect(lines(terminal) == ["abed", "    "])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
