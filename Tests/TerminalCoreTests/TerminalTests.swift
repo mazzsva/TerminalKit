@@ -7,6 +7,19 @@ struct TerminalTests {
         let terminal = Terminal(columns: 4, rows: 2)
         #expect(lines(terminal) == ["    ", "    "])
     }
+
+    @Test func printsCharacters() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("hé".utf8)
+        #expect(lines(terminal) == ["hé  ", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
+    @Test func overwritesTheLastColumn() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcdef".utf8)
+        #expect(lines(terminal) == ["abcf", "    "])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
