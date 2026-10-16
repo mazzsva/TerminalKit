@@ -25,6 +25,14 @@ final class TerminalContentView: NSView {
         true
     }
 
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        session.resize(
+            columns: max(Int((newSize.width - 2 * Self.padding) / cellSize.width), 1),
+            rows: max(Int((newSize.height - 2 * Self.padding) / cellSize.height), 1)
+        )
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         NSColor.textBackgroundColor.setFill()
         dirtyRect.fill()
