@@ -162,7 +162,10 @@ package final class PseudoTerminal: Sendable {
             continuation.yield(.output(bytes))
             return true
         }
-        if result == 0 || error != EAGAIN && error != EINTR {
+        if result < 0 && error == EINTR {
+            return true
+        }
+        if result == 0 || error != EAGAIN {
             cancelSources()
         }
         return false
