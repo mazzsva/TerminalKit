@@ -133,6 +133,25 @@ struct TerminalTests {
         terminal.receive("\n \(sequence)".utf8)
         #expect(terminal.cursor == position)
     }
+
+    @Test(arguments: [
+        ("\u{1B}[K", "ab  "),
+        ("\u{1B}[0K", "ab  "),
+        ("\u{1B}[1K", "   d"),
+        ("\u{1B}[2K", "    "),
+    ])
+    func erasesInLine(sequence: String, line: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\r\nefgh\u{1B}[1;3H\(sequence)".utf8)
+        #expect(lines(terminal) == [line, "efgh"])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
+    @Test func cancelsThePendingWrapOnErase() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\u{1B}[Ke".utf8)
+        #expect(lines(terminal) == ["abce", "    "])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {

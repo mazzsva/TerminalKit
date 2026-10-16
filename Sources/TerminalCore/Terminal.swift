@@ -71,6 +71,8 @@ package struct Terminal: Sendable {
             moveCursor(row: count - 1, column: sequence.parameter(at: 1, default: 1) - 1)
         case "d":
             moveCursor(row: count - 1, column: cursor.column)
+        case "K":
+            eraseInLine(sequence.parameter(at: 0, default: 0))
         default:
             break
         }
@@ -107,6 +109,24 @@ package struct Terminal: Sendable {
     private mutating func moveCursor(row: Int, column: Int) {
         isWrapPending = false
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
+    }
+
+    private mutating func eraseInLine(_ mode: Int) {
+        switch mode {
+        case 0:
+            erase(cursor.column ..< columns, row: cursor.row)
+        case 1:
+            erase(0 ..< cursor.column + 1, row: cursor.row)
+        case 2:
+            erase(0 ..< columns, row: cursor.row)
+        default:
+            break
+        }
+    }
+
+    private mutating func erase(_ range: Range<Int>, row: Int) {
+        isWrapPending = false
+        screen[row].replaceSubrange(range, with: repeatElement(Cell(), count: range.count))
     }
 
     private static func blankLine(columns: Int) -> [Cell] {
