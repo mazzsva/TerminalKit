@@ -102,10 +102,15 @@ package final class PseudoTerminal: Sendable {
     private func writeInput() {
         input.withLock { input in
             while !input.bytes.isEmpty, !readSource.isCancelled {
-                let count = input.bytes.withUnsafeBytes { Darwin.write(fileDescriptor, $0.baseAddress, $0.count) }
+                var error: Int32 = 0
+                let count = input.bytes.withUnsafeBytes { buffer in
+                    let count = Darwin.write(fileDescriptor, buffer.baseAddress, buffer.count)
+                    error = errno
+                    return count
+                }
                 if count > 0 {
                     input.bytes.removeFirst(count)
-                } else if errno == EAGAIN {
+                } else if count < 0 && error == EAGAIN {
                     if input.writeSource == nil {
                         let writeSource = DispatchSource.makeWriteSource(fileDescriptor: fileDescriptor, queue: queue)
                         writeSource.setEventHandler { [weak self] in
@@ -115,7 +120,7 @@ package final class PseudoTerminal: Sendable {
                         input.writeSource = writeSource
                     }
                     return
-                } else if errno != EINTR {
+                } else if count == 0 || error != EINTR {
                     input.bytes.removeAll()
                 }
             }
