@@ -72,9 +72,7 @@ struct TerminalSessionTests {
             configuration: shell("trap 'stty size; kill $!; exit' WINCH; sleep 60 & echo ready; wait")
         )
         try session.start()
-        for await text in Observations({ text(of: session) }) where text.contains("ready") {
-            break
-        }
+        await waitForText("ready", in: session)
         session.resize(columns: 100, rows: 30)
         await waitForExit(of: session)
         #expect(text(of: session).contains("30 100"))
@@ -95,11 +93,27 @@ private func shell(_ script: String) -> TerminalSession.Configuration {
 
 @MainActor
 @discardableResult
-private func waitForExit(of session: TerminalSession) async -> TerminalSession.State? {
+private func waitForExit(
+    of session: TerminalSession,
+    sourceLocation: SourceLocation = #_sourceLocation
+) async -> TerminalSession.State? {
     for await state in Observations({ session.state }) where state != .running {
         return state
     }
+    Issue.record("The process did not exit. Screen: \(text(of: session))", sourceLocation: sourceLocation)
     return nil
+}
+
+@MainActor
+private func waitForText(
+    _ line: String,
+    in session: TerminalSession,
+    sourceLocation: SourceLocation = #_sourceLocation
+) async {
+    for await text in Observations({ text(of: session) }) where text.contains(line) {
+        return
+    }
+    Issue.record("The screen did not show \"\(line)\". Screen: \(text(of: session))", sourceLocation: sourceLocation)
 }
 
 @MainActor
