@@ -53,6 +53,14 @@ public final class TerminalSession {
         }
     }
 
+    func resize(columns: Int, rows: Int) {
+        guard columns != terminal.columns || rows != terminal.rows else {
+            return
+        }
+        terminal.resize(columns: columns, rows: rows)
+        pseudoTerminal?.resize(columns: columns, rows: rows)
+    }
+
     private func handle(_ event: PseudoTerminal.Event) {
         switch event {
         case .output(let bytes):

@@ -57,6 +57,27 @@ struct TerminalSessionTests {
         #expect(session.title == "Title")
     }
 
+    @Test func startsTheProcessWithTheSizeOfTheScreen() async throws {
+        let session = TerminalSession(configuration: shell("stty size"))
+        session.resize(columns: 100, rows: 30)
+        try session.start()
+        await waitForExit(of: session)
+        #expect(text(of: session).first == "30 100")
+    }
+
+    @Test func resizesTheProcess() async throws {
+        let session = TerminalSession(
+            configuration: shell("trap 'stty size; exit' WINCH; echo ready; while :; do sleep 0.01; done")
+        )
+        try session.start()
+        for await text in Observations({ text(of: session) }) where text.contains("ready") {
+            break
+        }
+        session.resize(columns: 100, rows: 30)
+        await waitForExit(of: session)
+        #expect(text(of: session).contains("30 100"))
+    }
+
     @Test func throwsWhenTheProcessCannotStart() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/missing")))
         #expect(throws: POSIXError(.ENOENT)) {
@@ -77,4 +98,9 @@ private func waitForExit(of session: TerminalSession) async -> TerminalSession.S
         return state
     }
     return nil
+}
+
+@MainActor
+private func text(of session: TerminalSession) -> [String] {
+    session.terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
 }
