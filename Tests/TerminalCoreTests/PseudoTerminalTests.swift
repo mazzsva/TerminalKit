@@ -19,8 +19,17 @@ struct PseudoTerminalTests {
         #expect(try await output("head -c 200000 /dev/zero | tr '\\0' a").count == 200_000)
     }
 
-    @Test func givesTheProcessAControllingTerminal() async throws {
-        #expect(try await output("exec 3</dev/tty && echo yes") == "yes\r\n")
+    @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
+    func givesTheProcessAControllingTerminal(shell: String) async throws {
+        let output = try await output("exec 3</dev/tty && echo yes", shell: shell)
+        #expect(output == "yes\r\n")
+    }
+
+    @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
+    func makesTheProcessTheForegroundProcessGroup(shell: String) async throws {
+        let output = try await output("/bin/ps -o tpgid= -p $$ | /usr/bin/tr -d ' '; echo $$", shell: shell)
+        let lines = output.split(separator: "\r\n")
+        #expect(lines.count == 2 && lines[0] == lines[1])
     }
 
     @Test func setsTheWindowSize() async throws {
@@ -69,6 +78,44 @@ struct PseudoTerminalTests {
         #expect(output.hasSuffix("40 120\r\n"))
     }
 
+    @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
+    func signalsTheWindowSizeChange(shell: String) async throws {
+        let pseudoTerminal = try PseudoTerminal(
+            executableURL: URL(filePath: shell),
+            arguments: ["-c", "trap '/bin/stty size; kill $!; exit' WINCH; /bin/sleep 60 & echo ready; wait"],
+            environment: [:],
+            columns: 80,
+            rows: 24
+        )
+        var output = ""
+        for await event in pseudoTerminal.events {
+            guard case .output(let bytes) = event else {
+                continue
+            }
+            output += String(decoding: bytes, as: UTF8.self)
+            if output.hasSuffix("ready\r\n") {
+                pseudoTerminal.resize(columns: 100, rows: 30)
+            }
+        }
+        #expect(output.hasSuffix("30 100\r\n"))
+    }
+
+    @Test func hangsUpTheProcessWhenReleased() async throws {
+        var pseudoTerminal: PseudoTerminal? = try PseudoTerminal(
+            executableURL: URL(filePath: "/bin/zsh"),
+            arguments: ["-c", "/bin/sleep 60"],
+            environment: [:],
+            columns: 80,
+            rows: 24
+        )
+        let processIdentifier = try #require(pseudoTerminal?.processIdentifier)
+        pseudoTerminal = nil
+        while kill(processIdentifier, 0) == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(errno == ESRCH)
+    }
+
     @Test func throwsWhenTheExecutableIsMissing() {
         #expect(throws: POSIXError(.ENOENT)) {
             try PseudoTerminal(executableURL: URL(filePath: "/missing"), environment: [:], columns: 80, rows: 24)
@@ -78,6 +125,7 @@ struct PseudoTerminalTests {
 
 private func output(
     _ script: String,
+    shell: String = "/bin/sh",
     environment: [String: String] = [:],
     currentDirectoryURL: URL? = nil,
     columns: Int = 80,
@@ -85,7 +133,7 @@ private func output(
     input: (PseudoTerminal) -> Void = { _ in }
 ) async throws -> String {
     let pseudoTerminal = try PseudoTerminal(
-        executableURL: URL(filePath: "/bin/sh"),
+        executableURL: URL(filePath: shell),
         arguments: ["-c", script],
         environment: environment,
         currentDirectoryURL: currentDirectoryURL,

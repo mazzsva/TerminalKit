@@ -1,3 +1,4 @@
+import CTerminalCore
 import Darwin
 import Foundation
 import Synchronization
@@ -196,7 +197,7 @@ package final class PseudoTerminal: Sendable {
         posix_spawnattr_setsigmask(&attributes, &signals)
         posix_spawnattr_setflags(
             &attributes,
-            Int16(POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
+            Int16(POSIX_SPAWN_SETEXEC | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
         )
 
         let path = executableURL.path(percentEncoded: false)
@@ -209,8 +210,15 @@ package final class PseudoTerminal: Sendable {
         }
 
         var processIdentifier: pid_t = 0
-        let result = posix_spawn(
-            &processIdentifier, path, &fileActions, &attributes, argumentPointers, environmentPointers)
+        let result = spawn_in_terminal(
+            &processIdentifier,
+            terminal,
+            path,
+            &fileActions,
+            &attributes,
+            argumentPointers,
+            environmentPointers
+        )
         guard result == 0 else {
             throw POSIXError(result)
         }
