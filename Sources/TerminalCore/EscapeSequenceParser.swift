@@ -4,6 +4,7 @@ package struct EscapeSequenceParser: Sendable {
         case execute(Unicode.Scalar)
         case escape(intermediates: String, final: Unicode.Scalar)
         case controlSequence(ControlSequence)
+        case operatingSystemCommand(String)
     }
 
     package struct ControlSequence: Equatable, Sendable {
@@ -19,16 +20,19 @@ package struct EscapeSequenceParser: Sendable {
         case escapeIntermediate
         case controlSequence
         case ignoredControlSequence
+        case operatingSystemCommand
     }
 
     private static let maximumIntermediates = 2
     private static let maximumParameters = 32
     private static let maximumParameterValue = 65_535
+    private static let maximumStringLength = 4_096
 
     private var state = State.ground
     private var intermediates = ""
     private var privateMarker: Unicode.Scalar?
     private var parameters: [Int] = []
+    private var string: [Unicode.Scalar] = []
 
     package init() {}
 
@@ -42,10 +46,13 @@ package struct EscapeSequenceParser: Sendable {
             state = .ground
             return .execute(scalar)
         case "\u{1B}":
+            let action = state == .operatingSystemCommand ? finishString() : nil
             enterEscape()
-            return nil
+            return action
+        case "\u{7}" where state == .operatingSystemCommand:
+            return finishString()
         case "\u{0}" ... "\u{1F}":
-            return .execute(scalar)
+            return state == .operatingSystemCommand ? nil : .execute(scalar)
         default:
             break
         }
@@ -61,6 +68,11 @@ package struct EscapeSequenceParser: Sendable {
             return controlSequence(scalar)
         case .ignoredControlSequence:
             return ignoredControlSequence(scalar)
+        case .operatingSystemCommand:
+            if string.count < Self.maximumStringLength {
+                string.append(scalar)
+            }
+            return nil
         }
     }
 
@@ -80,6 +92,8 @@ package struct EscapeSequenceParser: Sendable {
             state = .escapeIntermediate
         case "[":
             state = .controlSequence
+        case "]":
+            state = .operatingSystemCommand
         case "0" ... "~":
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)
@@ -146,6 +160,12 @@ package struct EscapeSequenceParser: Sendable {
         intermediates = ""
         privateMarker = nil
         parameters = []
+        string = []
+    }
+
+    private mutating func finishString() -> Action {
+        state = .ground
+        return .operatingSystemCommand(String(String.UnicodeScalarView(string)))
     }
 
     private mutating func collect(_ scalar: Unicode.Scalar) {
