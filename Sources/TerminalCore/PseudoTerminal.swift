@@ -3,6 +3,7 @@ import Foundation
 
 package final class PseudoTerminal: Sendable {
     package enum Event: Equatable, Sendable {
+        case output([UInt8])
         case exit(Termination)
     }
 
@@ -11,12 +12,15 @@ package final class PseudoTerminal: Sendable {
         case uncaughtSignal(Int32)
     }
 
+    private static let readSize = 65_536
+
     package let processIdentifier: pid_t
     package let events: AsyncStream<Event>
 
     private let fileDescriptor: Int32
     private let continuation: AsyncStream<Event>.Continuation
     private let queue = DispatchQueue(label: "PseudoTerminal")
+    private let readSource: any DispatchSourceRead
 
     package init(
         executableURL: URL,
@@ -38,6 +42,7 @@ package final class PseudoTerminal: Sendable {
         }
         defer { close(secondary) }
         _ = fcntl(primary, F_SETFD, FD_CLOEXEC)
+        _ = fcntl(primary, F_SETFL, fcntl(primary, F_GETFL) | O_NONBLOCK)
 
         do {
             processIdentifier = try Self.spawn(
@@ -52,11 +57,19 @@ package final class PseudoTerminal: Sendable {
         }
         fileDescriptor = primary
         (events, continuation) = AsyncStream.makeStream(of: Event.self)
+        readSource = DispatchSource.makeReadSource(fileDescriptor: primary, queue: queue)
+        readSource.setEventHandler { [weak self] in
+            self?.readOutput()
+        }
+        readSource.setCancelHandler {
+            close(primary)
+        }
+        readSource.activate()
         monitorExit()
     }
 
     deinit {
-        close(fileDescriptor)
+        readSource.cancel()
         continuation.finish()
     }
 
@@ -76,7 +89,31 @@ package final class PseudoTerminal: Sendable {
         queue.async(execute: reap)
     }
 
+    @discardableResult
+    private func readOutput() -> Bool {
+        guard !readSource.isCancelled else {
+            return false
+        }
+        var result = 0
+        var error: Int32 = 0
+        let bytes = [UInt8](unsafeUninitializedCapacity: Self.readSize) { buffer, count in
+            result = read(fileDescriptor, buffer.baseAddress, buffer.count)
+            error = errno
+            count = max(result, 0)
+        }
+        if result > 0 {
+            continuation.yield(.output(bytes))
+            return true
+        }
+        if result == 0 || error != EAGAIN && error != EINTR {
+            readSource.cancel()
+        }
+        return false
+    }
+
     private func finish(_ termination: Termination) {
+        while readOutput() {}
+        readSource.cancel()
         continuation.yield(.exit(termination))
         continuation.finish()
     }
