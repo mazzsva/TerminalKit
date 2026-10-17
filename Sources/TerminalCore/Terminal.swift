@@ -48,9 +48,13 @@ package struct Terminal: Sendable {
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
         let removedRows = max(cursor.row + 1 - rows, 0)
+        if normalScreen == nil {
+            scrollback += screen.prefix(removedRows)
+        }
         screen = Self.resized(screen, columns: columns, rows: rows, removingFirst: removedRows)
         if var normalScreen {
             let removedNormalRows = max(normalScreen.savedCursor.position.row + 1 - rows, 0)
+            scrollback += normalScreen.lines.prefix(removedNormalRows)
             normalScreen.lines = Self.resized(
                 normalScreen.lines,
                 columns: columns,

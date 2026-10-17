@@ -510,6 +510,20 @@ struct TerminalTests {
         terminal.receive("a\u{1B}[H\u{1B}[M".utf8)
         #expect(terminal.scrollback.isEmpty)
     }
+
+    @Test func keepsTheLinesThatAResizeRemoves() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("a\r\nb\r\nc".utf8)
+        terminal.resize(columns: 1, rows: 1)
+        #expect(scrollback(terminal) == ["a", "b"])
+    }
+
+    @Test func keepsTheNormalLinesThatAResizeRemovesOnTheAlternateScreen() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("a\r\nb\r\nc\u{1B}[?1049h".utf8)
+        terminal.resize(columns: 1, rows: 1)
+        #expect(scrollback(terminal) == ["a", "b"])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
