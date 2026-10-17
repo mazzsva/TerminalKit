@@ -16,6 +16,7 @@ package struct Terminal: Sendable {
     }
 
     private static let tabWidth = 8
+    private static let asciiCharacters = (0 ..< 128).map { Character(Unicode.Scalar(UInt8($0))) }
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
 
@@ -80,7 +81,7 @@ package struct Terminal: Sendable {
             }
             switch action {
             case .print(let scalar):
-                print(Character(scalar))
+                print(scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar))
             case .execute("\n"):
                 lineFeed()
             case .execute("\r"):
