@@ -22,6 +22,11 @@ extension NSEvent.SpecialKey {
         case .downArrow: "\u{1B}[B"
         case .rightArrow: "\u{1B}[C"
         case .leftArrow: "\u{1B}[D"
+        case .home: "\u{1B}[H"
+        case .end: "\u{1B}[F"
+        case .pageUp: "\u{1B}[5~"
+        case .pageDown: "\u{1B}[6~"
+        case .deleteForward: "\u{1B}[3~"
         default: nil
         }
     }

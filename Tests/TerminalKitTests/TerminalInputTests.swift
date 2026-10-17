@@ -27,6 +27,14 @@ struct TerminalInputTests {
         #expect(try keyDown(functionKey: NSLeftArrowFunctionKey).terminalInput == Array("\u{1B}[D".utf8))
     }
 
+    @Test func sendsTheNavigationKeys() throws {
+        #expect(try keyDown(functionKey: NSHomeFunctionKey).terminalInput == Array("\u{1B}[H".utf8))
+        #expect(try keyDown(functionKey: NSEndFunctionKey).terminalInput == Array("\u{1B}[F".utf8))
+        #expect(try keyDown(functionKey: NSPageUpFunctionKey).terminalInput == Array("\u{1B}[5~".utf8))
+        #expect(try keyDown(functionKey: NSPageDownFunctionKey).terminalInput == Array("\u{1B}[6~".utf8))
+        #expect(try keyDown(functionKey: NSDeleteFunctionKey).terminalInput == Array("\u{1B}[3~".utf8))
+    }
+
     @Test func ignoresFunctionKeys() throws {
         #expect(try keyDown(functionKey: NSF1FunctionKey).terminalInput == nil)
     }
