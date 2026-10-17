@@ -44,6 +44,13 @@ final class TerminalContentView: NSView {
         true
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let window, window.firstResponder === window {
+            window.makeFirstResponder(self)
+        }
+    }
+
     override func keyDown(with event: NSEvent) {
         guard !event.modifierFlags.contains(.command) else {
             super.keyDown(with: event)
