@@ -125,7 +125,7 @@ package struct Terminal: Sendable {
         isWrapPending = false
         if cursor.row == rows - 1 {
             screen.removeFirst()
-            screen.append(Self.blankLine(columns: columns))
+            screen.append(Array(repeating: blank, count: columns))
         } else {
             cursor.row += 1
         }
@@ -177,7 +177,11 @@ package struct Terminal: Sendable {
 
     private mutating func erase(_ range: Range<Int>, row: Int) {
         isWrapPending = false
-        screen[row].replaceSubrange(range, with: repeatElement(Cell(), count: range.count))
+        screen[row].replaceSubrange(range, with: repeatElement(blank, count: range.count))
+    }
+
+    private var blank: Cell {
+        Cell(style: Style(background: style.background))
     }
 
     private static func blankLine(columns: Int) -> [Cell] {
