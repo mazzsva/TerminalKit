@@ -55,6 +55,18 @@ struct TerminalContentViewTests {
         #expect(color(in: representation, at: center) == color(in: representation, at: CGPoint(x: 190, y: 90)))
     }
 
+    @Test func drawsTheTextAfterAWideCharacterInItsCell() async throws {
+        let wide = try await drawnView(running: "printf '中x\\r'")
+        let narrow = try await drawnView(running: "printf '  x\\r'")
+        let cell = CGRect(
+            x: 4 + 2 * wide.cellSize.width,
+            y: 4,
+            width: wide.cellSize.width,
+            height: wide.cellSize.height
+        )
+        #expect(try pixels(in: cell, of: wide) == pixels(in: cell, of: narrow))
+    }
+
     @Test func drawsTheBackgroundColor() async throws {
         let view = try await drawnView(running: "printf '\\033[41m  \\033[m'")
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
@@ -253,4 +265,15 @@ private func representation(of view: NSView) throws -> NSBitmapImageRep {
 private func color(in representation: NSBitmapImageRep, at point: CGPoint) -> NSColor? {
     let scale = CGFloat(representation.pixelsWide) / representation.size.width
     return representation.colorAt(x: Int(point.x * scale), y: Int(point.y * scale))
+}
+
+@MainActor
+private func pixels(in rect: CGRect, of view: NSView) throws -> [NSColor?] {
+    let representation = try representation(of: view)
+    let scale = CGFloat(representation.pixelsWide) / representation.size.width
+    return stride(from: Int(rect.minY * scale), to: Int(rect.maxY * scale), by: 1)
+        .flatMap { y in
+            stride(from: Int(rect.minX * scale), to: Int(rect.maxX * scale), by: 1)
+                .map { x in representation.colorAt(x: x, y: y) }
+        }
 }
