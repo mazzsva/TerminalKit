@@ -204,6 +204,9 @@ package struct Terminal: Sendable {
             lineFeed()
         }
         let character = scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar)
+        for column in cursor.column ..< cursor.column + width {
+            clearWideCharacter(at: column)
+        }
         screen[cursor.row][cursor.column] = Cell(character: character, style: style, width: UInt8(width))
         if width == 2 {
             screen[cursor.row][cursor.column + 1] = Cell(style: style, width: 0)
@@ -213,6 +216,17 @@ package struct Terminal: Sendable {
             isWrapPending = true
         } else {
             cursor.column += width
+        }
+    }
+
+    private mutating func clearWideCharacter(at column: Int) {
+        switch screen[cursor.row][column].width {
+        case 0:
+            screen[cursor.row][column - 1] = blank
+        case 2 where column + 1 < columns:
+            screen[cursor.row][column + 1] = blank
+        default:
+            break
         }
     }
 

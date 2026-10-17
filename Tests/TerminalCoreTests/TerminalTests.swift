@@ -44,6 +44,16 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.width) == [1])
     }
 
+    @Test(arguments: [
+        ("\u{1B}[1Gx", "x  ", [1, 1, 1]), ("\u{1B}[2Gx", " x ", [1, 1, 1]), ("\u{1B}[2G中", " 中 ", [1, 2, 0]),
+    ])
+    func clearsTheOtherHalfOfAWideCharacter(sequence: String, line: String, widths: [UInt8]) {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("中\(sequence)")
+        #expect(lines(terminal) == [line])
+        #expect(terminal.screen[0].map(\.width) == widths)
+    }
+
     @Test func combinesMarksWithThePreviousCharacter() {
         var terminal = Terminal(columns: 3, rows: 1)
         terminal.receive("e\u{301}x")
