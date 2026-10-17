@@ -61,6 +61,8 @@ extension Terminal {
                     background = Self.color(from: &parameters) ?? background
                 case 49:
                     background = .default
+                case 58:
+                    _ = Self.color(from: &parameters)
                 case 90 ... 97:
                     foreground = .indexed(UInt8(parameter - 82))
                 case 100 ... 107:

@@ -117,6 +117,14 @@ struct StyleTests {
         #expect(terminal.screen[0].map(\.style) == backgroundCells(2))
     }
 
+    @Test func skipsTheUnderlineColor() {
+        var style = Terminal.Style()
+        style.apply([4, 31, 58, 5, 1])
+        #expect(style == Terminal.Style(foreground: .indexed(1), isUnderlined: true))
+        style.apply([58, 2, 0, 1, 9])
+        #expect(style == Terminal.Style(foreground: .indexed(1), isUnderlined: true))
+    }
+
     @Test func printsWithTheCurrentStyle() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("a\u{1B}[1mb\u{1B}[mc".utf8)
