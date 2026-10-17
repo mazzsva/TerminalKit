@@ -5,7 +5,9 @@ extension NSEvent {
         guard !modifierFlags.contains(.command), let characters, !characters.isEmpty else {
             return nil
         }
-        if let sequence = specialKey?.terminalSequence {
+        if let key = charactersIgnoringModifiers?.unicodeScalars.first,
+            let sequence = NSEvent.SpecialKey(rawValue: Int(key.value)).terminalSequence
+        {
             return Array(sequence.utf8)
         }
         guard !characters.unicodeScalars.contains(where: { (0xF700 ... 0xF8FF).contains($0.value) }) else {
@@ -27,6 +29,8 @@ extension NSEvent.SpecialKey {
         case .pageUp: "\u{1B}[5~"
         case .pageDown: "\u{1B}[6~"
         case .deleteForward: "\u{1B}[3~"
+        case .enter: "\r"
+        case .backTab: "\u{1B}[Z"
         default: nil
         }
     }
