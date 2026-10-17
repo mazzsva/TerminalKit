@@ -1,4 +1,5 @@
 import AppKit
+import TerminalCore
 
 final class TerminalContentView: NSView {
     private static let padding: CGFloat = 4
@@ -78,8 +79,13 @@ final class TerminalContentView: NSView {
 
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.textColor]
         for (row, line) in session.terminal.screen.enumerated() {
-            let text = String(line.map(\.character))
-            NSAttributedString(string: text, attributes: attributes).draw(at: rect(row: row, column: 0).origin)
+            var column = 0
+            while column < line.count {
+                let style = line[column].style
+                let end = line[column...].firstIndex { $0.style != style } ?? line.count
+                draw(line[column ..< end], style: style, at: rect(row: row, column: column).origin)
+                column = end
+            }
         }
 
         let cursor = cursorRect
@@ -95,6 +101,47 @@ final class TerminalContentView: NSView {
         }
         NSColor.textColor.withAlphaComponent(0.5).setFill()
         cursor.fill(using: .sourceOver)
+    }
+
+    private func draw(_ cells: ArraySlice<Terminal.Cell>, style: Terminal.Style, at origin: CGPoint) {
+        var foreground = NSColor.terminal(style.foreground) ?? .textColor
+        var background = NSColor.terminal(style.background)
+        if style.isInverse {
+            (foreground, background) = (background ?? .textBackgroundColor, foreground)
+        }
+        if let background {
+            background.setFill()
+            CGRect(x: origin.x, y: origin.y, width: cellSize.width * CGFloat(cells.count), height: cellSize.height)
+                .fill()
+        }
+        guard !style.isHidden else {
+            return
+        }
+        var attributes: [NSAttributedString.Key: Any] = [
+            .font: font(for: style),
+            .foregroundColor: style.isFaint ? foreground.withAlphaComponent(0.5) : foreground,
+        ]
+        if style.isUnderlined {
+            attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+        }
+        if style.isStrikethrough {
+            attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+        }
+        NSAttributedString(string: String(cells.map(\.character)), attributes: attributes).draw(at: origin)
+    }
+
+    private func font(for style: Terminal.Style) -> NSFont {
+        var traits: NSFontDescriptor.SymbolicTraits = []
+        if style.isBold {
+            traits.insert(.bold)
+        }
+        if style.isItalic {
+            traits.insert(.italic)
+        }
+        guard !traits.isEmpty else {
+            return font
+        }
+        return NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(traits), size: font.pointSize) ?? font
     }
 
     var cursorRect: CGRect {

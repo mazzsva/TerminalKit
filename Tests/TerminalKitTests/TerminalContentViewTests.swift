@@ -50,6 +50,41 @@ struct TerminalContentViewTests {
         #expect(color(in: representation, at: center) != color(in: representation, at: corner))
     }
 
+    @Test func drawsTheBackgroundColor() async throws {
+        let view = try await drawnView(running: "printf '\\033[41m  \\033[m'")
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let color = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
+        #expect(abs(color.redComponent - 194 / 255) < 0.02)
+        #expect(abs(color.greenComponent - 54 / 255) < 0.02)
+        #expect(abs(color.blueComponent - 33 / 255) < 0.02)
+    }
+
+    @Test func drawsTheForegroundColor() async throws {
+        let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
+        let red = try image(of: try await drawnView(running: "printf '\\033[31mX\\r'"))
+        #expect(red != plain)
+    }
+
+    @Test(arguments: ["1", "2", "3", "4", "9"])
+    func drawsTheTextStyle(parameter: String) async throws {
+        let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
+        let styled = try image(of: try await drawnView(running: "printf '\\033[\(parameter)mX\\r'"))
+        #expect(styled != plain)
+    }
+
+    @Test func drawsInverseText() async throws {
+        let view = try await drawnView(running: "printf '\\033[7m  \\033[m'")
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let representation = try representation(of: view)
+        #expect(color(in: representation, at: center) != color(in: representation, at: CGPoint(x: 190, y: 90)))
+    }
+
+    @Test func hidesHiddenText() async throws {
+        let blank = try image(of: try await drawnView(running: "printf ' \\r'"))
+        let hidden = try image(of: try await drawnView(running: "printf '\\033[8mX\\r'"))
+        #expect(hidden == blank)
+    }
+
     @Test func sendsKeyPressesToTheSession() async throws {
         let session = readingSession()
         let view = TerminalContentView(session: session)
@@ -148,10 +183,29 @@ private func lines(afterExitOf session: TerminalSession) async -> [String] {
 }
 
 @MainActor
+private func drawnView(running script: String) async throws -> TerminalContentView {
+    let session = TerminalSession(
+        configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", script])
+    )
+    let view = TerminalContentView(session: session)
+    view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+    try session.start()
+    for await state in Observations({ session.state }) where state != .running {
+        break
+    }
+    return view
+}
+
+@MainActor
 private func image(of view: NSView) throws -> Data {
+    try #require(try representation(of: view).tiffRepresentation)
+}
+
+@MainActor
+private func representation(of view: NSView) throws -> NSBitmapImageRep {
     let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
     view.cacheDisplay(in: view.bounds, to: representation)
-    return try #require(representation.tiffRepresentation)
+    return representation
 }
 
 @MainActor
