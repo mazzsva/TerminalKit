@@ -41,6 +41,7 @@ package struct Terminal: Sendable {
     private var style = Style()
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
+    private var replies: [UInt8] = []
     private var normalScreen: (lines: [[Cell]], savedCursor: SavedCursor)?
 
     package init(columns: Int, rows: Int) {
@@ -76,7 +77,9 @@ package struct Terminal: Sendable {
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
     }
 
-    package mutating func receive(_ bytes: [UInt8]) {
+    @discardableResult
+    package mutating func receive(_ bytes: [UInt8]) -> [UInt8] {
+        defer { replies.removeAll() }
         for scalar in decoder.decode(bytes) {
             guard let action = parser.advance(scalar) else {
                 continue
@@ -111,6 +114,7 @@ package struct Terminal: Sendable {
                 break
             }
         }
+        return replies
     }
 
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
@@ -166,6 +170,8 @@ package struct Terminal: Sendable {
             scrollDown(count, in: scrollRegion)
         case "m":
             style.apply(sequence.parameters)
+        case "n":
+            reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
             setScrollRegion(top: count - 1, bottom: min(sequence.parameter(at: 1, default: rows), rows))
         case "s" where sequence.parameters.isEmpty:
@@ -328,6 +334,17 @@ package struct Terminal: Sendable {
         }
         (screen, savedCursor) = normalScreen
         self.normalScreen = nil
+    }
+
+    private mutating func reportStatus(_ request: Int) {
+        switch request {
+        case 5:
+            replies += "\u{1B}[0n".utf8
+        case 6:
+            replies += "\u{1B}[\(cursor.row + 1);\(cursor.column + 1)R".utf8
+        default:
+            break
+        }
     }
 
     private mutating func saveCursor() {
