@@ -168,6 +168,8 @@ package struct Terminal: Sendable {
             scrollRegionUp(count)
         case "T" where sequence.parameters.count <= 1:
             scrollDown(count, in: scrollRegion)
+        case "c" where sequence.parameter(at: 0, default: 0) == 0:
+            replies += "\u{1B}[?1;2c".utf8
         case "m":
             style.apply(sequence.parameters)
         case "n":
