@@ -16,6 +16,8 @@ package struct Terminal: Sendable {
     }
 
     private static let tabWidth = 8
+    private static let maximumScrollback = 10_000
+    private static let scrollbackTrimCount = 1_000
 
     package private(set) var columns: Int
     package private(set) var rows: Int
@@ -49,12 +51,12 @@ package struct Terminal: Sendable {
         precondition(columns > 0 && rows > 0)
         let removedRows = max(cursor.row + 1 - rows, 0)
         if normalScreen == nil {
-            scrollback += screen.prefix(removedRows)
+            keepInScrollback(screen.prefix(removedRows))
         }
         screen = Self.resized(screen, columns: columns, rows: rows, removingFirst: removedRows)
         if var normalScreen {
             let removedNormalRows = max(normalScreen.savedCursor.position.row + 1 - rows, 0)
-            scrollback += normalScreen.lines.prefix(removedNormalRows)
+            keepInScrollback(normalScreen.lines.prefix(removedNormalRows))
             normalScreen.lines = Self.resized(
                 normalScreen.lines,
                 columns: columns,
@@ -235,9 +237,16 @@ package struct Terminal: Sendable {
         moveCursor(row: 0, column: 0)
     }
 
+    private mutating func keepInScrollback(_ lines: ArraySlice<[Cell]>) {
+        scrollback += lines
+        if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
+            scrollback.removeFirst(scrollback.count - Self.maximumScrollback)
+        }
+    }
+
     private mutating func scrollRegionUp(_ count: Int) {
         if scrollRegion.lowerBound == 0, normalScreen == nil {
-            scrollback += screen.prefix(min(count, scrollRegion.count))
+            keepInScrollback(screen.prefix(min(count, scrollRegion.count)))
         }
         scrollUp(count, in: scrollRegion)
     }

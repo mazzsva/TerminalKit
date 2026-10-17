@@ -524,6 +524,13 @@ struct TerminalTests {
         terminal.resize(columns: 1, rows: 1)
         #expect(scrollback(terminal) == ["a", "b"])
     }
+
+    @Test func limitsTheScrollback() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive((1 ... 12_000).map { "\($0)\r\n" }.joined().utf8)
+        #expect((10_000 ... 11_000).contains(terminal.scrollback.count))
+        #expect(scrollback(terminal).last == "12000")
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
