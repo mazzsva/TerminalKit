@@ -1,6 +1,17 @@
 import AppKit
 
 extension NSEvent {
+    var wordMovementInput: [UInt8]? {
+        guard modifierFlags.contains(.option), let key = charactersIgnoringModifiers?.unicodeScalars.first else {
+            return nil
+        }
+        return switch NSEvent.SpecialKey(rawValue: Int(key.value)) {
+        case .leftArrow: [0x1B, 0x62]
+        case .rightArrow: [0x1B, 0x66]
+        default: nil
+        }
+    }
+
     func metaInput(applicationCursorKeys: Bool) -> [UInt8]? {
         let modifierFlags = modifierFlags.subtracting(.option)
         guard

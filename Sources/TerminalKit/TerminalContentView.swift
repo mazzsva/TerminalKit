@@ -91,6 +91,10 @@ final class TerminalContentView: NSView {
             return
         }
         scrollToBottom()
+        if let input = event.wordMovementInput {
+            session.send(input)
+            return
+        }
         if usesOptionAsMetaKey, event.modifierFlags.contains(.option),
             let input = event.metaInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys)
         {
