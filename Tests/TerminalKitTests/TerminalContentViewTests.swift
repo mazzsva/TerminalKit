@@ -97,6 +97,20 @@ struct TerminalContentViewTests {
         #expect(await lines(afterExitOf: session).contains("got"))
     }
 
+    @Test func drawsTheMarkedText() throws {
+        let view = TerminalContentView(session: readingSession())
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        let cursorImage = try image(of: view)
+        view.setMarkedText(
+            "´",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        #expect(try image(of: view) != cursorImage)
+        view.unmarkText()
+        #expect(try image(of: view) == cursorImage)
+    }
+
     @Test func acceptsFirstResponder() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
         #expect(TerminalContentView(session: session).acceptsFirstResponder)

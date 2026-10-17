@@ -6,7 +6,11 @@ final class TerminalContentView: NSView {
     let session: TerminalSession
     let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
     let cellSize: CGSize
-    var markedText = ""
+    var markedText = "" {
+        didSet {
+            needsDisplay = true
+        }
+    }
 
     private var keyDownEvent: NSEvent?
 
@@ -66,9 +70,19 @@ final class TerminalContentView: NSView {
             NSAttributedString(string: text, attributes: attributes).draw(at: rect(row: row, column: 0).origin)
         }
 
-        let cursor = session.terminal.cursor
+        let cursor = rect(row: session.terminal.cursor.row, column: session.terminal.cursor.column)
+        guard markedText.isEmpty else {
+            let text = NSAttributedString(
+                string: markedText,
+                attributes: attributes.merging([.underlineStyle: NSUnderlineStyle.single.rawValue]) { $1 }
+            )
+            NSColor.textBackgroundColor.setFill()
+            CGRect(origin: cursor.origin, size: text.size()).fill()
+            text.draw(at: cursor.origin)
+            return
+        }
         NSColor.textColor.withAlphaComponent(0.5).setFill()
-        rect(row: cursor.row, column: cursor.column).fill(using: .sourceOver)
+        cursor.fill(using: .sourceOver)
     }
 
     private func rect(row: Int, column: Int) -> CGRect {
