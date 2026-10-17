@@ -32,6 +32,7 @@ package struct Terminal: Sendable {
     private var isWrapPending = false
     private var style = Style()
     private var savedCursor = SavedCursor()
+    private var scrollRegion: Range<Int>
     private var normalScreen: (lines: [[Cell]], savedCursor: SavedCursor)?
 
     package init(columns: Int, rows: Int) {
@@ -39,6 +40,7 @@ package struct Terminal: Sendable {
         self.columns = columns
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
+        scrollRegion = 0 ..< rows
     }
 
     package mutating func resize(columns: Int, rows: Int) {
@@ -58,6 +60,7 @@ package struct Terminal: Sendable {
         }
         self.columns = columns
         self.rows = rows
+        scrollRegion = 0 ..< rows
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
     }
 
@@ -74,6 +77,13 @@ package struct Terminal: Sendable {
                 moveCursor(row: cursor.row, column: cursor.column - 1)
             case .execute("\t"):
                 cursor.column = min((cursor.column / Self.tabWidth + 1) * Self.tabWidth, columns - 1)
+            case .escape(intermediates: "", final: "D"):
+                lineFeed()
+            case .escape(intermediates: "", final: "E"):
+                carriageReturn()
+                lineFeed()
+            case .escape(intermediates: "", final: "M"):
+                reverseLineFeed()
             case .escape(intermediates: "", final: "7"):
                 saveCursor()
             case .escape(intermediates: "", final: "8"):
@@ -125,8 +135,24 @@ package struct Terminal: Sendable {
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
             eraseInLine(sequence.parameter(at: 0, default: 0))
+        case "@":
+            insertCharacters(count)
+        case "P":
+            deleteCharacters(count)
+        case "X":
+            erase(cursor.column ..< min(cursor.column + count, columns), row: cursor.row)
+        case "L":
+            insertLines(count)
+        case "M":
+            deleteLines(count)
+        case "S":
+            scrollUp(count, in: scrollRegion)
+        case "T" where sequence.parameters.count <= 1:
+            scrollDown(count, in: scrollRegion)
         case "m":
             style.apply(sequence.parameters)
+        case "r":
+            setScrollRegion(top: count - 1, bottom: min(sequence.parameter(at: 1, default: rows), rows))
         case "s" where sequence.parameters.isEmpty:
             saveCursor()
         case "u" where sequence.parameters.isEmpty:
@@ -158,11 +184,69 @@ package struct Terminal: Sendable {
 
     private mutating func lineFeed() {
         isWrapPending = false
-        if cursor.row == rows - 1 {
-            screen.removeFirst()
-            screen.append(Array(repeating: blank, count: columns))
-        } else {
+        if cursor.row == scrollRegion.upperBound - 1 {
+            scrollUp(1, in: scrollRegion)
+        } else if cursor.row < rows - 1 {
             cursor.row += 1
+        }
+    }
+
+    private mutating func insertCharacters(_ count: Int) {
+        isWrapPending = false
+        let count = min(count, columns - cursor.column)
+        screen[cursor.row].insert(contentsOf: repeatElement(blank, count: count), at: cursor.column)
+        screen[cursor.row].removeLast(count)
+    }
+
+    private mutating func deleteCharacters(_ count: Int) {
+        isWrapPending = false
+        let count = min(count, columns - cursor.column)
+        screen[cursor.row].removeSubrange(cursor.column ..< cursor.column + count)
+        screen[cursor.row].append(contentsOf: repeatElement(blank, count: count))
+    }
+
+    private mutating func insertLines(_ count: Int) {
+        guard scrollRegion.contains(cursor.row) else {
+            return
+        }
+        scrollDown(count, in: cursor.row ..< scrollRegion.upperBound)
+        carriageReturn()
+    }
+
+    private mutating func deleteLines(_ count: Int) {
+        guard scrollRegion.contains(cursor.row) else {
+            return
+        }
+        scrollUp(count, in: cursor.row ..< scrollRegion.upperBound)
+        carriageReturn()
+    }
+
+    private mutating func setScrollRegion(top: Int, bottom: Int) {
+        guard top < bottom - 1 else {
+            return
+        }
+        scrollRegion = top ..< bottom
+        moveCursor(row: 0, column: 0)
+    }
+
+    private mutating func scrollUp(_ count: Int, in region: Range<Int>) {
+        let count = min(count, region.count)
+        screen.removeSubrange(region.lowerBound ..< region.lowerBound + count)
+        screen.insert(contentsOf: blankLines(count), at: region.upperBound - count)
+    }
+
+    private mutating func scrollDown(_ count: Int, in region: Range<Int>) {
+        let count = min(count, region.count)
+        screen.removeSubrange(region.upperBound - count ..< region.upperBound)
+        screen.insert(contentsOf: blankLines(count), at: region.lowerBound)
+    }
+
+    private mutating func reverseLineFeed() {
+        isWrapPending = false
+        if cursor.row == scrollRegion.lowerBound {
+            scrollDown(1, in: scrollRegion)
+        } else if cursor.row > 0 {
+            cursor.row -= 1
         }
     }
 
@@ -198,7 +282,7 @@ package struct Terminal: Sendable {
             return
         }
         normalScreen = (screen, savedCursor)
-        screen = Array(repeating: Array(repeating: blank, count: columns), count: rows)
+        screen = blankLines(rows)
         savedCursor = SavedCursor()
     }
 
@@ -261,6 +345,10 @@ package struct Terminal: Sendable {
 
     private var blank: Cell {
         Cell(style: Style(background: style.background))
+    }
+
+    private func blankLines(_ count: Int) -> [[Cell]] {
+        Array(repeating: Array(repeating: blank, count: columns), count: count)
     }
 
     private static func resized(_ screen: [[Cell]], columns: Int, rows: Int, removingFirst removedRows: Int)

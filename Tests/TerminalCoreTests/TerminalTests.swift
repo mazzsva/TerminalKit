@@ -306,6 +306,169 @@ struct TerminalTests {
         #expect(lines(terminal) == ["b ", "c "])
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
     }
+
+    @Test func scrollsUp() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2S".utf8)
+        #expect(lines(terminal) == ["c", "d", " ", " "])
+        #expect(terminal.cursor == Terminal.Position(row: 3, column: 0))
+    }
+
+    @Test func scrollsDown() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[T".utf8)
+        #expect(lines(terminal) == [" ", "a", "b", "c"])
+    }
+
+    @Test func scrollsNoMoreThanTheScreen() {
+        var terminal = Terminal(columns: 1, rows: 2)
+        terminal.receive("a\r\nb\u{1B}[9S".utf8)
+        #expect(lines(terminal) == [" ", " "])
+        terminal.receive("a\u{1B}[9T".utf8)
+        #expect(lines(terminal) == [" ", " "])
+    }
+
+    @Test(arguments: ["S", "T"])
+    func scrollsInLinesWithTheBackgroundColor(final: String) {
+        var terminal = Terminal(columns: 1, rows: 2)
+        terminal.receive("\u{1B}[44m\u{1B}[2\(final)".utf8)
+        #expect(terminal.screen.map { $0[0].style.background } == [.indexed(4), .indexed(4)])
+    }
+
+    @Test func scrollsInTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2;3r".utf8)
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
+        terminal.receive("\u{1B}[3Hx\ny".utf8)
+        #expect(lines(terminal) == ["a", "x", "y", "d"])
+    }
+
+    @Test func scrollsTheScrollRegionUpAndDown() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2;3r\u{1B}[S".utf8)
+        #expect(lines(terminal) == ["a", "c", " ", "d"])
+        terminal.receive("\u{1B}[2T".utf8)
+        #expect(lines(terminal) == ["a", " ", " ", "d"])
+    }
+
+    @Test func movesBelowTheScrollRegionWithoutScrolling() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[1;2r\u{1B}[3H\n\n".utf8)
+        #expect(lines(terminal) == ["a", "b", "c", "d"])
+        #expect(terminal.cursor == Terminal.Position(row: 3, column: 0))
+    }
+
+    @Test(arguments: ["\u{1B}[3;3r", "\u{1B}[3;2r", "\u{1B}[4;9r"])
+    func ignoresAScrollRegionOfLessThanTwoLines(sequence: String) {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\u{1B}[4H\(sequence)\n".utf8)
+        #expect(lines(terminal) == [" ", " ", " ", " "])
+        #expect(terminal.cursor == Terminal.Position(row: 3, column: 0))
+    }
+
+    @Test func resetsTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("\u{1B}[2;3r\u{1B}[r\u{1B}[4Ha\n".utf8)
+        #expect(lines(terminal) == [" ", " ", "a", " "])
+    }
+
+    @Test func resetsTheScrollRegionOnAResize() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("\u{1B}[2;3r".utf8)
+        terminal.resize(columns: 1, rows: 3)
+        terminal.receive("\u{1B}[3Ha\n".utf8)
+        #expect(lines(terminal) == [" ", "a", " "])
+    }
+
+    @Test func indexesWithAnEscapeSequence() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("ab\u{1B}Dc\u{1B}Ed".utf8)
+        #expect(lines(terminal) == [" c", "d "])
+    }
+
+    @Test func movesUpWithAReverseIndex() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("a\r\nb\u{1B}Mc".utf8)
+        #expect(lines(terminal) == ["c", "b", " "])
+    }
+
+    @Test func scrollsDownWithAReverseIndexAtTheTop() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("a\r\nb\r\nc\u{1B}[2;3r\u{1B}[2H\u{1B}Mx".utf8)
+        #expect(lines(terminal) == ["a", "x", "b"])
+    }
+
+    @Test func staysOnTheFirstLineAboveTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("a\u{1B}[2;3r\u{1B}[1H\u{1B}Mx".utf8)
+        #expect(lines(terminal) == ["x", " ", " "])
+    }
+
+    @Test func insertsLines() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2H\u{1B}[2L".utf8)
+        #expect(lines(terminal) == ["a", " ", " ", "b"])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
+    }
+
+    @Test func deletesLines() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2H\u{1B}[2M".utf8)
+        #expect(lines(terminal) == ["a", "d", " ", " "])
+    }
+
+    @Test func insertsAndDeletesLinesInTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[1;3r\u{1B}[2H\u{1B}[L".utf8)
+        #expect(lines(terminal) == ["a", " ", "b", "d"])
+        terminal.receive("\u{1B}[M".utf8)
+        #expect(lines(terminal) == ["a", "b", " ", "d"])
+    }
+
+    @Test func ignoresInsertedLinesOutsideTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[1;2r\u{1B}[4H\u{1B}[L\u{1B}[M".utf8)
+        #expect(lines(terminal) == ["a", "b", "c", "d"])
+    }
+
+    @Test func movesToTheFirstColumnWhenItInsertsLines() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("abc\u{1B}[Lx".utf8)
+        #expect(lines(terminal) == ["x  ", "abc"])
+    }
+
+    @Test func insertsCharacters() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("abcde\u{1B}[2G\u{1B}[2@x".utf8)
+        #expect(lines(terminal) == ["ax bc"])
+    }
+
+    @Test func deletesCharacters() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("abcde\u{1B}[2G\u{1B}[2P".utf8)
+        #expect(lines(terminal) == ["ade  "])
+    }
+
+    @Test func erasesCharacters() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("abcde\u{1B}[2G\u{1B}[2X".utf8)
+        #expect(lines(terminal) == ["a  de"])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+    }
+
+    @Test(arguments: ["@", "P", "X"])
+    func changesNoMoreThanTheRestOfTheLine(final: String) {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("abc\u{1B}[2G\u{1B}[9\(final)".utf8)
+        #expect(lines(terminal) == ["a  "])
+    }
+
+    @Test(arguments: ["@", "P", "X"])
+    func changesCharactersWithTheBackgroundColor(final: String) {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("ab\u{1B}[G\u{1B}[44m\u{1B}[2\(final)".utf8)
+        #expect(terminal.screen[0].map(\.style.background) == [.indexed(4), .indexed(4)])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
