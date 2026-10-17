@@ -135,6 +135,10 @@ package struct Terminal: Sendable {
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
             eraseInLine(sequence.parameter(at: 0, default: 0))
+        case "L":
+            insertLines(count)
+        case "M":
+            deleteLines(count)
         case "S":
             scrollUp(count, in: scrollRegion)
         case "T" where sequence.parameters.count <= 1:
@@ -179,6 +183,22 @@ package struct Terminal: Sendable {
         } else if cursor.row < rows - 1 {
             cursor.row += 1
         }
+    }
+
+    private mutating func insertLines(_ count: Int) {
+        guard scrollRegion.contains(cursor.row) else {
+            return
+        }
+        scrollDown(count, in: cursor.row ..< scrollRegion.upperBound)
+        carriageReturn()
+    }
+
+    private mutating func deleteLines(_ count: Int) {
+        guard scrollRegion.contains(cursor.row) else {
+            return
+        }
+        scrollUp(count, in: cursor.row ..< scrollRegion.upperBound)
+        carriageReturn()
     }
 
     private mutating func setScrollRegion(top: Int, bottom: Int) {

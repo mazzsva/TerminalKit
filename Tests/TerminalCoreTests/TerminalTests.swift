@@ -403,6 +403,39 @@ struct TerminalTests {
         terminal.receive("a\u{1B}[2;3r\u{1B}[1H\u{1B}Mx".utf8)
         #expect(lines(terminal) == ["x", " ", " "])
     }
+
+    @Test func insertsLines() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2H\u{1B}[2L".utf8)
+        #expect(lines(terminal) == ["a", " ", " ", "b"])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
+    }
+
+    @Test func deletesLines() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2H\u{1B}[2M".utf8)
+        #expect(lines(terminal) == ["a", "d", " ", " "])
+    }
+
+    @Test func insertsAndDeletesLinesInTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[1;3r\u{1B}[2H\u{1B}[L".utf8)
+        #expect(lines(terminal) == ["a", " ", "b", "d"])
+        terminal.receive("\u{1B}[M".utf8)
+        #expect(lines(terminal) == ["a", "b", " ", "d"])
+    }
+
+    @Test func ignoresInsertedLinesOutsideTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[1;2r\u{1B}[4H\u{1B}[L\u{1B}[M".utf8)
+        #expect(lines(terminal) == ["a", "b", "c", "d"])
+    }
+
+    @Test func movesToTheFirstColumnWhenItInsertsLines() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("abc\u{1B}[Lx".utf8)
+        #expect(lines(terminal) == ["x  ", "abc"])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
