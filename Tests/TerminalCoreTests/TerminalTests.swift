@@ -379,6 +379,30 @@ struct TerminalTests {
         terminal.receive("\u{1B}[3Ha\n".utf8)
         #expect(lines(terminal) == [" ", "a", " "])
     }
+
+    @Test func indexesWithAnEscapeSequence() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("ab\u{1B}Dc\u{1B}Ed".utf8)
+        #expect(lines(terminal) == [" c", "d "])
+    }
+
+    @Test func movesUpWithAReverseIndex() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("a\r\nb\u{1B}Mc".utf8)
+        #expect(lines(terminal) == ["c", "b", " "])
+    }
+
+    @Test func scrollsDownWithAReverseIndexAtTheTop() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("a\r\nb\r\nc\u{1B}[2;3r\u{1B}[2H\u{1B}Mx".utf8)
+        #expect(lines(terminal) == ["a", "x", "b"])
+    }
+
+    @Test func staysOnTheFirstLineAboveTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("a\u{1B}[2;3r\u{1B}[1H\u{1B}Mx".utf8)
+        #expect(lines(terminal) == ["x", " ", " "])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {

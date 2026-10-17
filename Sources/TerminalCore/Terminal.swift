@@ -77,6 +77,13 @@ package struct Terminal: Sendable {
                 moveCursor(row: cursor.row, column: cursor.column - 1)
             case .execute("\t"):
                 cursor.column = min((cursor.column / Self.tabWidth + 1) * Self.tabWidth, columns - 1)
+            case .escape(intermediates: "", final: "D"):
+                lineFeed()
+            case .escape(intermediates: "", final: "E"):
+                carriageReturn()
+                lineFeed()
+            case .escape(intermediates: "", final: "M"):
+                reverseLineFeed()
             case .escape(intermediates: "", final: "7"):
                 saveCursor()
             case .escape(intermediates: "", final: "8"):
@@ -192,6 +199,15 @@ package struct Terminal: Sendable {
         let count = min(count, region.count)
         screen.removeSubrange(region.upperBound - count ..< region.upperBound)
         screen.insert(contentsOf: blankLines(count), at: region.lowerBound)
+    }
+
+    private mutating func reverseLineFeed() {
+        isWrapPending = false
+        if cursor.row == scrollRegion.lowerBound {
+            scrollDown(1, in: scrollRegion)
+        } else if cursor.row > 0 {
+            cursor.row -= 1
+        }
     }
 
     private mutating func carriageReturn() {
