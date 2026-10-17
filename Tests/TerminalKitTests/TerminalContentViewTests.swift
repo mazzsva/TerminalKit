@@ -65,6 +65,26 @@ struct TerminalContentViewTests {
         #expect(red != plain)
     }
 
+    @Test(arguments: ["1", "2", "3", "4", "9"])
+    func drawsTheTextStyle(parameter: String) async throws {
+        let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
+        let styled = try image(of: try await drawnView(running: "printf '\\033[\(parameter)mX\\r'"))
+        #expect(styled != plain)
+    }
+
+    @Test func drawsInverseText() async throws {
+        let view = try await drawnView(running: "printf '\\033[7m  \\033[m'")
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let representation = try representation(of: view)
+        #expect(color(in: representation, at: center) != color(in: representation, at: CGPoint(x: 190, y: 90)))
+    }
+
+    @Test func hidesHiddenText() async throws {
+        let blank = try image(of: try await drawnView(running: "printf ' \\r'"))
+        let hidden = try image(of: try await drawnView(running: "printf '\\033[8mX\\r'"))
+        #expect(hidden == blank)
+    }
+
     @Test func sendsKeyPressesToTheSession() async throws {
         let session = readingSession()
         let view = TerminalContentView(session: session)

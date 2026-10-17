@@ -104,16 +104,44 @@ final class TerminalContentView: NSView {
     }
 
     private func draw(_ cells: ArraySlice<Terminal.Cell>, style: Terminal.Style, at origin: CGPoint) {
-        if let background = NSColor.terminal(style.background) {
+        var foreground = NSColor.terminal(style.foreground) ?? .textColor
+        var background = NSColor.terminal(style.background)
+        if style.isInverse {
+            (foreground, background) = (background ?? .textBackgroundColor, foreground)
+        }
+        if let background {
             background.setFill()
             CGRect(x: origin.x, y: origin.y, width: cellSize.width * CGFloat(cells.count), height: cellSize.height)
                 .fill()
         }
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.terminal(style.foreground) ?? .textColor,
+        guard !style.isHidden else {
+            return
+        }
+        var attributes: [NSAttributedString.Key: Any] = [
+            .font: font(for: style),
+            .foregroundColor: style.isFaint ? foreground.withAlphaComponent(0.5) : foreground,
         ]
+        if style.isUnderlined {
+            attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+        }
+        if style.isStrikethrough {
+            attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+        }
         NSAttributedString(string: String(cells.map(\.character)), attributes: attributes).draw(at: origin)
+    }
+
+    private func font(for style: Terminal.Style) -> NSFont {
+        var traits: NSFontDescriptor.SymbolicTraits = []
+        if style.isBold {
+            traits.insert(.bold)
+        }
+        if style.isItalic {
+            traits.insert(.italic)
+        }
+        guard !traits.isEmpty else {
+            return font
+        }
+        return NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(traits), size: font.pointSize) ?? font
     }
 
     var cursorRect: CGRect {
