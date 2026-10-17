@@ -51,26 +51,100 @@ struct TerminalContentViewTests {
     }
 
     @Test func sendsKeyPressesToTheSession() async throws {
-        let session = TerminalSession(
-            configuration: .init(
-                executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "read line; echo \"got $line\""])
-        )
+        let session = readingSession()
         let view = TerminalContentView(session: session)
         try session.start()
         for characters in ["h", "i", "\r"] {
             view.keyDown(with: try keyDown(characters))
         }
-        for await state in Observations({ session.state }) where state != .running {
-            break
-        }
-        let lines = session.terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
-        #expect(lines.contains("got hi"))
+        #expect(await lines(afterExitOf: session).contains("got hi"))
+    }
+
+    @Test func sendsTextFromTheInputSystem() async throws {
+        let session = readingSession()
+        let view = TerminalContentView(session: session)
+        try session.start()
+        view.insertText("é", replacementRange: NSRange(location: NSNotFound, length: 0))
+        view.keyDown(with: try keyDown("\r"))
+        #expect(await lines(afterExitOf: session).contains("got é"))
+    }
+
+    @Test func keepsTheMarkedTextUntilTheInsert() {
+        let view = TerminalContentView(session: readingSession())
+        view.setMarkedText(
+            "´",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        #expect(view.hasMarkedText())
+        #expect(view.markedRange() == NSRange(location: 0, length: 1))
+        view.insertText("é", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(!view.hasMarkedText())
+    }
+
+    @Test func dropsTheMarkedTextWhenUnmarked() async throws {
+        let session = readingSession()
+        let view = TerminalContentView(session: session)
+        try session.start()
+        view.setMarkedText(
+            "´",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.unmarkText()
+        view.keyDown(with: try keyDown("\r"))
+        #expect(!view.hasMarkedText())
+        #expect(await lines(afterExitOf: session).contains("got"))
+    }
+
+    @Test func drawsTheMarkedText() throws {
+        let view = TerminalContentView(session: readingSession())
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        let cursorImage = try image(of: view)
+        view.setMarkedText(
+            "´",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        #expect(try image(of: view) != cursorImage)
+        view.unmarkText()
+        #expect(try image(of: view) == cursorImage)
+    }
+
+    @Test func placesTheInputWindowAtTheCursor() {
+        let view = TerminalContentView(session: readingSession())
+        let window = NSWindow(
+            contentRect: NSRect(x: 100, y: 200, width: 300, height: 150),
+            styleMask: [],
+            backing: .buffered,
+            defer: true
+        )
+        window.contentView = view
+        let rect = view.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+        #expect(rect.origin == CGPoint(x: 104, y: 346 - view.cellSize.height))
+        #expect(rect.size == view.cellSize)
     }
 
     @Test func acceptsFirstResponder() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
         #expect(TerminalContentView(session: session).acceptsFirstResponder)
     }
+}
+
+@MainActor
+private func readingSession() -> TerminalSession {
+    TerminalSession(
+        configuration: .init(
+            executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "read line; echo \"got $line\""])
+    )
+}
+
+@MainActor
+private func lines(afterExitOf session: TerminalSession) async -> [String] {
+    for await state in Observations({ session.state }) where state != .running {
+        break
+    }
+    return session.terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
 }
 
 @MainActor

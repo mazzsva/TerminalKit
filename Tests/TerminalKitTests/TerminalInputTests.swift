@@ -48,6 +48,13 @@ struct TerminalInputTests {
                 == Array("\u{1B}[Z".utf8))
     }
 
+    @Test func sendsOnlyTheKeyAfterADeadKey() throws {
+        #expect(try keyDown("'\r", charactersIgnoringModifiers: "\r").terminalInput == [0x0D])
+        #expect(try keyDown("'\t", charactersIgnoringModifiers: "\t").terminalInput == [0x09])
+        #expect(try keyDown("'\u{1B}", charactersIgnoringModifiers: "\u{1B}").terminalInput == [0x1B])
+        #expect(try keyDown("'\u{7F}", charactersIgnoringModifiers: "\u{7F}").terminalInput == [0x7F])
+    }
+
     @Test func ignoresFunctionKeys() throws {
         #expect(try keyDown(NSF1FunctionKey).terminalInput == nil)
     }

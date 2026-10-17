@@ -6,6 +6,13 @@ final class TerminalContentView: NSView {
     let session: TerminalSession
     let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
     let cellSize: CGSize
+    var markedText = "" {
+        didSet {
+            needsDisplay = true
+        }
+    }
+
+    private var keyDownEvent: NSEvent?
 
     init(session: TerminalSession) {
         self.session = session
@@ -30,11 +37,19 @@ final class TerminalContentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        guard let input = event.terminalInput else {
+        guard !event.modifierFlags.contains(.command) else {
             super.keyDown(with: event)
             return
         }
-        session.send(input)
+        keyDownEvent = event
+        interpretKeyEvents([event])
+        keyDownEvent = nil
+    }
+
+    override func doCommand(by selector: Selector) {
+        if let input = keyDownEvent?.terminalInput {
+            session.send(input)
+        }
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -55,9 +70,23 @@ final class TerminalContentView: NSView {
             NSAttributedString(string: text, attributes: attributes).draw(at: rect(row: row, column: 0).origin)
         }
 
-        let cursor = session.terminal.cursor
+        let cursor = cursorRect
+        guard markedText.isEmpty else {
+            let text = NSAttributedString(
+                string: markedText,
+                attributes: attributes.merging([.underlineStyle: NSUnderlineStyle.single.rawValue]) { $1 }
+            )
+            NSColor.textBackgroundColor.setFill()
+            CGRect(origin: cursor.origin, size: text.size()).fill()
+            text.draw(at: cursor.origin)
+            return
+        }
         NSColor.textColor.withAlphaComponent(0.5).setFill()
-        rect(row: cursor.row, column: cursor.column).fill(using: .sourceOver)
+        cursor.fill(using: .sourceOver)
+    }
+
+    var cursorRect: CGRect {
+        rect(row: session.terminal.cursor.row, column: session.terminal.cursor.column)
     }
 
     private func rect(row: Int, column: Int) -> CGRect {
