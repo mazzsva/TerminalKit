@@ -20,6 +20,22 @@ struct PseudoTerminalTests {
         #expect(try await output("head -c 200000 /dev/zero | tr '\\0' a").count == 200_000)
     }
 
+    @Test func waitsForTheReaderBeforeItReadsMoreOutput() async throws {
+        let marker = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: marker) }
+        let pseudoTerminal = try PseudoTerminal(
+            executableURL: URL(filePath: "/bin/sh"),
+            arguments: ["-c", "head -c 10000000 /dev/zero; touch \"$0\"", marker.path(percentEncoded: false)],
+            environment: [:],
+            columns: 80,
+            rows: 24
+        )
+        try await Task.sleep(for: .seconds(1))
+        #expect(!FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
+        for await _ in pseudoTerminal.events {}
+        #expect(FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
+    }
+
     @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
     func givesTheProcessAControllingTerminal(shell: String) async throws {
         let output = try await output("exec 3</dev/tty && echo yes", shell: shell)
@@ -110,6 +126,22 @@ struct PseudoTerminalTests {
             rows: 24
         )
         let processIdentifier = try #require(pseudoTerminal?.processIdentifier)
+        pseudoTerminal = nil
+        while kill(processIdentifier, 0) == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(errno == ESRCH)
+    }
+
+    @Test func hangsUpAProcessThatWaitsForTheReader() async throws {
+        var pseudoTerminal: PseudoTerminal? = try PseudoTerminal(
+            executableURL: URL(filePath: "/usr/bin/yes"),
+            environment: [:],
+            columns: 80,
+            rows: 24
+        )
+        let processIdentifier = try #require(pseudoTerminal?.processIdentifier)
+        try await Task.sleep(for: .milliseconds(300))
         pseudoTerminal = nil
         while kill(processIdentifier, 0) == 0 {
             try await Task.sleep(for: .milliseconds(10))

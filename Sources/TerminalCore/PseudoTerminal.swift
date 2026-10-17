@@ -17,12 +17,13 @@ package final class PseudoTerminal: Sendable {
     private static let readSize = 65_536
 
     package let processIdentifier: pid_t
-    package let events: AsyncStream<Event>
+    package let events: Events
 
     private let fileDescriptor: Int32
     private let continuation: AsyncStream<Event>.Continuation
     private let queue = DispatchQueue(label: "PseudoTerminal")
     private let readSource: any DispatchSourceRead
+    private let flowControl: FlowControl
     private let input = Mutex(Input())
 
     private struct Input {
@@ -53,8 +54,11 @@ package final class PseudoTerminal: Sendable {
             throw error
         }
         fileDescriptor = primary
-        (events, continuation) = AsyncStream.makeStream(of: Event.self)
+        let stream: AsyncStream<Event>
+        (stream, continuation) = AsyncStream.makeStream(of: Event.self)
         readSource = DispatchSource.makeReadSource(fileDescriptor: primary, queue: queue)
+        flowControl = FlowControl(source: readSource)
+        events = Events(stream: stream, flowControl: flowControl)
         readSource.setEventHandler { [weak self] in
             self?.readOutput()
         }
@@ -151,6 +155,7 @@ package final class PseudoTerminal: Sendable {
         }
         if result > 0 {
             continuation.yield(.output(bytes))
+            flowControl.didYield()
             return true
         }
         if result < 0 && error == EINTR {
@@ -167,7 +172,7 @@ package final class PseudoTerminal: Sendable {
             input.writeSource?.cancel()
             input.writeSource = nil
         }
-        readSource.cancel()
+        flowControl.cancel()
     }
 
     private func finish(_ termination: Termination) {
