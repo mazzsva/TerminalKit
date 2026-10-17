@@ -129,6 +129,18 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.minY < top)
     }
 
+    @Test func hidesTheScrollIndicator() throws {
+        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let hostingView = NSHostingView(rootView: TerminalView(session: session).scrollIndicators(.automatic))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+        let scrollView = try #require(contentView(in: hostingView)?.enclosingScrollView)
+        #expect(scrollView.hasVerticalScroller)
+        hostingView.rootView = TerminalView(session: session).scrollIndicators(.hidden)
+        hostingView.layoutSubtreeIfNeeded()
+        #expect(!scrollView.hasVerticalScroller)
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),

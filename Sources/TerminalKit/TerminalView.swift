@@ -23,5 +23,7 @@ private struct Representable: NSViewRepresentable {
         if view.terminalView.session !== session {
             view.terminalView.session = session
         }
+        let scrollIndicatorVisibility = context.environment.verticalScrollIndicatorVisibility
+        view.hasVerticalScroller = scrollIndicatorVisibility != .hidden && scrollIndicatorVisibility != .never
     }
 }
