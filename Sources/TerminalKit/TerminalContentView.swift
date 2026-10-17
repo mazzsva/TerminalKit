@@ -57,6 +57,7 @@ final class TerminalContentView: NSView {
             super.keyDown(with: event)
             return
         }
+        scroll(CGPoint(x: 0, y: bounds.maxY - visibleRect.height))
         keyDownEvent = event
         interpretKeyEvents([event])
         keyDownEvent = nil

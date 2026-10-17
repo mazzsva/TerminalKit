@@ -91,6 +91,14 @@ struct TerminalViewTests {
         #expect(firstLine() == line)
     }
 
+    @Test func scrollsToTheBottomWhenYouType() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 50; read line")
+        scrollView.terminalView.scroll(.zero)
+        scrollView.terminalView.keyDown(with: try keyDown("\r"))
+        #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
+        await waitForExit(of: session)
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
