@@ -9,6 +9,12 @@ package struct Terminal: Sendable {
         package var column: Int
     }
 
+    private struct SavedCursor {
+        var position = Position(row: 0, column: 0)
+        var style = Style()
+        var isWrapPending = false
+    }
+
     private static let tabWidth = 8
 
     package private(set) var columns: Int
@@ -21,6 +27,7 @@ package struct Terminal: Sendable {
     private var parser = EscapeSequenceParser()
     private var isWrapPending = false
     private var style = Style()
+    private var savedCursor = SavedCursor()
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -56,6 +63,10 @@ package struct Terminal: Sendable {
                 moveCursor(row: cursor.row, column: cursor.column - 1)
             case .execute("\t"):
                 cursor.column = min((cursor.column / Self.tabWidth + 1) * Self.tabWidth, columns - 1)
+            case .escape(intermediates: "", final: "7"):
+                saveCursor()
+            case .escape(intermediates: "", final: "8"):
+                restoreCursor()
             case .controlSequence(let sequence):
                 perform(sequence)
             case .operatingSystemCommand(let command):
@@ -96,6 +107,10 @@ package struct Terminal: Sendable {
             eraseInLine(sequence.parameter(at: 0, default: 0))
         case "m":
             style.apply(sequence.parameters)
+        case "s" where sequence.parameters.isEmpty:
+            saveCursor()
+        case "u" where sequence.parameters.isEmpty:
+            restoreCursor()
         default:
             break
         }
@@ -139,6 +154,16 @@ package struct Terminal: Sendable {
     private mutating func moveCursor(row: Int, column: Int) {
         isWrapPending = false
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
+    }
+
+    private mutating func saveCursor() {
+        savedCursor = SavedCursor(position: cursor, style: style, isWrapPending: isWrapPending)
+    }
+
+    private mutating func restoreCursor() {
+        moveCursor(row: savedCursor.position.row, column: savedCursor.position.column)
+        style = savedCursor.style
+        isWrapPending = savedCursor.isWrapPending
     }
 
     private mutating func eraseInDisplay(_ mode: Int) {

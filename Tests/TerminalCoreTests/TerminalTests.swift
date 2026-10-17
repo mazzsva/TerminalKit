@@ -211,6 +211,38 @@ struct TerminalTests {
         #expect(lines(terminal) == ["a ", "  "])
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
     }
+
+    @Test func restoresTheSavedCursor() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}7cd\r\n\u{1B}8x".utf8)
+        #expect(lines(terminal) == ["abxd", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
+    }
+
+    @Test func restoresTheSavedCursorWithAControlSequence() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[scd\r\n\u{1B}[ux".utf8)
+        #expect(lines(terminal) == ["abxd", "    "])
+    }
+
+    @Test func restoresTheSavedStyle() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[1;31m\u{1B}7\u{1B}[m\u{1B}8a".utf8)
+        #expect(terminal.screen[0][0].style == Terminal.Style(foreground: .indexed(1), isBold: true))
+    }
+
+    @Test func restoresThePendingWrap() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("ab\u{1B}7\r\u{1B}8c".utf8)
+        #expect(lines(terminal) == ["ab", "c "])
+    }
+
+    @Test func restoresTheHomePositionWithoutASave() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[1mab\r\n\u{1B}8x".utf8)
+        #expect(lines(terminal) == ["xb  ", "    "])
+        #expect(terminal.screen[0][0].style == Terminal.Style())
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
