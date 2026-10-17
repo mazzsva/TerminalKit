@@ -243,6 +243,54 @@ struct TerminalTests {
         #expect(lines(terminal) == ["xb  ", "    "])
         #expect(terminal.screen[0][0].style == Terminal.Style())
     }
+
+    @Test func switchesToABlankAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?1049h".utf8)
+        #expect(terminal.isAlternateScreenActive)
+        #expect(lines(terminal) == ["    ", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
+    @Test func restoresTheNormalScreenAndCursor() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?1049h\u{1B}[2;3Hxy\u{1B}[?1049lc".utf8)
+        #expect(!terminal.isAlternateScreenActive)
+        #expect(lines(terminal) == ["abc ", "    "])
+    }
+
+    @Test(arguments: [47, 1047])
+    func switchesScreensWithoutTheCursor(mode: Int) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?\(mode)hx\u{1B}[?\(mode)lc".utf8)
+        #expect(lines(terminal) == ["ab c", "    "])
+    }
+
+    @Test func clearsTheAlternateScreenWithTheBackgroundColor() {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("\u{1B}[44m\u{1B}[?1049h".utf8)
+        #expect(terminal.screen[0].map(\.style.background) == [.indexed(4), .indexed(4)])
+    }
+
+    @Test func startsANewAlternateScreenEachTime() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?1049hab\u{1B}[?1049l\u{1B}[?1049h".utf8)
+        #expect(lines(terminal) == ["    "])
+    }
+
+    @Test func ignoresASecondSwitch() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("ab\u{1B}[?1049hx\u{1B}[?1049h\u{1B}[?1049l".utf8)
+        #expect(lines(terminal) == ["ab  "])
+    }
+
+    @Test func resizesTheNormalScreenOnTheAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\u{1B}[?1049h".utf8)
+        terminal.resize(columns: 2, rows: 3)
+        terminal.receive("\u{1B}[?1049l".utf8)
+        #expect(lines(terminal) == ["ab", "  ", "  "])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
