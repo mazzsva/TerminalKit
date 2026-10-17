@@ -470,6 +470,15 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.style.background) == [.indexed(4), .indexed(4)])
     }
 
+    @Test func hidesAndShowsTheCursor() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(terminal.isCursorVisible)
+        terminal.receive("\u{1B}[?25l")
+        #expect(!terminal.isCursorVisible)
+        terminal.receive("\u{1B}[?25h")
+        #expect(terminal.isCursorVisible)
+    }
+
     @Test func setsTheBracketedPasteMode() {
         var terminal = Terminal(columns: 1, rows: 1)
         #expect(!terminal.usesBracketedPaste)

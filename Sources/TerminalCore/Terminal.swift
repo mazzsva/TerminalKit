@@ -29,6 +29,7 @@ package struct Terminal: Sendable {
     package private(set) var title = ""
     package private(set) var usesApplicationCursorKeys = false
     package private(set) var usesBracketedPaste = false
+    package private(set) var isCursorVisible = true
 
     package var isAlternateScreenActive: Bool {
         normalScreen != nil
@@ -293,6 +294,8 @@ package struct Terminal: Sendable {
         switch (mode, isEnabled) {
         case (1, _):
             usesApplicationCursorKeys = isEnabled
+        case (25, _):
+            isCursorVisible = isEnabled
         case (2004, _):
             usesBracketedPaste = isEnabled
         case (47, true), (1047, true):
