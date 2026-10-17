@@ -1,6 +1,7 @@
 package struct Terminal: Sendable {
     package struct Cell: Equatable, Sendable {
         package var character: Character = " "
+        package var style = Style()
     }
 
     package struct Position: Equatable, Sendable {
@@ -19,6 +20,7 @@ package struct Terminal: Sendable {
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
     private var isWrapPending = false
+    private var style = Style()
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -92,6 +94,8 @@ package struct Terminal: Sendable {
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
             eraseInLine(sequence.parameter(at: 0, default: 0))
+        case "m":
+            style.apply(sequence.parameters)
         default:
             break
         }
@@ -109,7 +113,7 @@ package struct Terminal: Sendable {
             carriageReturn()
             lineFeed()
         }
-        screen[cursor.row][cursor.column].character = character
+        screen[cursor.row][cursor.column] = Cell(character: character, style: style)
         if cursor.column == columns - 1 {
             isWrapPending = true
         } else {
@@ -121,7 +125,7 @@ package struct Terminal: Sendable {
         isWrapPending = false
         if cursor.row == rows - 1 {
             screen.removeFirst()
-            screen.append(Self.blankLine(columns: columns))
+            screen.append(Array(repeating: blank, count: columns))
         } else {
             cursor.row += 1
         }
@@ -173,7 +177,11 @@ package struct Terminal: Sendable {
 
     private mutating func erase(_ range: Range<Int>, row: Int) {
         isWrapPending = false
-        screen[row].replaceSubrange(range, with: repeatElement(Cell(), count: range.count))
+        screen[row].replaceSubrange(range, with: repeatElement(blank, count: range.count))
+    }
+
+    private var blank: Cell {
+        Cell(style: Style(background: style.background))
     }
 
     private static func blankLine(columns: Int) -> [Cell] {
