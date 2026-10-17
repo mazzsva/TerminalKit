@@ -2,6 +2,7 @@ extension Terminal {
     package enum Color: Equatable, Sendable {
         case `default`
         case indexed(UInt8)
+        case rgb(red: UInt8, green: UInt8, blue: UInt8)
     }
 
     package struct Style: Equatable, Sendable {
@@ -50,10 +51,14 @@ extension Terminal {
                     isStrikethrough = false
                 case 30 ... 37:
                     foreground = .indexed(UInt8(parameter - 30))
+                case 38:
+                    foreground = Self.color(from: &parameters) ?? foreground
                 case 39:
                     foreground = .default
                 case 40 ... 47:
                     background = .indexed(UInt8(parameter - 40))
+                case 48:
+                    background = Self.color(from: &parameters) ?? background
                 case 49:
                     background = .default
                 case 90 ... 97:
@@ -63,6 +68,26 @@ extension Terminal {
                 default:
                     break
                 }
+            }
+        }
+
+        private static func color(from parameters: inout IndexingIterator<[Int]>) -> Color? {
+            switch parameters.next() {
+            case 5:
+                guard let index = parameters.next().flatMap(UInt8.init(exactly:)) else {
+                    return nil
+                }
+                return .indexed(index)
+            case 2:
+                guard let red = parameters.next().flatMap(UInt8.init(exactly:)),
+                    let green = parameters.next().flatMap(UInt8.init(exactly:)),
+                    let blue = parameters.next().flatMap(UInt8.init(exactly:))
+                else {
+                    return nil
+                }
+                return .rgb(red: red, green: green, blue: blue)
+            default:
+                return nil
             }
         }
     }

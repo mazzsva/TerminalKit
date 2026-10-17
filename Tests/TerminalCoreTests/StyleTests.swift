@@ -72,6 +72,39 @@ struct StyleTests {
         #expect(style.isBold)
     }
 
+    @Test func setsThe256Colors() {
+        var style = Terminal.Style()
+        style.apply([38, 5, 208, 48, 5, 17])
+        #expect(style.foreground == .indexed(208))
+        #expect(style.background == .indexed(17))
+    }
+
+    @Test func setsTheTrueColors() {
+        var style = Terminal.Style()
+        style.apply([38, 2, 255, 128, 0, 48, 2, 1, 2, 3])
+        #expect(style.foreground == .rgb(red: 255, green: 128, blue: 0))
+        #expect(style.background == .rgb(red: 1, green: 2, blue: 3))
+    }
+
+    @Test func continuesAfterAnExtendedColor() {
+        var style = Terminal.Style()
+        style.apply([38, 5, 1, 1, 48, 2, 0, 0, 0, 4])
+        #expect(style.isBold && style.isUnderlined)
+    }
+
+    @Test func ignoresAnIncompleteExtendedColor() {
+        var style = Terminal.Style()
+        style.apply([31])
+        style.apply([38, 5])
+        #expect(style.foreground == .indexed(1))
+        style.apply([38, 2, 1, 2])
+        #expect(style.foreground == .indexed(1))
+        style.apply([38, 5, 256])
+        #expect(style.foreground == .indexed(1))
+        style.apply([38, 9, 1])
+        #expect(style.foreground == .indexed(1))
+    }
+
     @Test func printsWithTheCurrentStyle() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("a\u{1B}[1mb\u{1B}[mc".utf8)
