@@ -16,6 +16,7 @@ package struct Terminal: Sendable {
     }
 
     private static let tabWidth = 8
+    private static let asciiCharacters = (0 ..< 128).map { Character(Unicode.Scalar(UInt8($0))) }
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
 
@@ -73,11 +74,14 @@ package struct Terminal: Sendable {
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
     }
 
-    package mutating func receive(_ bytes: some Sequence<UInt8>) {
-        for action in parser.parse(decoder.decode(bytes)) {
+    package mutating func receive(_ bytes: [UInt8]) {
+        for scalar in decoder.decode(bytes) {
+            guard let action = parser.advance(scalar) else {
+                continue
+            }
             switch action {
             case .print(let scalar):
-                print(Character(scalar))
+                print(scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar))
             case .execute("\n"):
                 lineFeed()
             case .execute("\r"):

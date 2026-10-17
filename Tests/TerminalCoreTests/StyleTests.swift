@@ -107,13 +107,13 @@ struct StyleTests {
 
     @Test func erasesWithTheBackgroundColor() {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("ab\u{1B}[1;31;44m\u{1B}[K".utf8)
+        terminal.receive("ab\u{1B}[1;31;44m\u{1B}[K")
         #expect(terminal.screen[0].map(\.style) == [Terminal.Style(), Terminal.Style()] + backgroundCells(2))
     }
 
     @Test func scrollsInLinesWithTheBackgroundColor() {
         var terminal = Terminal(columns: 2, rows: 1)
-        terminal.receive("\u{1B}[44m\n".utf8)
+        terminal.receive("\u{1B}[44m\n")
         #expect(terminal.screen[0].map(\.style) == backgroundCells(2))
     }
 
@@ -135,7 +135,7 @@ struct StyleTests {
 
     @Test func printsWithTheCurrentStyle() {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("a\u{1B}[1mb\u{1B}[mc".utf8)
+        terminal.receive("a\u{1B}[1mb\u{1B}[mc")
         #expect(terminal.screen[0].prefix(3).map(\.style.isBold) == [false, true, false])
     }
 }
