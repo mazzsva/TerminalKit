@@ -73,7 +73,14 @@ final class TerminalContentView: NSView {
         dirtyRect.fill()
 
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.textColor]
-        for (row, line) in session.terminal.screen.enumerated() {
+        let terminal = session.terminal
+        let lineCount = terminal.scrollback.count + terminal.rows
+        let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height), 0)
+        let lastRow = min(Int((dirtyRect.maxY - Self.padding) / cellSize.height), lineCount - 1)
+        for row in firstRow ..< max(lastRow + 1, firstRow) {
+            let line =
+                row < terminal.scrollback.count
+                ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
             var column = 0
             while column < line.count {
                 let style = line[column].style
@@ -140,7 +147,8 @@ final class TerminalContentView: NSView {
     }
 
     var cursorRect: CGRect {
-        rect(row: session.terminal.cursor.row, column: session.terminal.cursor.column)
+        let terminal = session.terminal
+        return rect(row: terminal.scrollback.count + terminal.cursor.row, column: terminal.cursor.column)
     }
 
     func fit(to size: CGSize) {
@@ -148,7 +156,10 @@ final class TerminalContentView: NSView {
             columns: max(Int((size.width - 2 * Self.padding) / cellSize.width), 1),
             rows: max(Int((size.height - 2 * Self.padding) / cellSize.height), 1)
         )
-        setFrameSize(size)
+        let lineCount = session.terminal.scrollback.count + session.terminal.rows
+        setFrameSize(
+            CGSize(width: size.width, height: max(size.height, CGFloat(lineCount) * cellSize.height + 2 * Self.padding))
+        )
     }
 
     private func rect(row: Int, column: Int) -> CGRect {

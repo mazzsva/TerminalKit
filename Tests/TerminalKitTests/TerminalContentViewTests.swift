@@ -57,6 +57,26 @@ struct TerminalContentViewTests {
         #expect(abs(color.blueComponent - 33 / 255) < 0.02)
     }
 
+    @Test func drawsTheScrollback() async throws {
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/bin/sh"),
+                arguments: ["-c", "printf '\\033[41m  \\033[m'; seq 1 30"]
+            )
+        )
+        let view = TerminalContentView(session: session)
+        view.fit(to: CGSize(width: 200, height: 100))
+        try session.start()
+        for await state in Observations({ session.state }) where state != .running {
+            break
+        }
+        view.fit(to: CGSize(width: 200, height: 100))
+        #expect(!session.terminal.scrollback.isEmpty)
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let color = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
+        #expect(abs(color.redComponent - 194 / 255) < 0.02)
+    }
+
     @Test func drawsTheForegroundColor() async throws {
         let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
         let red = try image(of: try await drawnView(running: "printf '\\033[31mX\\r'"))

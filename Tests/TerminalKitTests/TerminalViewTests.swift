@@ -38,6 +38,24 @@ struct TerminalViewTests {
         #expect(session.terminal.columns == Int((visibleSize.width - 8) / view.cellSize.width))
     }
 
+    @Test func growsWithTheScrollback() async throws {
+        let session = TerminalSession(
+            configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "seq 1 50"])
+        )
+        let scrollView = TerminalScrollView(session: session)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        scrollView.layoutSubtreeIfNeeded()
+        try session.start()
+        for await state in Observations({ session.state }) where state != .running {
+            break
+        }
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        let lineCount = session.terminal.scrollback.count + session.terminal.rows
+        #expect(session.terminal.scrollback.count > 0)
+        #expect(view.frame.height == CGFloat(lineCount) * view.cellSize.height + 8)
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
