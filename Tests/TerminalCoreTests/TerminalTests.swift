@@ -334,6 +334,51 @@ struct TerminalTests {
         terminal.receive("\u{1B}[44m\u{1B}[2\(final)".utf8)
         #expect(terminal.screen.map { $0[0].style.background } == [.indexed(4), .indexed(4)])
     }
+
+    @Test func scrollsInTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2;3r".utf8)
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
+        terminal.receive("\u{1B}[3Hx\ny".utf8)
+        #expect(lines(terminal) == ["a", "x", "y", "d"])
+    }
+
+    @Test func scrollsTheScrollRegionUpAndDown() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2;3r\u{1B}[S".utf8)
+        #expect(lines(terminal) == ["a", "c", " ", "d"])
+        terminal.receive("\u{1B}[2T".utf8)
+        #expect(lines(terminal) == ["a", " ", " ", "d"])
+    }
+
+    @Test func movesBelowTheScrollRegionWithoutScrolling() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[1;2r\u{1B}[3H\n\n".utf8)
+        #expect(lines(terminal) == ["a", "b", "c", "d"])
+        #expect(terminal.cursor == Terminal.Position(row: 3, column: 0))
+    }
+
+    @Test(arguments: ["\u{1B}[3;3r", "\u{1B}[3;2r", "\u{1B}[4;9r"])
+    func ignoresAScrollRegionOfLessThanTwoLines(sequence: String) {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\u{1B}[4H\(sequence)\n".utf8)
+        #expect(lines(terminal) == [" ", " ", " ", " "])
+        #expect(terminal.cursor == Terminal.Position(row: 3, column: 0))
+    }
+
+    @Test func resetsTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("\u{1B}[2;3r\u{1B}[r\u{1B}[4Ha\n".utf8)
+        #expect(lines(terminal) == [" ", " ", "a", " "])
+    }
+
+    @Test func resetsTheScrollRegionOnAResize() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("\u{1B}[2;3r".utf8)
+        terminal.resize(columns: 1, rows: 3)
+        terminal.receive("\u{1B}[3Ha\n".utf8)
+        #expect(lines(terminal) == [" ", "a", " "])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {

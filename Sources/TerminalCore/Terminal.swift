@@ -32,6 +32,7 @@ package struct Terminal: Sendable {
     private var isWrapPending = false
     private var style = Style()
     private var savedCursor = SavedCursor()
+    private var scrollRegion: Range<Int>
     private var normalScreen: (lines: [[Cell]], savedCursor: SavedCursor)?
 
     package init(columns: Int, rows: Int) {
@@ -39,6 +40,7 @@ package struct Terminal: Sendable {
         self.columns = columns
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
+        scrollRegion = 0 ..< rows
     }
 
     package mutating func resize(columns: Int, rows: Int) {
@@ -58,6 +60,7 @@ package struct Terminal: Sendable {
         }
         self.columns = columns
         self.rows = rows
+        scrollRegion = 0 ..< rows
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
     }
 
@@ -126,11 +129,13 @@ package struct Terminal: Sendable {
         case "K":
             eraseInLine(sequence.parameter(at: 0, default: 0))
         case "S":
-            scrollUp(count, in: 0 ..< rows)
+            scrollUp(count, in: scrollRegion)
         case "T" where sequence.parameters.count <= 1:
-            scrollDown(count, in: 0 ..< rows)
+            scrollDown(count, in: scrollRegion)
         case "m":
             style.apply(sequence.parameters)
+        case "r":
+            setScrollRegion(top: count - 1, bottom: min(sequence.parameter(at: 1, default: rows), rows))
         case "s" where sequence.parameters.isEmpty:
             saveCursor()
         case "u" where sequence.parameters.isEmpty:
@@ -162,11 +167,19 @@ package struct Terminal: Sendable {
 
     private mutating func lineFeed() {
         isWrapPending = false
-        if cursor.row == rows - 1 {
-            scrollUp(1, in: 0 ..< rows)
-        } else {
+        if cursor.row == scrollRegion.upperBound - 1 {
+            scrollUp(1, in: scrollRegion)
+        } else if cursor.row < rows - 1 {
             cursor.row += 1
         }
+    }
+
+    private mutating func setScrollRegion(top: Int, bottom: Int) {
+        guard top < bottom - 1 else {
+            return
+        }
+        scrollRegion = top ..< bottom
+        moveCursor(row: 0, column: 0)
     }
 
     private mutating func scrollUp(_ count: Int, in region: Range<Int>) {
