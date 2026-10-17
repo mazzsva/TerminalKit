@@ -22,6 +22,7 @@ package struct Terminal: Sendable {
     package private(set) var screen: [[Cell]]
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var title = ""
+    package private(set) var usesApplicationCursorKeys = false
 
     package var isAlternateScreenActive: Bool {
         normalScreen != nil
@@ -262,6 +263,8 @@ package struct Terminal: Sendable {
 
     private mutating func setPrivateMode(_ mode: Int, isEnabled: Bool) {
         switch (mode, isEnabled) {
+        case (1, _):
+            usesApplicationCursorKeys = isEnabled
         case (47, true), (1047, true):
             enterAlternateScreen()
         case (47, false), (1047, false):

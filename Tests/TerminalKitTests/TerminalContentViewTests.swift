@@ -95,6 +95,22 @@ struct TerminalContentViewTests {
         #expect(await lines(afterExitOf: session).contains("got hi"))
     }
 
+    @Test func sendsTheCursorKeysInTheModeOfTheProcess() async throws {
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/bin/sh"),
+                arguments: ["-c", "printf '\\033[?1h'; stty raw -echo; dd bs=3 count=1 2>/dev/null | od -An -tx1"]
+            )
+        )
+        let view = TerminalContentView(session: session)
+        try session.start()
+        for await isEnabled in Observations({ session.terminal.usesApplicationCursorKeys }) where isEnabled {
+            break
+        }
+        view.keyDown(with: try keyDown(NSUpArrowFunctionKey))
+        #expect(await lines(afterExitOf: session).contains("1b  4f  41"))
+    }
+
     @Test func sendsTextFromTheInputSystem() async throws {
         let session = readingSession()
         let view = TerminalContentView(session: session)
