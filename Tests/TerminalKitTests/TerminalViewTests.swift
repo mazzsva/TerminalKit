@@ -56,6 +56,23 @@ struct TerminalViewTests {
         #expect(view.frame.height == CGFloat(lineCount) * view.cellSize.height + 8)
     }
 
+    @Test func followsNewOutputAtTheBottom() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 50; read line; seq 51 100")
+        session.send(Array("\r".utf8))
+        await waitForExit(of: session)
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
+    }
+
+    @Test func keepsThePositionWhenScrolledBack() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 50; read line; seq 51 100")
+        scrollView.terminalView.scroll(.zero)
+        session.send(Array("\r".utf8))
+        await waitForExit(of: session)
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.minY == 0)
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
@@ -86,6 +103,29 @@ struct TerminalViewTests {
             TerminalContentView(session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh"))))
         )
         #expect(window.firstResponder === textView)
+    }
+}
+
+@MainActor
+private func scrollView(running script: String) async throws -> (TerminalScrollView, TerminalSession) {
+    let session = TerminalSession(
+        configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", script])
+    )
+    let scrollView = TerminalScrollView(session: session)
+    scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+    scrollView.layoutSubtreeIfNeeded()
+    try session.start()
+    for await count in Observations({ session.terminal.scrollback.count }) where count > 0 {
+        break
+    }
+    scrollView.layoutSubtreeIfNeeded()
+    return (scrollView, session)
+}
+
+@MainActor
+private func waitForExit(of session: TerminalSession) async {
+    for await state in Observations({ session.state }) where state != .running {
+        break
     }
 }
 

@@ -18,7 +18,11 @@ final class TerminalScrollView: NSScrollView {
     }
 
     override func layout() {
+        let isAtBottom = contentView.bounds.maxY >= terminalView.frame.height
         super.layout()
         terminalView.fit(to: contentSize)
+        if isAtBottom {
+            terminalView.scroll(CGPoint(x: 0, y: terminalView.frame.height - contentSize.height))
+        }
     }
 }
