@@ -306,6 +306,34 @@ struct TerminalTests {
         #expect(lines(terminal) == ["b ", "c "])
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
     }
+
+    @Test func scrollsUp() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2S".utf8)
+        #expect(lines(terminal) == ["c", "d", " ", " "])
+        #expect(terminal.cursor == Terminal.Position(row: 3, column: 0))
+    }
+
+    @Test func scrollsDown() {
+        var terminal = Terminal(columns: 1, rows: 4)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[T".utf8)
+        #expect(lines(terminal) == [" ", "a", "b", "c"])
+    }
+
+    @Test func scrollsNoMoreThanTheScreen() {
+        var terminal = Terminal(columns: 1, rows: 2)
+        terminal.receive("a\r\nb\u{1B}[9S".utf8)
+        #expect(lines(terminal) == [" ", " "])
+        terminal.receive("a\u{1B}[9T".utf8)
+        #expect(lines(terminal) == [" ", " "])
+    }
+
+    @Test(arguments: ["S", "T"])
+    func scrollsInLinesWithTheBackgroundColor(final: String) {
+        var terminal = Terminal(columns: 1, rows: 2)
+        terminal.receive("\u{1B}[44m\u{1B}[2\(final)".utf8)
+        #expect(terminal.screen.map { $0[0].style.background } == [.indexed(4), .indexed(4)])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {

@@ -125,6 +125,10 @@ package struct Terminal: Sendable {
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
             eraseInLine(sequence.parameter(at: 0, default: 0))
+        case "S":
+            scrollUp(count, in: 0 ..< rows)
+        case "T" where sequence.parameters.count <= 1:
+            scrollDown(count, in: 0 ..< rows)
         case "m":
             style.apply(sequence.parameters)
         case "s" where sequence.parameters.isEmpty:
@@ -159,11 +163,22 @@ package struct Terminal: Sendable {
     private mutating func lineFeed() {
         isWrapPending = false
         if cursor.row == rows - 1 {
-            screen.removeFirst()
-            screen.append(Array(repeating: blank, count: columns))
+            scrollUp(1, in: 0 ..< rows)
         } else {
             cursor.row += 1
         }
+    }
+
+    private mutating func scrollUp(_ count: Int, in region: Range<Int>) {
+        let count = min(count, region.count)
+        screen.removeSubrange(region.lowerBound ..< region.lowerBound + count)
+        screen.insert(contentsOf: blankLines(count), at: region.upperBound - count)
+    }
+
+    private mutating func scrollDown(_ count: Int, in region: Range<Int>) {
+        let count = min(count, region.count)
+        screen.removeSubrange(region.upperBound - count ..< region.upperBound)
+        screen.insert(contentsOf: blankLines(count), at: region.lowerBound)
     }
 
     private mutating func carriageReturn() {
@@ -198,7 +213,7 @@ package struct Terminal: Sendable {
             return
         }
         normalScreen = (screen, savedCursor)
-        screen = Array(repeating: Array(repeating: blank, count: columns), count: rows)
+        screen = blankLines(rows)
         savedCursor = SavedCursor()
     }
 
@@ -261,6 +276,10 @@ package struct Terminal: Sendable {
 
     private var blank: Cell {
         Cell(style: Style(background: style.background))
+    }
+
+    private func blankLines(_ count: Int) -> [[Cell]] {
+        Array(repeating: Array(repeating: blank, count: columns), count: count)
     }
 
     private static func resized(_ screen: [[Cell]], columns: Int, rows: Int, removingFirst removedRows: Int)
