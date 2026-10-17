@@ -141,6 +141,24 @@ struct TerminalViewTests {
         #expect(!scrollView.hasVerticalScroller)
     }
 
+    @Test func usesTheTerminalFont() throws {
+        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let large = NSFont.monospacedSystemFont(ofSize: 20, weight: .regular)
+        let hostingView = NSHostingView(rootView: TerminalView(session: session).terminalFont(large))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+        let view = try #require(contentView(in: hostingView))
+        let visibleWidth = try #require(view.enclosingScrollView).contentSize.width
+        #expect(view.font == large)
+        #expect(session.terminal.columns == Int((visibleWidth - 8) / view.cellSize.width))
+
+        let small = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
+        hostingView.rootView = TerminalView(session: session).terminalFont(small)
+        hostingView.layoutSubtreeIfNeeded()
+        #expect(view.font == small)
+        #expect(session.terminal.columns == Int((visibleWidth - 8) / view.cellSize.width))
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),

@@ -3,6 +3,7 @@ import TerminalCore
 
 final class TerminalContentView: NSView {
     static let padding: CGFloat = 4
+    static let defaultFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
 
     var session: TerminalSession {
         didSet {
@@ -13,8 +14,14 @@ final class TerminalContentView: NSView {
         }
     }
 
-    let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-    let cellSize: CGSize
+    var font = defaultFont {
+        didSet {
+            cellSize = Self.cellSize(of: font)
+            enclosingScrollView?.needsLayout = true
+            needsDisplay = true
+        }
+    }
+    private(set) var cellSize: CGSize
     var markedText = "" {
         didSet {
             needsDisplay = true
@@ -30,10 +37,7 @@ final class TerminalContentView: NSView {
 
     init(session: TerminalSession) {
         self.session = session
-        cellSize = CGSize(
-            width: ("M" as NSString).size(withAttributes: [.font: font]).width,
-            height: ceil(font.ascender - font.descender + font.leading)
-        )
+        cellSize = Self.cellSize(of: font)
         super.init(frame: .zero)
     }
 
@@ -121,6 +125,13 @@ final class TerminalContentView: NSView {
         }
         NSColor.textColor.withAlphaComponent(0.5).setFill()
         cursor.fill(using: .sourceOver)
+    }
+
+    private static func cellSize(of font: NSFont) -> CGSize {
+        CGSize(
+            width: ("M" as NSString).size(withAttributes: [.font: font]).width,
+            height: ceil(font.ascender - font.descender + font.leading)
+        )
     }
 
     func line(at row: Int) -> [Terminal.Cell] {
