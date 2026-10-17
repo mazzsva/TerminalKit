@@ -135,6 +135,12 @@ package struct Terminal: Sendable {
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
             eraseInLine(sequence.parameter(at: 0, default: 0))
+        case "@":
+            insertCharacters(count)
+        case "P":
+            deleteCharacters(count)
+        case "X":
+            erase(cursor.column ..< min(cursor.column + count, columns), row: cursor.row)
         case "L":
             insertLines(count)
         case "M":
@@ -183,6 +189,20 @@ package struct Terminal: Sendable {
         } else if cursor.row < rows - 1 {
             cursor.row += 1
         }
+    }
+
+    private mutating func insertCharacters(_ count: Int) {
+        isWrapPending = false
+        let count = min(count, columns - cursor.column)
+        screen[cursor.row].insert(contentsOf: repeatElement(blank, count: count), at: cursor.column)
+        screen[cursor.row].removeLast(count)
+    }
+
+    private mutating func deleteCharacters(_ count: Int) {
+        isWrapPending = false
+        let count = min(count, columns - cursor.column)
+        screen[cursor.row].removeSubrange(cursor.column ..< cursor.column + count)
+        screen[cursor.row].append(contentsOf: repeatElement(blank, count: count))
     }
 
     private mutating func insertLines(_ count: Int) {

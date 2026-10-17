@@ -436,6 +436,39 @@ struct TerminalTests {
         terminal.receive("abc\u{1B}[Lx".utf8)
         #expect(lines(terminal) == ["x  ", "abc"])
     }
+
+    @Test func insertsCharacters() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("abcde\u{1B}[2G\u{1B}[2@x".utf8)
+        #expect(lines(terminal) == ["ax bc"])
+    }
+
+    @Test func deletesCharacters() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("abcde\u{1B}[2G\u{1B}[2P".utf8)
+        #expect(lines(terminal) == ["ade  "])
+    }
+
+    @Test func erasesCharacters() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("abcde\u{1B}[2G\u{1B}[2X".utf8)
+        #expect(lines(terminal) == ["a  de"])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+    }
+
+    @Test(arguments: ["@", "P", "X"])
+    func changesNoMoreThanTheRestOfTheLine(final: String) {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("abc\u{1B}[2G\u{1B}[9\(final)".utf8)
+        #expect(lines(terminal) == ["a  "])
+    }
+
+    @Test(arguments: ["@", "P", "X"])
+    func changesCharactersWithTheBackgroundColor(final: String) {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("ab\u{1B}[G\u{1B}[44m\u{1B}[2\(final)".utf8)
+        #expect(terminal.screen[0].map(\.style.background) == [.indexed(4), .indexed(4)])
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
