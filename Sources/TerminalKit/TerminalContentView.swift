@@ -6,6 +6,9 @@ final class TerminalContentView: NSView {
     let session: TerminalSession
     let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
     let cellSize: CGSize
+    var markedText = ""
+
+    private var keyDownEvent: NSEvent?
 
     init(session: TerminalSession) {
         self.session = session
@@ -30,11 +33,19 @@ final class TerminalContentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        guard let input = event.terminalInput else {
+        guard !event.modifierFlags.contains(.command) else {
             super.keyDown(with: event)
             return
         }
-        session.send(input)
+        keyDownEvent = event
+        interpretKeyEvents([event])
+        keyDownEvent = nil
+    }
+
+    override func doCommand(by selector: Selector) {
+        if let input = keyDownEvent?.terminalInput {
+            session.send(input)
+        }
     }
 
     override func setFrameSize(_ newSize: NSSize) {
