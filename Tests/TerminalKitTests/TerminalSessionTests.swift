@@ -59,6 +59,14 @@ struct TerminalSessionTests {
         #expect(session.title == "Title")
     }
 
+    @Test func sendsInputToTheProcess() async throws {
+        let session = TerminalSession(configuration: shell("read line; echo \"got $line\""))
+        try session.start()
+        session.send(Array("hello\r".utf8))
+        await waitForExit(of: session)
+        #expect(text(of: session).contains("got hello"))
+    }
+
     @Test func startsTheProcessWithTheSizeOfTheScreen() async throws {
         let session = TerminalSession(configuration: shell("stty size"))
         session.resize(columns: 100, rows: 30)

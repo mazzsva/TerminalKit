@@ -61,6 +61,10 @@ public final class TerminalSession {
         pseudoTerminal?.resize(columns: columns, rows: rows)
     }
 
+    func send(_ bytes: [UInt8]) {
+        pseudoTerminal?.write(bytes)
+    }
+
     private func handle(_ event: PseudoTerminal.Event) {
         switch event {
         case .output(let bytes):

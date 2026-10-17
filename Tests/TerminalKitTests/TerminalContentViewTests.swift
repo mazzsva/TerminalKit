@@ -49,6 +49,28 @@ struct TerminalContentViewTests {
         let corner = CGPoint(x: 190, y: 90)
         #expect(color(in: representation, at: center) != color(in: representation, at: corner))
     }
+
+    @Test func sendsKeyPressesToTheSession() async throws {
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "read line; echo \"got $line\""])
+        )
+        let view = TerminalContentView(session: session)
+        try session.start()
+        for characters in ["h", "i", "\r"] {
+            view.keyDown(with: try keyDown(characters))
+        }
+        for await state in Observations({ session.state }) where state != .running {
+            break
+        }
+        let lines = session.terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
+        #expect(lines.contains("got hi"))
+    }
+
+    @Test func acceptsFirstResponder() {
+        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        #expect(TerminalContentView(session: session).acceptsFirstResponder)
+    }
 }
 
 @MainActor

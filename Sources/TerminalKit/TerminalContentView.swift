@@ -25,6 +25,18 @@ final class TerminalContentView: NSView {
         true
     }
 
+    override var acceptsFirstResponder: Bool {
+        true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        guard let input = event.terminalInput else {
+            super.keyDown(with: event)
+            return
+        }
+        session.send(input)
+    }
+
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         session.resize(
