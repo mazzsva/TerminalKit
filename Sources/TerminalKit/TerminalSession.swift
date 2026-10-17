@@ -68,7 +68,10 @@ public final class TerminalSession {
     private func handle(_ event: PseudoTerminal.Event) {
         switch event {
         case .output(let bytes):
-            terminal.receive(bytes)
+            let replies = terminal.receive(bytes)
+            if !replies.isEmpty {
+                pseudoTerminal?.write(replies)
+            }
         case .exit(let termination):
             state = .exited(Termination(termination))
             pseudoTerminal = nil
