@@ -38,16 +38,7 @@ package final class PseudoTerminal: Sendable {
         columns: Int,
         rows: Int
     ) throws(POSIXError) {
-        var size = winsize(columns: columns, rows: rows)
-        var primary: Int32 = -1
-        var secondary: Int32 = -1
-        guard openpty(&primary, &secondary, nil, nil, &size) == 0 else {
-            throw POSIXError(errno)
-        }
-        _ = fcntl(primary, F_SETFD, FD_CLOEXEC)
-        _ = fcntl(secondary, F_SETFD, FD_CLOEXEC)
-        _ = fcntl(primary, F_SETFL, fcntl(primary, F_GETFL) | O_NONBLOCK)
-
+        let (primary, secondary) = try Self.openTerminal(columns: columns, rows: rows)
         do {
             processIdentifier = try Self.spawn(
                 executableURL: executableURL,
@@ -184,6 +175,29 @@ package final class PseudoTerminal: Sendable {
         cancelSources()
         continuation.yield(.exit(termination))
         continuation.finish()
+    }
+
+    private static func openTerminal(columns: Int, rows: Int) throws(POSIXError) -> (primary: Int32, secondary: Int32) {
+        let primary = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC)
+        guard primary != -1 else {
+            throw POSIXError(errno)
+        }
+        var name = [CChar](repeating: 0, count: 128)
+        guard grantpt(primary) == 0, unlockpt(primary) == 0, ptsname_r(primary, &name, name.count) == 0 else {
+            let error = errno
+            close(primary)
+            throw POSIXError(error)
+        }
+        let secondary = open(name, O_RDWR | O_NOCTTY | O_CLOEXEC)
+        guard secondary != -1 else {
+            let error = errno
+            close(primary)
+            throw POSIXError(error)
+        }
+        var size = winsize(columns: columns, rows: rows)
+        _ = ioctl(secondary, TIOCSWINSZ, &size)
+        _ = fcntl(primary, F_SETFL, fcntl(primary, F_GETFL) | O_NONBLOCK)
+        return (primary, secondary)
     }
 
     private static func spawn(
