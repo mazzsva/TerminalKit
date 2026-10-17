@@ -3,7 +3,15 @@ import AppKit
 final class TerminalContentView: NSView {
     private static let padding: CGFloat = 4
 
-    let session: TerminalSession
+    var session: TerminalSession {
+        didSet {
+            inputContext?.discardMarkedText()
+            markedText = ""
+            fitSession()
+            needsDisplay = true
+        }
+    }
+
     let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
     let cellSize: CGSize
     var markedText = "" {
@@ -54,10 +62,7 @@ final class TerminalContentView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        session.resize(
-            columns: max(Int((newSize.width - 2 * Self.padding) / cellSize.width), 1),
-            rows: max(Int((newSize.height - 2 * Self.padding) / cellSize.height), 1)
-        )
+        fitSession()
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -87,6 +92,13 @@ final class TerminalContentView: NSView {
 
     var cursorRect: CGRect {
         rect(row: session.terminal.cursor.row, column: session.terminal.cursor.column)
+    }
+
+    private func fitSession() {
+        session.resize(
+            columns: max(Int((bounds.width - 2 * Self.padding) / cellSize.width), 1),
+            rows: max(Int((bounds.height - 2 * Self.padding) / cellSize.height), 1)
+        )
     }
 
     private func rect(row: Int, column: Int) -> CGRect {

@@ -19,5 +19,9 @@ private struct Representable: NSViewRepresentable {
         TerminalContentView(session: session)
     }
 
-    func updateNSView(_ view: TerminalContentView, context: Context) {}
+    func updateNSView(_ view: TerminalContentView, context: Context) {
+        if view.session !== session {
+            view.session = session
+        }
+    }
 }
