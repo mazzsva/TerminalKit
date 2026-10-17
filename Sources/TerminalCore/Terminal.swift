@@ -14,6 +14,7 @@ package struct Terminal: Sendable {
         var position = Position(row: 0, column: 0)
         var style = Style()
         var isWrapPending = false
+        var usesLineDrawing = false
     }
 
     private static let tabWidth = 8
@@ -395,13 +396,19 @@ package struct Terminal: Sendable {
     }
 
     private mutating func saveCursor() {
-        savedCursor = SavedCursor(position: cursor, style: style, isWrapPending: isWrapPending)
+        savedCursor = SavedCursor(
+            position: cursor,
+            style: style,
+            isWrapPending: isWrapPending,
+            usesLineDrawing: usesLineDrawing
+        )
     }
 
     private mutating func restoreCursor() {
         moveCursor(row: savedCursor.position.row, column: savedCursor.position.column)
         style = savedCursor.style
         isWrapPending = savedCursor.isWrapPending
+        usesLineDrawing = savedCursor.usesLineDrawing
     }
 
     private mutating func eraseInDisplay(_ mode: Int) {

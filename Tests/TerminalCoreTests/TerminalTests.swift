@@ -85,6 +85,12 @@ struct TerminalTests {
         #expect(lines(terminal) == ["┌───┐", "│ ▒ │", "└───┘"])
     }
 
+    @Test func restoresTheGraphicsCharactersWithTheCursor() {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("\u{1B}(0\u{1B}7\u{1B}(B\u{1B}8q\u{1B}(B\u{1B}8q")
+        #expect(lines(terminal) == ["─ "])
+    }
+
     @Test func printsTheOtherCharactersInTheGraphicsSet() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{1B}(0AZ^\u{1B}(Bq")
