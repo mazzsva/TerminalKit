@@ -15,13 +15,13 @@ public struct TerminalView: View {
 private struct Representable: NSViewRepresentable {
     let session: TerminalSession
 
-    func makeNSView(context: Context) -> TerminalContentView {
-        TerminalContentView(session: session)
+    func makeNSView(context: Context) -> TerminalScrollView {
+        TerminalScrollView(session: session)
     }
 
-    func updateNSView(_ view: TerminalContentView, context: Context) {
-        if view.session !== session {
-            view.session = session
+    func updateNSView(_ view: TerminalScrollView, context: Context) {
+        if view.terminalView.session !== session {
+            view.terminalView.session = session
         }
     }
 }

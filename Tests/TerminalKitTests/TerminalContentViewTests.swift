@@ -10,16 +10,14 @@ struct TerminalContentViewTests {
     @Test func fitsTheScreenToTheView() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
         let view = TerminalContentView(session: session)
-        view.setFrameSize(
-            NSSize(width: 8 + view.cellSize.width * 100.5, height: 8 + view.cellSize.height * 30.5)
-        )
+        view.fit(to: CGSize(width: 8 + view.cellSize.width * 100.5, height: 8 + view.cellSize.height * 30.5))
         #expect(session.terminal.columns == 100)
         #expect(session.terminal.rows == 30)
     }
 
     @Test func keepsAtLeastOneCell() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
-        TerminalContentView(session: session).setFrameSize(.zero)
+        TerminalContentView(session: session).fit(to: .zero)
         #expect(session.terminal.columns == 1)
         #expect(session.terminal.rows == 1)
     }

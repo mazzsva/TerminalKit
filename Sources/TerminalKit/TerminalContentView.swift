@@ -8,7 +8,7 @@ final class TerminalContentView: NSView {
         didSet {
             inputContext?.discardMarkedText()
             markedText = ""
-            fitSession()
+            enclosingScrollView?.needsLayout = true
             needsDisplay = true
         }
     }
@@ -66,11 +66,6 @@ final class TerminalContentView: NSView {
         if let input = keyDownEvent?.terminalInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys) {
             session.send(input)
         }
-    }
-
-    override func setFrameSize(_ newSize: NSSize) {
-        super.setFrameSize(newSize)
-        fitSession()
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -148,11 +143,12 @@ final class TerminalContentView: NSView {
         rect(row: session.terminal.cursor.row, column: session.terminal.cursor.column)
     }
 
-    private func fitSession() {
+    func fit(to size: CGSize) {
         session.resize(
-            columns: max(Int((bounds.width - 2 * Self.padding) / cellSize.width), 1),
-            rows: max(Int((bounds.height - 2 * Self.padding) / cellSize.height), 1)
+            columns: max(Int((size.width - 2 * Self.padding) / cellSize.width), 1),
+            rows: max(Int((size.height - 2 * Self.padding) / cellSize.height), 1)
         )
+        setFrameSize(size)
     }
 
     private func rect(row: Int, column: Int) -> CGRect {

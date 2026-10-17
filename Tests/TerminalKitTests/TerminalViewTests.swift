@@ -13,9 +13,11 @@ struct TerminalViewTests {
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         hostingView.layoutSubtreeIfNeeded()
         let view = try #require(contentView(in: hostingView))
+        let visibleSize = try #require(view.enclosingScrollView).contentSize
         #expect(view.session === session)
-        #expect(view.frame.size == hostingView.frame.size)
-        #expect(session.terminal.columns == Int((400 - 8) / view.cellSize.width))
+        #expect(view.frame.size == visibleSize)
+        #expect(session.terminal.columns == Int((visibleSize.width - 8) / view.cellSize.width))
+        #expect(session.terminal.rows == Int((visibleSize.height - 8) / view.cellSize.height))
     }
 
     @Test func showsANewSessionInTheSameView() throws {
@@ -30,9 +32,10 @@ struct TerminalViewTests {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
         hostingView.rootView = TerminalView(session: session)
         hostingView.layoutSubtreeIfNeeded()
+        let visibleSize = try #require(view.enclosingScrollView).contentSize
         #expect(contentView(in: hostingView) === view)
         #expect(view.session === session)
-        #expect(session.terminal.columns == Int((400 - 8) / view.cellSize.width))
+        #expect(session.terminal.columns == Int((visibleSize.width - 8) / view.cellSize.width))
     }
 
     @Test func focusesTheTerminalWhenItAppears() throws {
