@@ -1,7 +1,7 @@
 import AppKit
+import TerminalCore
 import Testing
 
-import TerminalCore
 @testable import TerminalKit
 
 struct TerminalColorTests {
