@@ -84,9 +84,7 @@ final class TerminalContentView: NSView {
         let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height), 0)
         let lastRow = min(Int((dirtyRect.maxY - Self.padding) / cellSize.height), lineCount - 1)
         for row in firstRow ..< max(lastRow + 1, firstRow) {
-            let line =
-                row < terminal.scrollback.count
-                ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
+            let line = line(at: row)
             let runs = Self.runs(in: line)
             for (columns, style) in runs {
                 if let background = colors(for: style).background {
@@ -116,6 +114,12 @@ final class TerminalContentView: NSView {
         }
         NSColor.textColor.withAlphaComponent(0.5).setFill()
         cursor.fill(using: .sourceOver)
+    }
+
+    func line(at row: Int) -> [Terminal.Cell] {
+        let terminal = session.terminal
+        return row < terminal.scrollback.count
+            ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
     }
 
     private var selectionColor: NSColor {

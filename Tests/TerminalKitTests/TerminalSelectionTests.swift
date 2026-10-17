@@ -30,7 +30,7 @@ struct TerminalSelectionTests {
 
     @Test func selectsNothingWithoutADrag() {
         let selection = Selection(anchor: .init(line: 1, column: 3), head: .init(line: 1, column: 3))
-        #expect(selection.columns(inLine: 1, count: 10) == nil)
+        #expect(selection.columns(inLine: 1, count: 10)?.isEmpty == true)
     }
 
     @Test func keepsTheColumnsInTheLine() {
@@ -62,6 +62,57 @@ struct TerminalSelectionTests {
         view.cacheDisplay(in: view.bounds, to: representation)
         #expect(representation.colorAt(x: 40, y: 40) != before)
     }
+
+    @Test func copiesTheSelectedText() async throws {
+        let view = try await view(running: "printf 'hello world   \\r\\nsecond line'")
+        view.selection = Selection(anchor: .init(line: 0, column: 6), head: .init(line: 1, column: 6))
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
+        #expect(view.writeSelection(to: pasteboard, types: [.string]))
+        #expect(pasteboard.string(forType: .string) == "world\nsecond")
+    }
+
+    @Test func copiesWithoutTheSpacesAtTheEndOfALine() async throws {
+        let view = try await view(running: "printf 'hello world   '")
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 40))
+        #expect(view.selectedText == "hello world")
+    }
+
+    @Test func copiesFromTheScrollback() async throws {
+        let view = try await view(running: "seq 1 100")
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 2, column: 0))
+        #expect(view.selectedText == "1\n2\n")
+    }
+
+    @Test func copiesNothingWithoutADrag() async throws {
+        let view = try await view(running: "printf 'hello'")
+        view.selection = Selection(anchor: .init(line: 0, column: 2), head: .init(line: 0, column: 2))
+        #expect(view.selectedText == nil)
+    }
+
+    @Test func turnsOnCopyOnlyWithASelection() {
+        let view = viewInWindow()
+        let item = NSMenuItem(title: "Copy", action: #selector(TerminalContentView.copy(_:)), keyEquivalent: "c")
+        #expect(!view.validateMenuItem(item))
+        #expect(view.validRequestor(forSendType: .string, returnType: nil) as? NSView !== view)
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 1, column: 0))
+        #expect(view.validateMenuItem(item))
+        #expect(view.validRequestor(forSendType: .string, returnType: nil) as? NSView === view)
+    }
+}
+
+@MainActor
+private func view(running script: String) async throws -> TerminalContentView {
+    let session = TerminalSession(
+        configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", script])
+    )
+    let view = TerminalContentView(session: session)
+    view.fit(to: CGSize(width: 400, height: 300))
+    try session.start()
+    for await state in Observations({ session.state }) where state != .running {
+        break
+    }
+    return view
 }
 
 @MainActor
