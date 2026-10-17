@@ -78,6 +78,12 @@ struct TerminalSelectionTests {
         #expect(view.selectedText == "hello world")
     }
 
+    @Test func copiesWideCharactersOnce() async throws {
+        let view = try await view(running: "printf 'a中b😀'")
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 6))
+        #expect(view.selectedText == "a中b😀")
+    }
+
     @Test func copiesFromTheScrollback() async throws {
         let view = try await view(running: "seq 1 100")
         view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 2, column: 0))
