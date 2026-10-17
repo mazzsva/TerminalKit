@@ -32,6 +32,7 @@ extension TerminalContentView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        autoscroll(with: event)
         selection?.head = selectionPoint(at: convert(event.locationInWindow, from: nil))
     }
 

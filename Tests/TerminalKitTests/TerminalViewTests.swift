@@ -99,6 +99,36 @@ struct TerminalViewTests {
         await waitForExit(of: session)
     }
 
+    @Test func scrollsWhenYouSelectAboveTheView() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 50")
+        await waitForExit(of: session)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [],
+            backing: .buffered,
+            defer: true
+        )
+        window.contentView = scrollView
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        let top = scrollView.contentView.bounds.minY
+        let event = try #require(
+            NSEvent.mouseEvent(
+                with: .leftMouseDragged,
+                location: CGPoint(x: 100, y: 320),
+                modifierFlags: [],
+                timestamp: 0,
+                windowNumber: window.windowNumber,
+                context: nil,
+                eventNumber: 0,
+                clickCount: 1,
+                pressure: 1
+            )
+        )
+        view.mouseDragged(with: event)
+        #expect(scrollView.contentView.bounds.minY < top)
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
