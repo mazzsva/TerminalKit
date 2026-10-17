@@ -46,6 +46,32 @@ struct StyleTests {
         #expect(style.isBold)
     }
 
+    @Test func setsTheStandardColors() {
+        var style = Terminal.Style()
+        style.apply([31, 42])
+        #expect(style.foreground == .indexed(1))
+        #expect(style.background == .indexed(2))
+        style.apply([37, 40])
+        #expect(style.foreground == .indexed(7))
+        #expect(style.background == .indexed(0))
+    }
+
+    @Test func setsTheBrightColors() {
+        var style = Terminal.Style()
+        style.apply([90, 107])
+        #expect(style.foreground == .indexed(8))
+        #expect(style.background == .indexed(15))
+    }
+
+    @Test func setsTheDefaultColors() {
+        var style = Terminal.Style()
+        style.apply([1, 31, 42])
+        style.apply([39, 49])
+        #expect(style.foreground == .default)
+        #expect(style.background == .default)
+        #expect(style.isBold)
+    }
+
     @Test func printsWithTheCurrentStyle() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("a\u{1B}[1mb\u{1B}[mc".utf8)
