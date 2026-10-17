@@ -6,7 +6,7 @@ import Testing
 
 struct TerminalColorTests {
     @Test func usesTheDefaultColorsOfTheView() {
-        #expect(NSColor.terminal(.default) == nil)
+        #expect(NSColor.terminal(.default, ansiColors: ansiColors) == nil)
     }
 
     @Test func usesTheStandardColorsOfTerminal() {
@@ -33,8 +33,10 @@ struct TerminalColorTests {
 }
 
 private func components(_ color: Terminal.Color) -> [Int]? {
-    guard let color = NSColor.terminal(color)?.usingColorSpace(.sRGB) else {
+    guard let color = NSColor.terminal(color, ansiColors: ansiColors)?.usingColorSpace(.sRGB) else {
         return nil
     }
     return [color.redComponent, color.greenComponent, color.blueComponent].map { Int(($0 * 255).rounded()) }
 }
+
+private let ansiColors = TerminalPalette.standard.ansiColors.map(NSColor.init)

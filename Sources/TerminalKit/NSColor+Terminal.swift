@@ -2,19 +2,12 @@ import AppKit
 import TerminalCore
 
 extension NSColor {
-    private static let standardColors: [(red: UInt8, green: UInt8, blue: UInt8)] = [
-        (0, 0, 0), (194, 54, 33), (37, 188, 36), (173, 173, 39),
-        (73, 46, 225), (211, 56, 211), (51, 187, 200), (203, 204, 205),
-        (129, 131, 131), (252, 57, 31), (49, 231, 34), (234, 236, 35),
-        (88, 51, 255), (249, 53, 248), (20, 240, 240), (233, 235, 235),
-    ]
-
-    static func terminal(_ color: Terminal.Color) -> NSColor? {
+    static func terminal(_ color: Terminal.Color, ansiColors: [NSColor]) -> NSColor? {
         switch color {
         case .default:
             nil
         case .indexed(let index) where index < 16:
-            NSColor(standardColors[Int(index)])
+            ansiColors[Int(index)]
         case .indexed(let index) where index < 232:
             NSColor(cubeColor(Int(index) - 16))
         case .indexed(let index):

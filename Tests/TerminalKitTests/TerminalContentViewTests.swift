@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import TerminalKit
@@ -94,6 +95,18 @@ struct TerminalContentViewTests {
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
         let color = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
         #expect(abs(color.redComponent - 194 / 255) < 0.02)
+    }
+
+    @Test func drawsWithThePalette() async throws {
+        let view = try await drawnView(running: "printf '\\033[41m  \\033[m'")
+        var palette = TerminalPalette.standard
+        palette.background = Color(.sRGB, red: 0.2, green: 0.3, blue: 0.4)
+        palette.ansiColors[1] = Color(.sRGB, red: 0.4, green: 0.6, blue: 0.2)
+        view.palette = palette
+        let representation = try representation(of: view)
+        let cell = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        #expect(isClose(color(in: representation, at: cell), to: [0.4, 0.6, 0.2]))
+        #expect(isClose(color(in: representation, at: CGPoint(x: 190, y: 90)), to: [0.2, 0.3, 0.4]))
     }
 
     @Test func drawsTheForegroundColor() async throws {
@@ -276,4 +289,12 @@ private func pixels(in rect: CGRect, of view: NSView) throws -> [NSColor?] {
             stride(from: Int(rect.minX * scale), to: Int(rect.maxX * scale), by: 1)
                 .map { x in representation.colorAt(x: x, y: y) }
         }
+}
+
+private func isClose(_ color: NSColor?, to components: [CGFloat]) -> Bool {
+    guard let color = color?.usingColorSpace(.sRGB) else {
+        return false
+    }
+    return zip([color.redComponent, color.greenComponent, color.blueComponent], components)
+        .allSatisfy { abs($0 - $1) < 0.02 }
 }

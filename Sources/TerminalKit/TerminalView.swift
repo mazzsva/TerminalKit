@@ -27,6 +27,9 @@ private struct Representable: NSViewRepresentable {
         if view.terminalView.font != font {
             view.terminalView.font = font
         }
+        if view.terminalView.palette != context.environment.terminalPalette {
+            view.terminalView.palette = context.environment.terminalPalette
+        }
         let scrollIndicatorVisibility = context.environment.verticalScrollIndicatorVisibility
         view.hasVerticalScroller = scrollIndicatorVisibility != .hidden && scrollIndicatorVisibility != .never
     }
