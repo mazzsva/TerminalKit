@@ -58,7 +58,9 @@ extension TerminalContentView: NSServicesMenuRequestor, NSMenuItemValidation {
         forSendType sendType: NSPasteboard.PasteboardType?,
         returnType: NSPasteboard.PasteboardType?
     ) -> Any? {
-        sendType == .string && returnType == nil && selectedText != nil
+        let canSend = sendType == nil || sendType == .string && selectedText != nil
+        let canReturn = returnType == nil || returnType == .string
+        return canSend && canReturn && (sendType != nil || returnType != nil)
             ? self : super.validRequestor(forSendType: sendType, returnType: returnType)
     }
 

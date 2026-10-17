@@ -35,6 +35,15 @@ struct TerminalPasteTests {
         #expect(bytes == "61  62")
     }
 
+    @Test func takesTextFromServices() throws {
+        let (view, _) = try startedView(running: "exit")
+        #expect(view.validRequestor(forSendType: nil, returnType: .string) as? NSView === view)
+        #expect(view.validRequestor(forSendType: .string, returnType: .string) as? NSView !== view)
+        view.selection = .init(anchor: .init(line: 0, column: 0), head: .init(line: 1, column: 0))
+        #expect(view.validRequestor(forSendType: .string, returnType: .string) as? NSView === view)
+        #expect(view.validRequestor(forSendType: nil, returnType: .fileURL) as? NSView !== view)
+    }
+
     @Test func pastesNothingWithoutText() throws {
         let (view, _) = try startedView(running: "exit")
         let pasteboard = pasteboard(containing: nil)
