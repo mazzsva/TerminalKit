@@ -478,8 +478,44 @@ struct TerminalTests {
         terminal.receive("\u{1B}[?1l".utf8)
         #expect(!terminal.usesApplicationCursorKeys)
     }
+
+    @Test func keepsTheLinesThatScrollOffTheScreen() {
+        var terminal = Terminal(columns: 1, rows: 2)
+        terminal.receive("a\r\nb\r\nc\r\nd".utf8)
+        #expect(scrollback(terminal) == ["a", "b"])
+        terminal.receive("\u{1B}[S".utf8)
+        #expect(scrollback(terminal) == ["a", "b", "c"])
+    }
+
+    @Test func keepsNoLinesFromAScrollRegionBelowTheTop() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("\u{1B}[2;3r\u{1B}[3Ha\nb\n\u{1B}[S".utf8)
+        #expect(terminal.scrollback.isEmpty)
+    }
+
+    @Test func keepsTheLinesThatScrollOffAScrollRegionAtTheTop() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("\u{1B}[1;2r\u{1B}[2Ha\nb".utf8)
+        #expect(scrollback(terminal) == [" "])
+    }
+
+    @Test func keepsNoLinesFromTheAlternateScreen() {
+        var terminal = Terminal(columns: 1, rows: 2)
+        terminal.receive("\u{1B}[?1049ha\r\nb\r\nc\u{1B}[S".utf8)
+        #expect(terminal.scrollback.isEmpty)
+    }
+
+    @Test func keepsNoDeletedLines() {
+        var terminal = Terminal(columns: 1, rows: 2)
+        terminal.receive("a\u{1B}[H\u{1B}[M".utf8)
+        #expect(terminal.scrollback.isEmpty)
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
     terminal.screen.map { String($0.map(\.character)) }
+}
+
+private func scrollback(_ terminal: Terminal) -> [String] {
+    terminal.scrollback.map { String($0.map(\.character)) }
 }

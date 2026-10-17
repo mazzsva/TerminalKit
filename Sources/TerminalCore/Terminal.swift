@@ -20,6 +20,7 @@ package struct Terminal: Sendable {
     package private(set) var columns: Int
     package private(set) var rows: Int
     package private(set) var screen: [[Cell]]
+    package private(set) var scrollback: [[Cell]] = []
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var title = ""
     package private(set) var usesApplicationCursorKeys = false
@@ -147,7 +148,7 @@ package struct Terminal: Sendable {
         case "M":
             deleteLines(count)
         case "S":
-            scrollUp(count, in: scrollRegion)
+            scrollRegionUp(count)
         case "T" where sequence.parameters.count <= 1:
             scrollDown(count, in: scrollRegion)
         case "m":
@@ -186,7 +187,7 @@ package struct Terminal: Sendable {
     private mutating func lineFeed() {
         isWrapPending = false
         if cursor.row == scrollRegion.upperBound - 1 {
-            scrollUp(1, in: scrollRegion)
+            scrollRegionUp(1)
         } else if cursor.row < rows - 1 {
             cursor.row += 1
         }
@@ -228,6 +229,13 @@ package struct Terminal: Sendable {
         }
         scrollRegion = top ..< bottom
         moveCursor(row: 0, column: 0)
+    }
+
+    private mutating func scrollRegionUp(_ count: Int) {
+        if scrollRegion.lowerBound == 0, normalScreen == nil {
+            scrollback += screen.prefix(min(count, scrollRegion.count))
+        }
+        scrollUp(count, in: scrollRegion)
     }
 
     private mutating func scrollUp(_ count: Int, in region: Range<Int>) {
