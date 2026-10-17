@@ -2,7 +2,7 @@ import AppKit
 import TerminalCore
 
 final class TerminalContentView: NSView {
-    private static let padding: CGFloat = 4
+    static let padding: CGFloat = 4
 
     var session: TerminalSession {
         didSet {
@@ -16,6 +16,11 @@ final class TerminalContentView: NSView {
     let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
     let cellSize: CGSize
     var markedText = "" {
+        didSet {
+            needsDisplay = true
+        }
+    }
+    var selection: Selection? {
         didSet {
             needsDisplay = true
         }
@@ -82,12 +87,19 @@ final class TerminalContentView: NSView {
             let line =
                 row < terminal.scrollback.count
                 ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
-            var column = 0
-            while column < line.count {
-                let style = line[column].style
-                let end = line[column...].firstIndex { $0.style != style } ?? line.count
-                draw(line[column ..< end], style: style, at: rect(row: row, column: column).origin)
-                column = end
+            let runs = Self.runs(in: line)
+            for (columns, style) in runs {
+                if let background = colors(for: style).background {
+                    background.setFill()
+                    rect(row: row, columns: columns).fill()
+                }
+            }
+            if let columns = selection?.columns(inLine: terminal.removedScrollbackCount + row, count: line.count) {
+                selectionColor.setFill()
+                rect(row: row, columns: columns).fill()
+            }
+            for (columns, style) in runs {
+                drawText(line[columns], style: style, at: rect(row: row, columns: columns).origin)
             }
         }
 
@@ -106,20 +118,33 @@ final class TerminalContentView: NSView {
         cursor.fill(using: .sourceOver)
     }
 
-    private func draw(_ cells: ArraySlice<Terminal.Cell>, style: Terminal.Style, at origin: CGPoint) {
-        var foreground = NSColor.terminal(style.foreground) ?? .textColor
-        var background = NSColor.terminal(style.background)
-        if style.isInverse {
-            (foreground, background) = (background ?? .textBackgroundColor, foreground)
+    private var selectionColor: NSColor {
+        window?.firstResponder === self ? .selectedTextBackgroundColor : .unemphasizedSelectedTextBackgroundColor
+    }
+
+    private static func runs(in line: [Terminal.Cell]) -> [(columns: Range<Int>, style: Terminal.Style)] {
+        var runs: [(columns: Range<Int>, style: Terminal.Style)] = []
+        var column = 0
+        while column < line.count {
+            let style = line[column].style
+            let end = line[column...].firstIndex { $0.style != style } ?? line.count
+            runs.append((column ..< end, style))
+            column = end
         }
-        if let background {
-            background.setFill()
-            CGRect(x: origin.x, y: origin.y, width: cellSize.width * CGFloat(cells.count), height: cellSize.height)
-                .fill()
-        }
+        return runs
+    }
+
+    private func colors(for style: Terminal.Style) -> (foreground: NSColor, background: NSColor?) {
+        let foreground = NSColor.terminal(style.foreground) ?? .textColor
+        let background = NSColor.terminal(style.background)
+        return style.isInverse ? (background ?? .textBackgroundColor, foreground) : (foreground, background)
+    }
+
+    private func drawText(_ cells: ArraySlice<Terminal.Cell>, style: Terminal.Style, at origin: CGPoint) {
         guard !style.isHidden else {
             return
         }
+        let foreground = colors(for: style).foreground
         var attributes: [NSAttributedString.Key: Any] = [
             .font: font(for: style),
             .foregroundColor: style.isFaint ? foreground.withAlphaComponent(0.5) : foreground,
@@ -149,7 +174,10 @@ final class TerminalContentView: NSView {
 
     var cursorRect: CGRect {
         let terminal = session.terminal
-        return rect(row: terminal.scrollback.count + terminal.cursor.row, column: terminal.cursor.column)
+        return rect(
+            row: terminal.scrollback.count + terminal.cursor.row,
+            columns: terminal.cursor.column ..< terminal.cursor.column + 1
+        )
     }
 
     func fit(to size: CGSize) {
@@ -163,11 +191,11 @@ final class TerminalContentView: NSView {
         )
     }
 
-    private func rect(row: Int, column: Int) -> CGRect {
+    private func rect(row: Int, columns: Range<Int>) -> CGRect {
         CGRect(
-            x: Self.padding + CGFloat(column) * cellSize.width,
+            x: Self.padding + CGFloat(columns.lowerBound) * cellSize.width,
             y: Self.padding + CGFloat(row) * cellSize.height,
-            width: cellSize.width,
+            width: CGFloat(columns.count) * cellSize.width,
             height: cellSize.height
         )
     }
