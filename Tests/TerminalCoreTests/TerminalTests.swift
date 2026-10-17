@@ -469,6 +469,15 @@ struct TerminalTests {
         terminal.receive("ab\u{1B}[G\u{1B}[44m\u{1B}[2\(final)".utf8)
         #expect(terminal.screen[0].map(\.style.background) == [.indexed(4), .indexed(4)])
     }
+
+    @Test func setsTheApplicationCursorKeysMode() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(!terminal.usesApplicationCursorKeys)
+        terminal.receive("\u{1B}[?1h".utf8)
+        #expect(terminal.usesApplicationCursorKeys)
+        terminal.receive("\u{1B}[?1l".utf8)
+        #expect(!terminal.usesApplicationCursorKeys)
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
