@@ -10,16 +10,14 @@ struct TerminalContentViewTests {
     @Test func fitsTheScreenToTheView() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
         let view = TerminalContentView(session: session)
-        view.setFrameSize(
-            NSSize(width: 8 + view.cellSize.width * 100.5, height: 8 + view.cellSize.height * 30.5)
-        )
+        view.fit(to: CGSize(width: 8 + view.cellSize.width * 100.5, height: 8 + view.cellSize.height * 30.5))
         #expect(session.terminal.columns == 100)
         #expect(session.terminal.rows == 30)
     }
 
     @Test func keepsAtLeastOneCell() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
-        TerminalContentView(session: session).setFrameSize(.zero)
+        TerminalContentView(session: session).fit(to: .zero)
         #expect(session.terminal.columns == 1)
         #expect(session.terminal.rows == 1)
     }
@@ -57,6 +55,26 @@ struct TerminalContentViewTests {
         #expect(abs(color.redComponent - 194 / 255) < 0.02)
         #expect(abs(color.greenComponent - 54 / 255) < 0.02)
         #expect(abs(color.blueComponent - 33 / 255) < 0.02)
+    }
+
+    @Test func drawsTheScrollback() async throws {
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/bin/sh"),
+                arguments: ["-c", "printf '\\033[41m  \\033[m'; seq 1 30"]
+            )
+        )
+        let view = TerminalContentView(session: session)
+        view.fit(to: CGSize(width: 200, height: 100))
+        try session.start()
+        for await state in Observations({ session.state }) where state != .running {
+            break
+        }
+        view.fit(to: CGSize(width: 200, height: 100))
+        #expect(!session.terminal.scrollback.isEmpty)
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let color = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
+        #expect(abs(color.redComponent - 194 / 255) < 0.02)
     }
 
     @Test func drawsTheForegroundColor() async throws {
