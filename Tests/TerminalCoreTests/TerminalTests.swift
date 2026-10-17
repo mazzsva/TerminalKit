@@ -470,6 +470,44 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.style.background) == [.indexed(4), .indexed(4)])
     }
 
+    @Test func reportsTheCursorPosition() {
+        var terminal = Terminal(columns: 10, rows: 5)
+        #expect(terminal.receive("\u{1B}[3;7H\u{1B}[6n") == "\u{1B}[3;7R")
+        #expect(terminal.receive("\u{1B}[H\u{1B}[6n") == "\u{1B}[1;1R")
+    }
+
+    @Test func reportsTheStatus() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(terminal.receive("\u{1B}[5n") == "\u{1B}[0n")
+    }
+
+    @Test func repliesOnlyOnce() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        terminal.receive("\u{1B}[5n")
+        #expect(terminal.receive("a") == "")
+    }
+
+    @Test func ignoresUnknownStatusRequests() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(terminal.receive("\u{1B}[7n\u{1B}[?6n") == "")
+    }
+
+    @Test func reportsTheDeviceAttributes() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(terminal.receive("\u{1B}[c") == "\u{1B}[?1;2c")
+        #expect(terminal.receive("\u{1B}[0c") == "\u{1B}[?1;2c")
+        #expect(terminal.receive("\u{1B}[1c\u{1B}[>c") == "")
+    }
+
+    @Test func hidesAndShowsTheCursor() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(terminal.isCursorVisible)
+        terminal.receive("\u{1B}[?25l")
+        #expect(!terminal.isCursorVisible)
+        terminal.receive("\u{1B}[?25h")
+        #expect(terminal.isCursorVisible)
+    }
+
     @Test func setsTheBracketedPasteMode() {
         var terminal = Terminal(columns: 1, rows: 1)
         #expect(!terminal.usesBracketedPaste)

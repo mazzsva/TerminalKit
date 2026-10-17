@@ -48,6 +48,13 @@ struct TerminalContentViewTests {
         #expect(color(in: representation, at: center) != color(in: representation, at: corner))
     }
 
+    @Test func hidesTheCursor() async throws {
+        let view = try await drawnView(running: "printf '\\033[?25l'")
+        let representation = try representation(of: view)
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        #expect(color(in: representation, at: center) == color(in: representation, at: CGPoint(x: 190, y: 90)))
+    }
+
     @Test func drawsTheBackgroundColor() async throws {
         let view = try await drawnView(running: "printf '\\033[41m  \\033[m'")
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)

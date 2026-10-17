@@ -67,6 +67,15 @@ struct TerminalSessionTests {
         #expect(text(of: session).contains("got hello"))
     }
 
+    @Test func answersTheQueriesOfTheProcess() async throws {
+        let session = TerminalSession(
+            configuration: shell("stty raw -echo; printf '\\033[6n'; head -c 6 | od -An -tx1")
+        )
+        try session.start()
+        await waitForExit(of: session)
+        #expect(text(of: session).contains("1b  5b  31  3b  31  52"))
+    }
+
     @Test func startsTheProcessWithTheSizeOfTheScreen() async throws {
         let session = TerminalSession(configuration: shell("stty size"))
         session.resize(columns: 100, rows: 30)

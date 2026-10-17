@@ -1,7 +1,8 @@
 @testable import TerminalCore
 
 extension Terminal {
-    mutating func receive(_ text: String) {
-        receive(Array(text.utf8))
+    @discardableResult
+    mutating func receive(_ text: String) -> String {
+        String(decoding: receive(Array(text.utf8)), as: UTF8.self)
     }
 }
