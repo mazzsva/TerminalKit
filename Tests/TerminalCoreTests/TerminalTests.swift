@@ -44,6 +44,31 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.width) == [1])
     }
 
+    @Test func combinesMarksWithThePreviousCharacter() {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("e\u{301}x")
+        #expect(lines(terminal) == ["éx "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
+    @Test func combinesMarksWithAWideCharacter() {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("❤\u{FE0F}中\u{FE0F}")
+        #expect(terminal.screen[0].map(\.character) == ["❤\u{FE0F}", "中\u{FE0F}", " "])
+    }
+
+    @Test func combinesMarksWithTheLastCharacterOfALine() {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("ae\u{301}")
+        #expect(lines(terminal) == ["aé"])
+    }
+
+    @Test func ignoresMarksWithoutAPreviousCharacter() {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("\u{301}a\u{200B}")
+        #expect(lines(terminal) == ["a "])
+    }
+
     @Test func wrapsAtTheEndOfALine() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("abcdef")

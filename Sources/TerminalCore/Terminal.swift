@@ -194,7 +194,11 @@ package struct Terminal: Sendable {
     }
 
     private mutating func print(_ scalar: Unicode.Scalar) {
-        let width = columns > 1 ? max(scalar.width, 1) : 1
+        guard scalar.width > 0 else {
+            combine(scalar)
+            return
+        }
+        let width = columns > 1 ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
             carriageReturn()
             lineFeed()
@@ -209,6 +213,21 @@ package struct Terminal: Sendable {
             isWrapPending = true
         } else {
             cursor.column += width
+        }
+    }
+
+    private mutating func combine(_ scalar: Unicode.Scalar) {
+        var column = isWrapPending ? cursor.column : cursor.column - 1
+        if column > 0, screen[cursor.row][column].width == 0 {
+            column -= 1
+        }
+        guard column >= 0 else {
+            return
+        }
+        var text = String(screen[cursor.row][column].character)
+        text.unicodeScalars.append(scalar)
+        if let character = text.first, text.count == 1 {
+            screen[cursor.row][column].character = character
         }
     }
 
