@@ -20,8 +20,15 @@ struct TerminalInputTests {
         #expect(try keyDown("c", modifierFlags: .command).terminalInput == nil)
     }
 
+    @Test func sendsTheArrowKeys() throws {
+        #expect(try keyDown(functionKey: NSUpArrowFunctionKey).terminalInput == Array("\u{1B}[A".utf8))
+        #expect(try keyDown(functionKey: NSDownArrowFunctionKey).terminalInput == Array("\u{1B}[B".utf8))
+        #expect(try keyDown(functionKey: NSRightArrowFunctionKey).terminalInput == Array("\u{1B}[C".utf8))
+        #expect(try keyDown(functionKey: NSLeftArrowFunctionKey).terminalInput == Array("\u{1B}[D".utf8))
+    }
+
     @Test func ignoresFunctionKeys() throws {
-        #expect(try keyDown(String(UnicodeScalar(NSF1FunctionKey)!)).terminalInput == nil)
+        #expect(try keyDown(functionKey: NSF1FunctionKey).terminalInput == nil)
     }
 }
 
@@ -40,4 +47,8 @@ func keyDown(_ characters: String, modifierFlags: NSEvent.ModifierFlags = []) th
             keyCode: 0
         )
     )
+}
+
+func keyDown(functionKey: Int) throws -> NSEvent {
+    try keyDown(String(try #require(UnicodeScalar(functionKey))))
 }
