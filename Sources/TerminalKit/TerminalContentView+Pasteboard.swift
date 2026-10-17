@@ -36,6 +36,19 @@ extension TerminalContentView: NSServicesMenuRequestor, NSMenuItemValidation {
         return pasteboard.setString(selectedText, forType: .string)
     }
 
+    @objc func paste(_ sender: Any?) {
+        _ = readSelection(from: .general)
+    }
+
+    func readSelection(from pasteboard: NSPasteboard) -> Bool {
+        guard let text = pasteboard.string(forType: .string) else {
+            return false
+        }
+        scrollToBottom()
+        session.send(Array(text.replacing("\r\n", with: "\r").replacing("\n", with: "\r").utf8))
+        return true
+    }
+
     override func validRequestor(
         forSendType sendType: NSPasteboard.PasteboardType?,
         returnType: NSPasteboard.PasteboardType?
@@ -45,6 +58,13 @@ extension TerminalContentView: NSServicesMenuRequestor, NSMenuItemValidation {
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        menuItem.action == #selector(copy(_:)) ? selectedText != nil : true
+        switch menuItem.action {
+        case #selector(copy(_:)):
+            selectedText != nil
+        case #selector(paste(_:)):
+            NSPasteboard.general.availableType(from: [.string]) != nil
+        default:
+            true
+        }
     }
 }
