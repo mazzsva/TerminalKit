@@ -1,3 +1,4 @@
+import CTerminalCore
 import Darwin
 import Foundation
 import Synchronization
@@ -43,8 +44,8 @@ package final class PseudoTerminal: Sendable {
         guard openpty(&primary, &secondary, nil, nil, &size) == 0 else {
             throw POSIXError(errno)
         }
-        defer { close(secondary) }
         _ = fcntl(primary, F_SETFD, FD_CLOEXEC)
+        _ = fcntl(secondary, F_SETFD, FD_CLOEXEC)
         _ = fcntl(primary, F_SETFL, fcntl(primary, F_GETFL) | O_NONBLOCK)
 
         do {
@@ -57,6 +58,7 @@ package final class PseudoTerminal: Sendable {
             )
         } catch {
             close(primary)
+            close(secondary)
             throw error
         }
         fileDescriptor = primary
@@ -69,7 +71,7 @@ package final class PseudoTerminal: Sendable {
             close(primary)
         }
         readSource.activate()
-        monitorExit()
+        monitorExit(secondary: secondary)
     }
 
     deinit {
@@ -123,11 +125,12 @@ package final class PseudoTerminal: Sendable {
         }
     }
 
-    private func monitorExit() {
+    private func monitorExit(secondary: Int32) {
         let processIdentifier = processIdentifier
         Thread { [weak self] in
             var status: Int32 = 0
             while waitpid(processIdentifier, &status, 0) == -1 && errno == EINTR {}
+            close(secondary)
             let termination = Termination(status: status)
             guard let self else {
                 return
@@ -196,7 +199,7 @@ package final class PseudoTerminal: Sendable {
         posix_spawnattr_setsigmask(&attributes, &signals)
         posix_spawnattr_setflags(
             &attributes,
-            Int16(POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
+            Int16(POSIX_SPAWN_SETEXEC | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK)
         )
 
         let path = executableURL.path(percentEncoded: false)
@@ -209,8 +212,15 @@ package final class PseudoTerminal: Sendable {
         }
 
         var processIdentifier: pid_t = 0
-        let result = posix_spawn(
-            &processIdentifier, path, &fileActions, &attributes, argumentPointers, environmentPointers)
+        let result = spawn_in_terminal(
+            &processIdentifier,
+            terminal,
+            path,
+            &fileActions,
+            &attributes,
+            argumentPointers,
+            environmentPointers
+        )
         guard result == 0 else {
             throw POSIXError(result)
         }
