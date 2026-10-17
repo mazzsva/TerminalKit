@@ -111,6 +111,20 @@ struct TerminalContentViewTests {
         #expect(try image(of: view) == cursorImage)
     }
 
+    @Test func placesTheInputWindowAtTheCursor() {
+        let view = TerminalContentView(session: readingSession())
+        let window = NSWindow(
+            contentRect: NSRect(x: 100, y: 200, width: 300, height: 150),
+            styleMask: [],
+            backing: .buffered,
+            defer: true
+        )
+        window.contentView = view
+        let rect = view.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+        #expect(rect.origin == CGPoint(x: 104, y: 346 - view.cellSize.height))
+        #expect(rect.size == view.cellSize)
+    }
+
     @Test func acceptsFirstResponder() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
         #expect(TerminalContentView(session: session).acceptsFirstResponder)

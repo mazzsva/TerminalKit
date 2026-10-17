@@ -36,7 +36,7 @@ extension TerminalContentView: NSTextInputClient {
     }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
-        .zero
+        window?.convertToScreen(convert(cursorRect, to: nil)) ?? .zero
     }
 
     func characterIndex(for point: NSPoint) -> Int {

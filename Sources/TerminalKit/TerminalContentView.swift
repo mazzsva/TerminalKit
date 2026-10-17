@@ -70,7 +70,7 @@ final class TerminalContentView: NSView {
             NSAttributedString(string: text, attributes: attributes).draw(at: rect(row: row, column: 0).origin)
         }
 
-        let cursor = rect(row: session.terminal.cursor.row, column: session.terminal.cursor.column)
+        let cursor = cursorRect
         guard markedText.isEmpty else {
             let text = NSAttributedString(
                 string: markedText,
@@ -83,6 +83,10 @@ final class TerminalContentView: NSView {
         }
         NSColor.textColor.withAlphaComponent(0.5).setFill()
         cursor.fill(using: .sourceOver)
+    }
+
+    var cursorRect: CGRect {
+        rect(row: session.terminal.cursor.row, column: session.terminal.cursor.column)
     }
 
     private func rect(row: Int, column: Int) -> CGRect {
