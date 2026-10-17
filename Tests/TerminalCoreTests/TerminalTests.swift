@@ -15,6 +15,35 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
+    @Test func printsWideCharactersInTwoCells() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("a中b")
+        #expect(terminal.screen[0].map(\.width) == [1, 2, 0, 1, 1])
+        #expect(lines(terminal) == ["a中 b "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 4))
+    }
+
+    @Test func waitsToWrapAfterAWideCharacterAtTheEnd() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("a中")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+        terminal.receive("b")
+        #expect(lines(terminal) == ["a中 ", "b  "])
+    }
+
+    @Test func wrapsAWideCharacterThatDoesNotFit() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("ab中")
+        #expect(lines(terminal) == ["ab ", "中  "])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
+    }
+
+    @Test func printsAWideCharacterInOneColumnScreen() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        terminal.receive("中")
+        #expect(terminal.screen[0].map(\.width) == [1])
+    }
+
     @Test func wrapsAtTheEndOfALine() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("abcdef")

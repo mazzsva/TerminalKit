@@ -2,6 +2,7 @@ package struct Terminal: Sendable {
     package struct Cell: Equatable, Sendable {
         package var character: Character = " "
         package var style = Style()
+        package var width: UInt8 = 1
     }
 
     package struct Position: Equatable, Sendable {
@@ -86,7 +87,7 @@ package struct Terminal: Sendable {
             }
             switch action {
             case .print(let scalar):
-                print(scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar))
+                print(scalar)
             case .execute("\n"):
                 lineFeed()
             case .execute("\r"):
@@ -192,16 +193,22 @@ package struct Terminal: Sendable {
         }
     }
 
-    private mutating func print(_ character: Character) {
-        if isWrapPending {
+    private mutating func print(_ scalar: Unicode.Scalar) {
+        let width = columns > 1 ? max(scalar.width, 1) : 1
+        if isWrapPending || cursor.column + width > columns {
             carriageReturn()
             lineFeed()
         }
-        screen[cursor.row][cursor.column] = Cell(character: character, style: style)
-        if cursor.column == columns - 1 {
+        let character = scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar)
+        screen[cursor.row][cursor.column] = Cell(character: character, style: style, width: UInt8(width))
+        if width == 2 {
+            screen[cursor.row][cursor.column + 1] = Cell(style: style, width: 0)
+        }
+        if cursor.column + width == columns {
+            cursor.column = columns - 1
             isWrapPending = true
         } else {
-            cursor.column += 1
+            cursor.column += width
         }
     }
 
