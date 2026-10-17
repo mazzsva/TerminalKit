@@ -45,7 +45,12 @@ extension TerminalContentView: NSServicesMenuRequestor, NSMenuItemValidation {
             return false
         }
         scrollToBottom()
-        session.send(Array(text.replacing("\r\n", with: "\r").replacing("\n", with: "\r").utf8))
+        let lines = text.replacing("\r\n", with: "\r").replacing("\n", with: "\r")
+        guard session.terminal.usesBracketedPaste else {
+            session.send(Array(lines.utf8))
+            return true
+        }
+        session.send(Array("\u{1B}[200~\(lines.replacing("\u{1B}", with: ""))\u{1B}[201~".utf8))
         return true
     }
 
