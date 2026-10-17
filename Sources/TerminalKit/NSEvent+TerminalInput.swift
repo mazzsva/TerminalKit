@@ -10,7 +10,7 @@ extension NSEvent {
         {
             return Array(sequence.utf8)
         }
-        guard !characters.unicodeScalars.contains(where: { (0xF700 ... 0xF8FF).contains($0.value) }) else {
+        guard !characters.unicodeScalars.contains(where: { (0xF700 ... 0xF7FF).contains($0.value) }) else {
             return nil
         }
         return Array(characters.utf8)

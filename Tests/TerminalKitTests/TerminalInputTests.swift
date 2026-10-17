@@ -8,6 +8,7 @@ struct TerminalInputTests {
     @Test func sendsTypedCharacters() throws {
         #expect(try keyDown("a").terminalInput == [0x61])
         #expect(try keyDown("é").terminalInput == [0xC3, 0xA9])
+        #expect(try keyDown("\u{F8FF}").terminalInput == Array("\u{F8FF}".utf8))
     }
 
     @Test func sendsControlCharacters() throws {
