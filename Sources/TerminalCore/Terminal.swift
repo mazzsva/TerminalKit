@@ -73,7 +73,7 @@ package struct Terminal: Sendable {
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
     }
 
-    package mutating func receive(_ bytes: some Sequence<UInt8>) {
+    package mutating func receive(_ bytes: [UInt8]) {
         for action in parser.parse(decoder.decode(bytes)) {
             switch action {
             case .print(let scalar):
