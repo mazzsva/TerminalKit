@@ -69,7 +69,7 @@ struct TerminalSessionTests {
 
     @Test func resizesTheProcess() async throws {
         let session = TerminalSession(
-            configuration: shell("trap 'stty size; kill $!; exit' WINCH; sleep 60 & echo ready; wait")
+            configuration: shell("trap 'stty size; exit' WINCH; echo ready; while :; do sleep 0.1; done")
         )
         try session.start()
         await waitForText("ready", in: session)

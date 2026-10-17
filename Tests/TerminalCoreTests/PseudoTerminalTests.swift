@@ -83,7 +83,7 @@ struct PseudoTerminalTests {
     func signalsTheWindowSizeChange(shell: String) async throws {
         let pseudoTerminal = try PseudoTerminal(
             executableURL: URL(filePath: shell),
-            arguments: ["-c", "trap '/bin/stty size; kill $!; exit' WINCH; /bin/sleep 60 & echo ready; wait"],
+            arguments: ["-c", "trap '/bin/stty size; exit' WINCH; echo ready; while :; do /bin/sleep 0.1; done"],
             environment: [:],
             columns: 80,
             rows: 24
