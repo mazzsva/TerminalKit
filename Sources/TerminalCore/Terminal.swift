@@ -9,6 +9,12 @@ package struct Terminal: Sendable {
         package var column: Int
     }
 
+    private struct SavedCursor {
+        var position = Position(row: 0, column: 0)
+        var style = Style()
+        var isWrapPending = false
+    }
+
     private static let tabWidth = 8
 
     package private(set) var columns: Int
@@ -17,10 +23,16 @@ package struct Terminal: Sendable {
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var title = ""
 
+    package var isAlternateScreenActive: Bool {
+        normalScreen != nil
+    }
+
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
     private var isWrapPending = false
     private var style = Style()
+    private var savedCursor = SavedCursor()
+    private var normalScreen: (lines: [[Cell]], savedCursor: SavedCursor)?
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -32,12 +44,18 @@ package struct Terminal: Sendable {
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
         let removedRows = max(cursor.row + 1 - rows, 0)
-        screen.removeFirst(removedRows)
-        screen = screen.prefix(rows)
-            .map { line in
-                Array(line.prefix(columns)) + Self.blankLine(columns: max(columns - line.count, 0))
-            }
-        screen += Array(repeating: Self.blankLine(columns: columns), count: rows - screen.count)
+        screen = Self.resized(screen, columns: columns, rows: rows, removingFirst: removedRows)
+        if var normalScreen {
+            let removedNormalRows = max(normalScreen.savedCursor.position.row + 1 - rows, 0)
+            normalScreen.lines = Self.resized(
+                normalScreen.lines,
+                columns: columns,
+                rows: rows,
+                removingFirst: removedNormalRows
+            )
+            normalScreen.savedCursor.position.row -= removedNormalRows
+            self.normalScreen = normalScreen
+        }
         self.columns = columns
         self.rows = rows
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
@@ -56,6 +74,10 @@ package struct Terminal: Sendable {
                 moveCursor(row: cursor.row, column: cursor.column - 1)
             case .execute("\t"):
                 cursor.column = min((cursor.column / Self.tabWidth + 1) * Self.tabWidth, columns - 1)
+            case .escape(intermediates: "", final: "7"):
+                saveCursor()
+            case .escape(intermediates: "", final: "8"):
+                restoreCursor()
             case .controlSequence(let sequence):
                 perform(sequence)
             case .operatingSystemCommand(let command):
@@ -67,7 +89,16 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
-        guard sequence.privateMarker == nil, sequence.intermediates.isEmpty else {
+        guard sequence.intermediates.isEmpty else {
+            return
+        }
+        if sequence.privateMarker == "?", sequence.final == "h" || sequence.final == "l" {
+            for mode in sequence.parameters {
+                setPrivateMode(mode, isEnabled: sequence.final == "h")
+            }
+            return
+        }
+        guard sequence.privateMarker == nil else {
             return
         }
         let count = sequence.parameter(at: 0, default: 1)
@@ -96,6 +127,10 @@ package struct Terminal: Sendable {
             eraseInLine(sequence.parameter(at: 0, default: 0))
         case "m":
             style.apply(sequence.parameters)
+        case "s" where sequence.parameters.isEmpty:
+            saveCursor()
+        case "u" where sequence.parameters.isEmpty:
+            restoreCursor()
         default:
             break
         }
@@ -141,6 +176,50 @@ package struct Terminal: Sendable {
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
     }
 
+    private mutating func setPrivateMode(_ mode: Int, isEnabled: Bool) {
+        switch (mode, isEnabled) {
+        case (47, true), (1047, true):
+            enterAlternateScreen()
+        case (47, false), (1047, false):
+            exitAlternateScreen()
+        case (1049, true):
+            saveCursor()
+            enterAlternateScreen()
+        case (1049, false):
+            exitAlternateScreen()
+            restoreCursor()
+        default:
+            break
+        }
+    }
+
+    private mutating func enterAlternateScreen() {
+        guard normalScreen == nil else {
+            return
+        }
+        normalScreen = (screen, savedCursor)
+        screen = Array(repeating: Array(repeating: blank, count: columns), count: rows)
+        savedCursor = SavedCursor()
+    }
+
+    private mutating func exitAlternateScreen() {
+        guard let normalScreen else {
+            return
+        }
+        (screen, savedCursor) = normalScreen
+        self.normalScreen = nil
+    }
+
+    private mutating func saveCursor() {
+        savedCursor = SavedCursor(position: cursor, style: style, isWrapPending: isWrapPending)
+    }
+
+    private mutating func restoreCursor() {
+        moveCursor(row: savedCursor.position.row, column: savedCursor.position.column)
+        style = savedCursor.style
+        isWrapPending = savedCursor.isWrapPending
+    }
+
     private mutating func eraseInDisplay(_ mode: Int) {
         switch mode {
         case 0:
@@ -182,6 +261,16 @@ package struct Terminal: Sendable {
 
     private var blank: Cell {
         Cell(style: Style(background: style.background))
+    }
+
+    private static func resized(_ screen: [[Cell]], columns: Int, rows: Int, removingFirst removedRows: Int)
+        -> [[Cell]]
+    {
+        let lines = screen.dropFirst(removedRows).prefix(rows)
+            .map { line in
+                Array(line.prefix(columns)) + blankLine(columns: max(columns - line.count, 0))
+            }
+        return lines + Array(repeating: blankLine(columns: columns), count: rows - lines.count)
     }
 
     private static func blankLine(columns: Int) -> [Cell] {

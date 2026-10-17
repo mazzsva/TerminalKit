@@ -211,6 +211,101 @@ struct TerminalTests {
         #expect(lines(terminal) == ["a ", "  "])
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
     }
+
+    @Test func restoresTheSavedCursor() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}7cd\r\n\u{1B}8x".utf8)
+        #expect(lines(terminal) == ["abxd", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
+    }
+
+    @Test func restoresTheSavedCursorWithAControlSequence() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[scd\r\n\u{1B}[ux".utf8)
+        #expect(lines(terminal) == ["abxd", "    "])
+    }
+
+    @Test func restoresTheSavedStyle() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[1;31m\u{1B}7\u{1B}[m\u{1B}8a".utf8)
+        #expect(terminal.screen[0][0].style == Terminal.Style(foreground: .indexed(1), isBold: true))
+    }
+
+    @Test func restoresThePendingWrap() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("ab\u{1B}7\r\u{1B}8c".utf8)
+        #expect(lines(terminal) == ["ab", "c "])
+    }
+
+    @Test func restoresTheHomePositionWithoutASave() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[1mab\r\n\u{1B}8x".utf8)
+        #expect(lines(terminal) == ["xb  ", "    "])
+        #expect(terminal.screen[0][0].style == Terminal.Style())
+    }
+
+    @Test func switchesToABlankAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?1049h".utf8)
+        #expect(terminal.isAlternateScreenActive)
+        #expect(lines(terminal) == ["    ", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
+    @Test func restoresTheNormalScreenAndCursor() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?1049h\u{1B}[2;3Hxy\u{1B}[?1049lc".utf8)
+        #expect(!terminal.isAlternateScreenActive)
+        #expect(lines(terminal) == ["abc ", "    "])
+    }
+
+    @Test(arguments: [47, 1047])
+    func switchesScreensWithoutTheCursor(mode: Int) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?\(mode)hx\u{1B}[?\(mode)lc".utf8)
+        #expect(lines(terminal) == ["ab c", "    "])
+    }
+
+    @Test func clearsTheAlternateScreenWithTheBackgroundColor() {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("\u{1B}[44m\u{1B}[?1049h".utf8)
+        #expect(terminal.screen[0].map(\.style.background) == [.indexed(4), .indexed(4)])
+    }
+
+    @Test func startsANewAlternateScreenEachTime() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?1049hab\u{1B}[?1049l\u{1B}[?1049h".utf8)
+        #expect(lines(terminal) == ["    "])
+    }
+
+    @Test func ignoresASecondSwitch() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("ab\u{1B}[?1049hx\u{1B}[?1049h\u{1B}[?1049l".utf8)
+        #expect(lines(terminal) == ["ab  "])
+    }
+
+    @Test func resizesTheNormalScreenOnTheAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\u{1B}[?1049h".utf8)
+        terminal.resize(columns: 2, rows: 3)
+        terminal.receive("\u{1B}[?1049l".utf8)
+        #expect(lines(terminal) == ["ab", "  ", "  "])
+    }
+
+    @Test func keepsASavedCursorForEachScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?1049h\u{1B}[2;2H\u{1B}7\u{1B}[?1049lc".utf8)
+        #expect(lines(terminal) == ["abc ", "    "])
+    }
+
+    @Test func keepsTheSavedCursorLineWhenTheNormalScreenGetsShorter() {
+        var terminal = Terminal(columns: 2, rows: 3)
+        terminal.receive("a\r\nb\r\nc\u{1B}[?1049h".utf8)
+        terminal.resize(columns: 2, rows: 2)
+        terminal.receive("\u{1B}[?1049l".utf8)
+        #expect(lines(terminal) == ["b ", "c "])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
