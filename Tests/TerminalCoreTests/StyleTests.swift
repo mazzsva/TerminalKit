@@ -117,6 +117,14 @@ struct StyleTests {
         #expect(terminal.screen[0].map(\.style) == backgroundCells(2))
     }
 
+    @Test func skipsAllValuesOfAnInvalidTrueColor() {
+        var style = Terminal.Style()
+        style.apply([38, 2, 300, 1, 4])
+        #expect(style == Terminal.Style())
+        style.apply([48, 2, 1, 300, 4, 1])
+        #expect(style == Terminal.Style(isBold: true))
+    }
+
     @Test func skipsTheUnderlineColor() {
         var style = Terminal.Style()
         style.apply([4, 31, 58, 5, 1])

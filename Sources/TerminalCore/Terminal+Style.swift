@@ -81,13 +81,12 @@ extension Terminal {
                 }
                 return .indexed(index)
             case 2:
-                guard let red = parameters.next().flatMap(UInt8.init(exactly:)),
-                    let green = parameters.next().flatMap(UInt8.init(exactly:)),
-                    let blue = parameters.next().flatMap(UInt8.init(exactly:))
-                else {
+                let values = [parameters.next(), parameters.next(), parameters.next()]
+                    .compactMap { $0.flatMap(UInt8.init(exactly:)) }
+                guard values.count == 3 else {
                     return nil
                 }
-                return .rgb(red: red, green: green, blue: blue)
+                return .rgb(red: values[0], green: values[1], blue: values[2])
             default:
                 return nil
             }
