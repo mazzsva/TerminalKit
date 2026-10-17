@@ -470,6 +470,15 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.style.background) == [.indexed(4), .indexed(4)])
     }
 
+    @Test func setsTheBracketedPasteMode() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(!terminal.usesBracketedPaste)
+        terminal.receive("\u{1B}[?2004h")
+        #expect(terminal.usesBracketedPaste)
+        terminal.receive("\u{1B}[?2004l")
+        #expect(!terminal.usesBracketedPaste)
+    }
+
     @Test func setsTheApplicationCursorKeysMode() {
         var terminal = Terminal(columns: 1, rows: 1)
         #expect(!terminal.usesApplicationCursorKeys)

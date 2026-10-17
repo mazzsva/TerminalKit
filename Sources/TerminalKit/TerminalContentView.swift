@@ -62,10 +62,14 @@ final class TerminalContentView: NSView {
             super.keyDown(with: event)
             return
         }
-        scroll(CGPoint(x: 0, y: bounds.maxY - visibleRect.height))
+        scrollToBottom()
         keyDownEvent = event
         interpretKeyEvents([event])
         keyDownEvent = nil
+    }
+
+    func scrollToBottom() {
+        scroll(CGPoint(x: 0, y: bounds.maxY - visibleRect.height))
     }
 
     override func doCommand(by selector: Selector) {
