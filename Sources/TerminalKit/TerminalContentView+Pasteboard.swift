@@ -19,7 +19,7 @@ extension TerminalContentView: NSServicesMenuRequestor, NSMenuItemValidation {
                     return nil
                 }
                 let end = line[columns].lastIndex { $0.character != " " }.map { $0 + 1 } ?? columns.lowerBound
-                return String(line[columns.lowerBound ..< end].map(\.character))
+                return String(line[columns.lowerBound ..< end].filter { $0.width > 0 }.map(\.character))
             }
         return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }

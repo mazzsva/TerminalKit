@@ -101,7 +101,7 @@ final class TerminalContentView: NSView {
                 rect(row: row, columns: columns).fill()
             }
             for (columns, style) in runs {
-                drawText(line[columns], style: style, at: rect(row: row, columns: columns).origin)
+                drawText(line, columns: columns, row: row, style: style)
             }
         }
 
@@ -151,7 +151,7 @@ final class TerminalContentView: NSView {
         return style.isInverse ? (background ?? .textBackgroundColor, foreground) : (foreground, background)
     }
 
-    private func drawText(_ cells: ArraySlice<Terminal.Cell>, style: Terminal.Style, at origin: CGPoint) {
+    private func drawText(_ line: [Terminal.Cell], columns: Range<Int>, row: Int, style: Terminal.Style) {
         guard !style.isHidden else {
             return
         }
@@ -166,7 +166,24 @@ final class TerminalContentView: NSView {
         if style.isStrikethrough {
             attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
         }
-        NSAttributedString(string: String(cells.map(\.character)), attributes: attributes).draw(at: origin)
+        var column = columns.lowerBound
+        while column < columns.upperBound {
+            let end =
+                line[column ..< columns.upperBound].firstIndex { $0.width != 1 || !$0.character.isASCII }
+                ?? columns.upperBound
+            if end > column {
+                let text = String(line[column ..< end].map(\.character))
+                NSAttributedString(string: text, attributes: attributes)
+                    .draw(at: rect(row: row, columns: column ..< end).origin)
+                column = end
+            } else {
+                if line[column].width > 0 {
+                    NSAttributedString(string: String(line[column].character), attributes: attributes)
+                        .draw(at: rect(row: row, columns: column ..< column + 1).origin)
+                }
+                column += 1
+            }
+        }
     }
 
     private func font(for style: Terminal.Style) -> NSFont {
