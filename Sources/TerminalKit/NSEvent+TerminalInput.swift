@@ -1,6 +1,28 @@
 import AppKit
 
 extension NSEvent {
+    func metaInput(applicationCursorKeys: Bool) -> [UInt8]? {
+        let modifierFlags = modifierFlags.subtracting(.option)
+        guard
+            let event = NSEvent.keyEvent(
+                with: type,
+                location: locationInWindow,
+                modifierFlags: modifierFlags,
+                timestamp: timestamp,
+                windowNumber: windowNumber,
+                context: nil,
+                characters: characters(byApplyingModifiers: modifierFlags) ?? "",
+                charactersIgnoringModifiers: charactersIgnoringModifiers ?? "",
+                isARepeat: isARepeat,
+                keyCode: keyCode
+            ),
+            let input = event.terminalInput(applicationCursorKeys: applicationCursorKeys)
+        else {
+            return nil
+        }
+        return [0x1B] + input
+    }
+
     func terminalInput(applicationCursorKeys: Bool = false) -> [UInt8]? {
         guard !modifierFlags.contains(.command), let characters, !characters.isEmpty else {
             return nil

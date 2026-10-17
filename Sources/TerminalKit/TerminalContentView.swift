@@ -28,6 +28,7 @@ final class TerminalContentView: NSView {
             needsDisplay = true
         }
     }
+    var usesOptionAsMetaKey = false
     var markedText = "" {
         didSet {
             needsDisplay = true
@@ -90,6 +91,12 @@ final class TerminalContentView: NSView {
             return
         }
         scrollToBottom()
+        if usesOptionAsMetaKey, event.modifierFlags.contains(.option),
+            let input = event.metaInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys)
+        {
+            session.send(input)
+            return
+        }
         keyDownEvent = event
         interpretKeyEvents([event])
         keyDownEvent = nil
