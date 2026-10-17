@@ -15,6 +15,70 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
+    @Test func printsWideCharactersInTwoCells() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("a中b")
+        #expect(terminal.screen[0].map(\.width) == [1, 2, 0, 1, 1])
+        #expect(lines(terminal) == ["a中 b "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 4))
+    }
+
+    @Test func waitsToWrapAfterAWideCharacterAtTheEnd() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("a中")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+        terminal.receive("b")
+        #expect(lines(terminal) == ["a中 ", "b  "])
+    }
+
+    @Test func wrapsAWideCharacterThatDoesNotFit() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("ab中")
+        #expect(lines(terminal) == ["ab ", "中  "])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
+    }
+
+    @Test func printsAWideCharacterInOneColumnScreen() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        terminal.receive("中")
+        #expect(terminal.screen[0].map(\.width) == [1])
+    }
+
+    @Test(arguments: [
+        ("\u{1B}[1Gx", "x  ", [1, 1, 1]), ("\u{1B}[2Gx", " x ", [1, 1, 1]), ("\u{1B}[2G中", " 中 ", [1, 2, 0]),
+    ])
+    func clearsTheOtherHalfOfAWideCharacter(sequence: String, line: String, widths: [UInt8]) {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("中\(sequence)")
+        #expect(lines(terminal) == [line])
+        #expect(terminal.screen[0].map(\.width) == widths)
+    }
+
+    @Test func combinesMarksWithThePreviousCharacter() {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("e\u{301}x")
+        #expect(lines(terminal) == ["éx "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
+    @Test func combinesMarksWithAWideCharacter() {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("❤\u{FE0F}中\u{FE0F}")
+        #expect(terminal.screen[0].map(\.character) == ["❤\u{FE0F}", "中\u{FE0F}", " "])
+    }
+
+    @Test func combinesMarksWithTheLastCharacterOfALine() {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("ae\u{301}")
+        #expect(lines(terminal) == ["aé"])
+    }
+
+    @Test func ignoresMarksWithoutAPreviousCharacter() {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("\u{301}a\u{200B}")
+        #expect(lines(terminal) == ["a "])
+    }
+
     @Test func wrapsAtTheEndOfALine() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("abcdef")

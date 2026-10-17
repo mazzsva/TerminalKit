@@ -1,4 +1,5 @@
 #include <spawn.h>
+#include <stdint.h>
 
 int spawn_in_terminal(
     pid_t *pid,
@@ -9,3 +10,5 @@ int spawn_in_terminal(
     char *const arguments[],
     char *const environment[]
 );
+
+int character_width(uint32_t scalar);

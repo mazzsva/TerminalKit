@@ -2,6 +2,7 @@ package struct Terminal: Sendable {
     package struct Cell: Equatable, Sendable {
         package var character: Character = " "
         package var style = Style()
+        package var width: UInt8 = 1
     }
 
     package struct Position: Equatable, Sendable {
@@ -86,7 +87,7 @@ package struct Terminal: Sendable {
             }
             switch action {
             case .print(let scalar):
-                print(scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar))
+                print(scalar)
             case .execute("\n"):
                 lineFeed()
             case .execute("\r"):
@@ -192,16 +193,55 @@ package struct Terminal: Sendable {
         }
     }
 
-    private mutating func print(_ character: Character) {
-        if isWrapPending {
+    private mutating func print(_ scalar: Unicode.Scalar) {
+        guard scalar.width > 0 else {
+            combine(scalar)
+            return
+        }
+        let width = columns > 1 ? scalar.width : 1
+        if isWrapPending || cursor.column + width > columns {
             carriageReturn()
             lineFeed()
         }
-        screen[cursor.row][cursor.column] = Cell(character: character, style: style)
-        if cursor.column == columns - 1 {
+        let character = scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar)
+        for column in cursor.column ..< cursor.column + width {
+            clearWideCharacter(at: column)
+        }
+        screen[cursor.row][cursor.column] = Cell(character: character, style: style, width: UInt8(width))
+        if width == 2 {
+            screen[cursor.row][cursor.column + 1] = Cell(style: style, width: 0)
+        }
+        if cursor.column + width == columns {
+            cursor.column = columns - 1
             isWrapPending = true
         } else {
-            cursor.column += 1
+            cursor.column += width
+        }
+    }
+
+    private mutating func clearWideCharacter(at column: Int) {
+        switch screen[cursor.row][column].width {
+        case 0:
+            screen[cursor.row][column - 1] = blank
+        case 2 where column + 1 < columns:
+            screen[cursor.row][column + 1] = blank
+        default:
+            break
+        }
+    }
+
+    private mutating func combine(_ scalar: Unicode.Scalar) {
+        var column = isWrapPending ? cursor.column : cursor.column - 1
+        if column > 0, screen[cursor.row][column].width == 0 {
+            column -= 1
+        }
+        guard column >= 0 else {
+            return
+        }
+        var text = String(screen[cursor.row][column].character)
+        text.unicodeScalars.append(scalar)
+        if let character = text.first, text.count == 1 {
+            screen[cursor.row][column].character = character
         }
     }
 
