@@ -14,6 +14,7 @@ package struct Terminal: Sendable {
         var position = Position(row: 0, column: 0)
         var style = Style()
         var isWrapPending = false
+        var usesLineDrawing = false
     }
 
     private static let tabWidth = 8
@@ -40,6 +41,7 @@ package struct Terminal: Sendable {
     private var parser = EscapeSequenceParser()
     private var isWrapPending = false
     private var style = Style()
+    private var usesLineDrawing = false
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
     private var replies: [UInt8] = []
@@ -87,7 +89,7 @@ package struct Terminal: Sendable {
             }
             switch action {
             case .print(let scalar):
-                print(scalar)
+                print(usesLineDrawing ? scalar.lineDrawingCharacter : scalar)
             case .execute("\n"):
                 lineFeed()
             case .execute("\r"):
@@ -103,6 +105,10 @@ package struct Terminal: Sendable {
                 lineFeed()
             case .escape(intermediates: "", final: "M"):
                 reverseLineFeed()
+            case .escape(intermediates: "(", final: "0"):
+                usesLineDrawing = true
+            case .escape(intermediates: "(", final: "B"):
+                usesLineDrawing = false
             case .escape(intermediates: "", final: "7"):
                 saveCursor()
             case .escape(intermediates: "", final: "8"):
@@ -390,13 +396,19 @@ package struct Terminal: Sendable {
     }
 
     private mutating func saveCursor() {
-        savedCursor = SavedCursor(position: cursor, style: style, isWrapPending: isWrapPending)
+        savedCursor = SavedCursor(
+            position: cursor,
+            style: style,
+            isWrapPending: isWrapPending,
+            usesLineDrawing: usesLineDrawing
+        )
     }
 
     private mutating func restoreCursor() {
         moveCursor(row: savedCursor.position.row, column: savedCursor.position.column)
         style = savedCursor.style
         isWrapPending = savedCursor.isWrapPending
+        usesLineDrawing = savedCursor.usesLineDrawing
     }
 
     private mutating func eraseInDisplay(_ mode: Int) {
