@@ -4,6 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct TerminalSessionTests {
     @Test func keepsTheConfiguration() {
         let configuration = TerminalSession.Configuration(
@@ -29,10 +30,11 @@ struct TerminalSessionTests {
         #expect(TerminalSession(configuration: shell("exit")).state == .idle)
     }
 
-    @Test func runsTheProcess() throws {
-        let session = TerminalSession(configuration: shell("sleep 1"))
+    @Test func runsTheProcess() async throws {
+        let session = TerminalSession(configuration: shell("exit"))
         try session.start()
         #expect(session.state == .running)
+        await waitForExit(of: session)
     }
 
     @Test func showsTheOutputOfTheProcess() async throws {
@@ -57,6 +59,25 @@ struct TerminalSessionTests {
         #expect(session.title == "Title")
     }
 
+    @Test func startsTheProcessWithTheSizeOfTheScreen() async throws {
+        let session = TerminalSession(configuration: shell("stty size"))
+        session.resize(columns: 100, rows: 30)
+        try session.start()
+        await waitForExit(of: session)
+        #expect(text(of: session).first == "30 100")
+    }
+
+    @Test func resizesTheProcess() async throws {
+        let session = TerminalSession(
+            configuration: shell("trap 'stty size; kill $!; exit' WINCH; sleep 60 & echo ready; wait")
+        )
+        try session.start()
+        await waitForText("ready", in: session)
+        session.resize(columns: 100, rows: 30)
+        await waitForExit(of: session)
+        #expect(text(of: session).contains("30 100"))
+    }
+
     @Test func throwsWhenTheProcessCannotStart() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/missing")))
         #expect(throws: POSIXError(.ENOENT)) {
@@ -72,9 +93,30 @@ private func shell(_ script: String) -> TerminalSession.Configuration {
 
 @MainActor
 @discardableResult
-private func waitForExit(of session: TerminalSession) async -> TerminalSession.State? {
+private func waitForExit(
+    of session: TerminalSession,
+    sourceLocation: SourceLocation = #_sourceLocation
+) async -> TerminalSession.State? {
     for await state in Observations({ session.state }) where state != .running {
         return state
     }
+    Issue.record("The process did not exit. Screen: \(text(of: session))", sourceLocation: sourceLocation)
     return nil
+}
+
+@MainActor
+private func waitForText(
+    _ line: String,
+    in session: TerminalSession,
+    sourceLocation: SourceLocation = #_sourceLocation
+) async {
+    for await text in Observations({ text(of: session) }) where text.contains(line) {
+        return
+    }
+    Issue.record("The screen did not show \"\(line)\". Screen: \(text(of: session))", sourceLocation: sourceLocation)
+}
+
+@MainActor
+private func text(of session: TerminalSession) -> [String] {
+    session.terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
 }

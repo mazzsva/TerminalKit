@@ -2,6 +2,7 @@ import Foundation
 import TerminalCore
 import Testing
 
+@Suite(.timeLimit(.minutes(1)))
 struct PseudoTerminalTests {
     @Test func reportsTheExitStatus() async throws {
         #expect(try await termination("exit 3") == .exit(3))
