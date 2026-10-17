@@ -116,6 +116,9 @@ final class TerminalContentView: NSView {
             text.draw(at: cursor.origin)
             return
         }
+        guard terminal.isCursorVisible else {
+            return
+        }
         NSColor.textColor.withAlphaComponent(0.5).setFill()
         cursor.fill(using: .sourceOver)
     }
