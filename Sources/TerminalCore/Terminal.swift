@@ -74,7 +74,10 @@ package struct Terminal: Sendable {
     }
 
     package mutating func receive(_ bytes: [UInt8]) {
-        for action in parser.parse(decoder.decode(bytes)) {
+        for scalar in decoder.decode(bytes) {
+            guard let action = parser.advance(scalar) else {
+                continue
+            }
             switch action {
             case .print(let scalar):
                 print(Character(scalar))

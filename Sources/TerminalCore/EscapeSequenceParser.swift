@@ -48,7 +48,7 @@ package struct EscapeSequenceParser: Sendable {
         scalars.compactMap { advance($0) }
     }
 
-    private mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
+    package mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
         case "\u{18}", "\u{1A}":
             state = .ground
