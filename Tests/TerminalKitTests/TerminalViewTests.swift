@@ -73,6 +73,24 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.minY == 0)
     }
 
+    @Test func keepsThePositionWhenOldLinesAreRemoved() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 10500; read line; seq 1 2000")
+        for await lines in Observations({ session.terminal.screen.map { String($0.map(\.character)) } })
+        where lines.contains(where: { $0.hasPrefix("10500") }) {
+            break
+        }
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        view.scroll(CGPoint(x: 0, y: 4 + 5_000 * view.cellSize.height))
+        let firstLine = { session.terminal.scrollback[Int(scrollView.contentView.bounds.minY / view.cellSize.height)] }
+        let line = firstLine()
+        session.send(Array("\r".utf8))
+        await waitForExit(of: session)
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(session.terminal.removedScrollbackCount > 0)
+        #expect(firstLine() == line)
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),

@@ -23,6 +23,7 @@ package struct Terminal: Sendable {
     package private(set) var rows: Int
     package private(set) var screen: [[Cell]]
     package private(set) var scrollback: [[Cell]] = []
+    package private(set) var removedScrollbackCount = 0
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var title = ""
     package private(set) var usesApplicationCursorKeys = false
@@ -240,6 +241,7 @@ package struct Terminal: Sendable {
     private mutating func keepInScrollback(_ lines: ArraySlice<[Cell]>) {
         scrollback += lines
         if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
+            removedScrollbackCount += scrollback.count - Self.maximumScrollback
             scrollback.removeFirst(scrollback.count - Self.maximumScrollback)
         }
     }
