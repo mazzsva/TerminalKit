@@ -16,10 +16,13 @@ package struct Terminal: Sendable {
     }
 
     private static let tabWidth = 8
+    private static let maximumScrollback = 10_000
+    private static let scrollbackTrimCount = 1_000
 
     package private(set) var columns: Int
     package private(set) var rows: Int
     package private(set) var screen: [[Cell]]
+    package private(set) var scrollback: [[Cell]] = []
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var title = ""
     package private(set) var usesApplicationCursorKeys = false
@@ -47,9 +50,13 @@ package struct Terminal: Sendable {
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
         let removedRows = max(cursor.row + 1 - rows, 0)
+        if normalScreen == nil {
+            keepInScrollback(screen.prefix(removedRows))
+        }
         screen = Self.resized(screen, columns: columns, rows: rows, removingFirst: removedRows)
         if var normalScreen {
             let removedNormalRows = max(normalScreen.savedCursor.position.row + 1 - rows, 0)
+            keepInScrollback(normalScreen.lines.prefix(removedNormalRows))
             normalScreen.lines = Self.resized(
                 normalScreen.lines,
                 columns: columns,
@@ -147,7 +154,7 @@ package struct Terminal: Sendable {
         case "M":
             deleteLines(count)
         case "S":
-            scrollUp(count, in: scrollRegion)
+            scrollRegionUp(count)
         case "T" where sequence.parameters.count <= 1:
             scrollDown(count, in: scrollRegion)
         case "m":
@@ -186,7 +193,7 @@ package struct Terminal: Sendable {
     private mutating func lineFeed() {
         isWrapPending = false
         if cursor.row == scrollRegion.upperBound - 1 {
-            scrollUp(1, in: scrollRegion)
+            scrollRegionUp(1)
         } else if cursor.row < rows - 1 {
             cursor.row += 1
         }
@@ -228,6 +235,20 @@ package struct Terminal: Sendable {
         }
         scrollRegion = top ..< bottom
         moveCursor(row: 0, column: 0)
+    }
+
+    private mutating func keepInScrollback(_ lines: ArraySlice<[Cell]>) {
+        scrollback += lines
+        if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
+            scrollback.removeFirst(scrollback.count - Self.maximumScrollback)
+        }
+    }
+
+    private mutating func scrollRegionUp(_ count: Int) {
+        if scrollRegion.lowerBound == 0, normalScreen == nil {
+            keepInScrollback(screen.prefix(min(count, scrollRegion.count)))
+        }
+        scrollUp(count, in: scrollRegion)
     }
 
     private mutating func scrollUp(_ count: Int, in region: Range<Int>) {
