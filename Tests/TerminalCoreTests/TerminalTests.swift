@@ -291,6 +291,21 @@ struct TerminalTests {
         terminal.receive("\u{1B}[?1049l".utf8)
         #expect(lines(terminal) == ["ab", "  ", "  "])
     }
+
+    @Test func keepsASavedCursorForEachScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?1049h\u{1B}[2;2H\u{1B}7\u{1B}[?1049lc".utf8)
+        #expect(lines(terminal) == ["abc ", "    "])
+    }
+
+    @Test func keepsTheSavedCursorLineWhenTheNormalScreenGetsShorter() {
+        var terminal = Terminal(columns: 2, rows: 3)
+        terminal.receive("a\r\nb\r\nc\u{1B}[?1049h".utf8)
+        terminal.resize(columns: 2, rows: 2)
+        terminal.receive("\u{1B}[?1049l".utf8)
+        #expect(lines(terminal) == ["b ", "c "])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {

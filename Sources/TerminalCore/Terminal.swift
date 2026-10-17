@@ -32,7 +32,7 @@ package struct Terminal: Sendable {
     private var isWrapPending = false
     private var style = Style()
     private var savedCursor = SavedCursor()
-    private var normalScreen: [[Cell]]?
+    private var normalScreen: (lines: [[Cell]], savedCursor: SavedCursor)?
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -45,7 +45,17 @@ package struct Terminal: Sendable {
         precondition(columns > 0 && rows > 0)
         let removedRows = max(cursor.row + 1 - rows, 0)
         screen = Self.resized(screen, columns: columns, rows: rows, removingFirst: removedRows)
-        normalScreen = normalScreen.map { Self.resized($0, columns: columns, rows: rows, removingFirst: 0) }
+        if var normalScreen {
+            let removedNormalRows = max(normalScreen.savedCursor.position.row + 1 - rows, 0)
+            normalScreen.lines = Self.resized(
+                normalScreen.lines,
+                columns: columns,
+                rows: rows,
+                removingFirst: removedNormalRows
+            )
+            normalScreen.savedCursor.position.row -= removedNormalRows
+            self.normalScreen = normalScreen
+        }
         self.columns = columns
         self.rows = rows
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
@@ -187,15 +197,16 @@ package struct Terminal: Sendable {
         guard normalScreen == nil else {
             return
         }
-        normalScreen = screen
+        normalScreen = (screen, savedCursor)
         screen = Array(repeating: Array(repeating: blank, count: columns), count: rows)
+        savedCursor = SavedCursor()
     }
 
     private mutating func exitAlternateScreen() {
         guard let normalScreen else {
             return
         }
-        screen = normalScreen
+        (screen, savedCursor) = normalScreen
         self.normalScreen = nil
     }
 
