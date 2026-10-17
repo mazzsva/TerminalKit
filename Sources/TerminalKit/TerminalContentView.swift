@@ -63,7 +63,7 @@ final class TerminalContentView: NSView {
     }
 
     override func doCommand(by selector: Selector) {
-        if let input = keyDownEvent?.terminalInput {
+        if let input = keyDownEvent?.terminalInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys) {
             session.send(input)
         }
     }
