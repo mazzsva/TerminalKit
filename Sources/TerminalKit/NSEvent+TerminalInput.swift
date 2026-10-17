@@ -18,8 +18,16 @@ extension NSEvent {
 }
 
 extension NSEvent.SpecialKey {
+    fileprivate static var escape: Self {
+        Self(rawValue: 0x1B)
+    }
+
     fileprivate var terminalSequence: String? {
         switch self {
+        case .carriageReturn, .enter: "\r"
+        case .tab: "\t"
+        case .delete: "\u{7F}"
+        case .escape: "\u{1B}"
         case .upArrow: "\u{1B}[A"
         case .downArrow: "\u{1B}[B"
         case .rightArrow: "\u{1B}[C"
@@ -29,7 +37,6 @@ extension NSEvent.SpecialKey {
         case .pageUp: "\u{1B}[5~"
         case .pageDown: "\u{1B}[6~"
         case .deleteForward: "\u{1B}[3~"
-        case .enter: "\r"
         case .backTab: "\u{1B}[Z"
         default: nil
         }
