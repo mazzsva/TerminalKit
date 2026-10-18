@@ -18,6 +18,35 @@ struct PseudoTerminalTests {
         #expect(try await output("head -c 200000 /dev/zero | tr '\\0' a").count == 200_000)
     }
 
+    @Test func joinsTheOutputOfManyReads() async throws {
+        let pseudoTerminal = try PseudoTerminal(
+            executableURL: URL(filePath: "/bin/sh"),
+            arguments: ["-c", "head -c 50000 /dev/zero | tr '\\0' a"],
+            environment: [:],
+            columns: 80,
+            rows: 24
+        )
+        try await Task.sleep(for: .milliseconds(500))
+        var iterator = pseudoTerminal.output.makeAsyncIterator()
+        #expect(try #require(await iterator.next()).count > 1_024)
+    }
+
+    @Test func keepsTheOrderOfTheOutputForASlowReader() async throws {
+        let pseudoTerminal = try PseudoTerminal(
+            executableURL: URL(filePath: "/bin/sh"),
+            arguments: ["-c", "stty -opost; exec seq 1 100000"],
+            environment: [:],
+            columns: 80,
+            rows: 24
+        )
+        var output: [UInt8] = []
+        for await bytes in pseudoTerminal.output {
+            output += bytes
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        #expect(output == Array((1 ... 100_000).map { "\($0)\n" }.joined().utf8))
+    }
+
     @Test func waitsForTheReaderBeforeItReadsMoreOutput() async throws {
         let marker = URL.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: marker) }

@@ -3,23 +3,25 @@ import Synchronization
 
 extension PseudoTerminal {
     package struct Output: AsyncSequence, Sendable {
-        let stream: AsyncStream<[UInt8]>
-        let flowControl: FlowControl
+        let wakeUps: AsyncStream<Void>
+        let buffer: OutputBuffer
 
         package func makeAsyncIterator() -> AsyncIterator {
-            AsyncIterator(iterator: stream.makeAsyncIterator(), flowControl: flowControl)
+            AsyncIterator(wakeUps: wakeUps.makeAsyncIterator(), buffer: buffer)
         }
 
         package struct AsyncIterator: AsyncIteratorProtocol {
-            var iterator: AsyncStream<[UInt8]>.Iterator
-            let flowControl: FlowControl
+            var wakeUps: AsyncStream<Void>.Iterator
+            let buffer: OutputBuffer
 
             package mutating func next(isolation actor: isolated (any Actor)? = #isolation) async -> [UInt8]? {
-                let bytes = await iterator.next(isolation: actor)
-                if bytes != nil {
-                    flowControl.didRead()
+                while await wakeUps.next(isolation: actor) != nil {
+                    let bytes = buffer.take()
+                    if !bytes.isEmpty {
+                        return bytes
+                    }
                 }
-                return bytes
+                return nil
             }
 
             package mutating func next() async -> [UInt8]? {
@@ -28,39 +30,46 @@ extension PseudoTerminal {
         }
     }
 
-    final class FlowControl: Sendable {
+    final class OutputBuffer: Sendable {
         private struct State {
-            var unreadEvents = 0
+            var bytes: [UInt8] = []
             var isSuspended = false
             var isCancelled = false
         }
 
-        private static let maximumUnreadEvents = 4
+        private static let capacity = 65_536
 
         private let source: any DispatchSourceRead
+        private let wakeUp: AsyncStream<Void>.Continuation
         private let state = Mutex(State())
 
-        init(source: any DispatchSourceRead) {
+        init(source: any DispatchSourceRead, wakeUp: AsyncStream<Void>.Continuation) {
             self.source = source
+            self.wakeUp = wakeUp
         }
 
-        func didYield() {
+        func append(_ bytes: [UInt8]) {
             state.withLock { state in
-                state.unreadEvents += 1
-                if state.unreadEvents >= Self.maximumUnreadEvents, !state.isSuspended, !state.isCancelled {
+                if state.bytes.isEmpty {
+                    wakeUp.yield()
+                }
+                state.bytes += bytes
+                if state.bytes.count >= Self.capacity, !state.isSuspended, !state.isCancelled {
                     state.isSuspended = true
                     source.suspend()
                 }
             }
         }
 
-        func didRead() {
+        func take() -> [UInt8] {
             state.withLock { state in
-                state.unreadEvents -= 1
-                if state.unreadEvents < Self.maximumUnreadEvents, state.isSuspended, !state.isCancelled {
+                if state.isSuspended, !state.isCancelled {
                     state.isSuspended = false
                     source.resume()
                 }
+                var bytes: [UInt8] = []
+                swap(&bytes, &state.bytes)
+                return bytes
             }
         }
 
