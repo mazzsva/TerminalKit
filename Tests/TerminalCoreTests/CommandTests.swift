@@ -268,6 +268,53 @@ struct CommandTests {
         #expect(text(at: terminal.commands[1].output, in: terminal) == "a")
     }
 
+    @Test func keepsTheRowsOfThePromptForTheShell() {
+        var terminal = Terminal(columns: 30, rows: 6)
+        terminal.receive("long output line that wraps\r\n\u{1B}]133;A\u{7}top line of a long prompt\r\n% ")
+        terminal.receive("\u{1B}]133;B\u{7}echo abc")
+        terminal.resize(columns: 10, rows: 6)
+        #expect(screenLines(terminal) == ["long outpu", "t line tha", "t wraps", "top line o", "% echo abc", ""])
+        #expect(terminal.cursor == Terminal.Position(row: 4, column: 9))
+
+        terminal.resize(columns: 12, rows: 6)
+        #expect(screenLines(terminal) == ["long output", "line that wr", "aps", "top line o", "% echo abc", ""])
+    }
+
+    @Test func reflowsThePromptAboveASecondaryMark() {
+        var terminal = Terminal(columns: 30, rows: 6)
+        terminal.receive("\u{1B}]133;A\u{7}top line of a long prompt\r\n\u{1B}]133;A;k=s\u{7}% ")
+        terminal.receive("\u{1B}]133;B\u{7}echo abc")
+        terminal.resize(columns: 10, rows: 6)
+        #expect(screenLines(terminal) == ["top line o", "f a long p", "rompt", "% echo abc", "", ""])
+
+        terminal.receive("\r\n\u{1B}]133;C\u{7}")
+        #expect(terminal.commands.last?.prompt == Terminal.Position(row: 0, column: 0))
+        #expect(terminal.commands.last?.text == "echo abc")
+    }
+
+    @Test func reflowsThePromptOfARunningCommand() {
+        var terminal = Terminal(columns: 30, rows: 6)
+        terminal.receive("\u{1B}]133;A\u{7}top line of a long prompt\r\n% ")
+        terminal.receive("\u{1B}]133;B\u{7}cat\r\n\u{1B}]133;C\u{7}")
+        terminal.resize(columns: 10, rows: 6)
+        #expect(screenLines(terminal) == ["top line o", "f a long p", "rompt", "% cat", "", ""])
+    }
+
+    @Test func reflowsAPromptThatStartsInTheScrollback() {
+        var terminal = Terminal(columns: 30, rows: 2)
+        terminal.receive("\u{1B}]133;A\u{7}top line of a long prompt\r\nsecond\r\n% \u{1B}]133;B\u{7}ls")
+        terminal.resize(columns: 10, rows: 2)
+        #expect(scrollbackLines(terminal) == ["top line o", "f a long p", "rompt"])
+        #expect(screenLines(terminal) == ["second", "% ls"])
+    }
+
+    @Test func forgetsThePromptOfAClearedScreen() {
+        var terminal = Terminal(columns: 30, rows: 6)
+        terminal.receive("\u{1B}]133;A\u{7}top line of a long prompt\u{1B}[2J\u{1B}[Hlong output line\r\n% ")
+        terminal.resize(columns: 10, rows: 6)
+        #expect(screenLines(terminal) == ["long outpu", "t line", "%", "", "", ""])
+    }
+
     @Test func trimsTheOldestCommands() {
         var terminal = Terminal(columns: 20, rows: 5)
         let command = "\u{1B}]133;C;cmdline_url=x\u{7}\u{1B}]133;D;0\u{7}"
@@ -278,6 +325,14 @@ struct CommandTests {
         #expect(terminal.removedCommandCount == 1_001)
         #expect(terminal.commands.last?.isFinished == true)
     }
+}
+
+private func screenLines(_ terminal: Terminal) -> [String] {
+    terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
+}
+
+private func scrollbackLines(_ terminal: Terminal) -> [String] {
+    terminal.scrollback.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
 }
 
 private func text(at position: Terminal.Position?, in terminal: Terminal) -> String {

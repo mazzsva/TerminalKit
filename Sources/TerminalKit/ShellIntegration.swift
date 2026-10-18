@@ -162,7 +162,10 @@ enum ShellIntegration {
                 builtin local code=$?
                 if [[ $PS1 != "$__terminalkit_ps1" ]]; then
                     __terminalkit_plain_ps1=$PS1
-                    PS1='\[\e]133;A\a\]'$PS1'\[\e]133;B\a\]'
+                    builtin local ps1="$PS1" newline='\n' line='\n\[\e]133;A;k=s\a\]'
+                    ps1=${ps1//"$newline"/$line}
+                    ps1=${ps1//$'\n'/$'\n''\[\e]133;A;k=s\a\]'}
+                    PS1='\[\e]133;A\a\]'$ps1'\[\e]133;B\a\]'
                     __terminalkit_ps1=$PS1
                 fi
                 __terminalkit_prompting=1

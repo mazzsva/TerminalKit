@@ -61,6 +61,7 @@ package struct Terminal: Sendable {
     private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
     var prompt: Position?
     var input: Position?
+    var redrawnPrompt: Position?
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -163,6 +164,9 @@ package struct Terminal: Sendable {
         var groupStart = positions[0].row
         while groupStart > scrollback.count, oldLines[groupStart - 1].isWrapped {
             groupStart -= 1
+        }
+        if let row = redrawnPrompt.map({ $0.row - firstLine }), (scrollback.count ..< groupStart).contains(row) {
+            groupStart = row
         }
         var groupEnd = positions[0].row
         while groupEnd < oldLines.count - 1, oldLines[groupEnd].isWrapped {
