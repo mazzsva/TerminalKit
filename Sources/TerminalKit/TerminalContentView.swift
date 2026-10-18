@@ -287,10 +287,11 @@ final class TerminalContentView: NSView {
     }
 
     func fit(to size: CGSize) {
-        session.resize(
-            columns: max(Int((size.width - 2 * Self.padding) / cellSize.width), 1),
-            rows: max(Int((size.height - 2 * Self.padding) / cellSize.height), 1)
-        )
+        let columns = max(Int((size.width - 2 * Self.padding) / cellSize.width), 1)
+        if columns != session.terminal.columns {
+            selection = nil
+        }
+        session.resize(columns: columns, rows: max(Int((size.height - 2 * Self.padding) / cellSize.height), 1))
         let lineCount = session.terminal.scrollback.count + session.terminal.rows
         setFrameSize(
             CGSize(width: size.width, height: max(size.height, CGFloat(lineCount) * cellSize.height + 2 * Self.padding))

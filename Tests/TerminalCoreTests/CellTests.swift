@@ -17,6 +17,12 @@ struct CellTests {
         #expect(cell == other)
     }
 
+    @Test func showsPaddingAsABlank() {
+        #expect(Terminal.Cell.padding.character == " ")
+        #expect(Terminal.Cell.padding.isBlank)
+        #expect(Terminal.Cell.padding != Terminal.Cell())
+    }
+
     @Test func storesOnlyPlainValues() {
         #expect(_isPOD(Terminal.Cell.self))
     }

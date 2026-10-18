@@ -62,6 +62,31 @@ package struct Terminal: Sendable {
 
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
+        if columns != self.columns {
+            guard var normalScreen else {
+                let (lines, anchors) = reflow(
+                    screen,
+                    keeping: [(cursor, isWrapPending), (savedCursor.position, savedCursor.isWrapPending)],
+                    columns: columns,
+                    rows: rows
+                )
+                screen = lines
+                (cursor, isWrapPending) = anchors[0]
+                (savedCursor.position, savedCursor.isWrapPending) = anchors[1]
+                setSize(columns: columns, rows: rows)
+                return
+            }
+            let saved = normalScreen.savedCursor
+            let (lines, anchors) = reflow(
+                normalScreen.lines,
+                keeping: [(saved.position, saved.isWrapPending)],
+                columns: columns,
+                rows: rows
+            )
+            normalScreen.lines = lines
+            (normalScreen.savedCursor.position, normalScreen.savedCursor.isWrapPending) = anchors[0]
+            self.normalScreen = normalScreen
+        }
         let removedRows = max(cursor.row + 1 - rows, 0)
         if normalScreen == nil {
             keepInScrollback(screen.prefix(removedRows))
@@ -79,13 +104,99 @@ package struct Terminal: Sendable {
             normalScreen.savedCursor.position.row -= removedNormalRows
             self.normalScreen = normalScreen
         }
+        setSize(columns: columns, rows: rows)
+        moveCursor(row: cursor.row - removedRows, column: cursor.column)
+    }
+
+    private mutating func setSize(columns: Int, rows: Int) {
         tabStops =
             columns > self.columns
             ? tabStops + Self.defaultTabStops(self.columns ..< columns) : Array(tabStops.prefix(columns))
         self.columns = columns
         self.rows = rows
         scrollRegion = 0 ..< rows
-        moveCursor(row: cursor.row - removedRows, column: cursor.column)
+    }
+
+    private mutating func reflow(
+        _ screen: [Line],
+        keeping anchors: [(position: Position, isWrapPending: Bool)],
+        columns: Int,
+        rows: Int
+    ) -> (screen: [Line], anchors: [(position: Position, isWrapPending: Bool)]) {
+        let oldLines = scrollback + screen
+        let positions =
+            anchors.map { Position(row: scrollback.count + $0.position.row, column: $0.position.column) }
+            + [Position(row: scrollback.count, column: 0)]
+        var groupStart = positions[0].row
+        while groupStart > 0, oldLines[groupStart - 1].isWrapped {
+            groupStart -= 1
+        }
+        var groupEnd = positions[0].row
+        while groupEnd < oldLines.count - 1, oldLines[groupEnd].isWrapped {
+            groupEnd += 1
+        }
+        var lines: [Line] = []
+        var mapped = positions
+        for (part, reflows) in [
+            (0 ..< groupStart, true), (groupStart ..< groupEnd + 1, false), (groupEnd + 1 ..< oldLines.count, true),
+        ] {
+            let indices = positions.indices.filter { part.contains(positions[$0].row) }
+            if reflows {
+                let (partLines, partPositions) = Self.reflow(
+                    Array(oldLines[part]),
+                    columns: columns,
+                    positions: indices.map {
+                        Position(row: positions[$0].row - part.lowerBound, column: positions[$0].column)
+                    }
+                )
+                for (index, position) in zip(indices, partPositions) {
+                    mapped[index] = Position(row: lines.count + position.row, column: position.column)
+                }
+                lines += partLines
+            } else {
+                for index in indices {
+                    mapped[index] = Position(
+                        row: lines.count + positions[index].row - part.lowerBound,
+                        column: min(positions[index].column, columns - 1)
+                    )
+                }
+                lines += oldLines[part].map { Self.fitted($0, columns: columns) }
+            }
+        }
+        let firstRow = mapped[mapped.count - 1].row
+        var newScreen = Array(lines[firstRow...])
+        var newScrollback = Array(lines[..<firstRow])
+        var newAnchors = zip(anchors, mapped)
+            .map { anchor, position in
+                let row = position.row - firstRow
+                guard anchor.isWrapPending else {
+                    return (position: Position(row: row, column: position.column), isWrapPending: false)
+                }
+                return position.column + 1 < columns
+                    ? (Position(row: row, column: position.column + 1), false)
+                    : (Position(row: row, column: columns - 1), true)
+            }
+        let cursorRow = newAnchors.first?.position.row ?? 0
+        while newScreen.count > rows, newScreen.count - 1 > cursorRow, let last = newScreen.last, !last.isWrapped,
+            last.allSatisfy(\.isBlank)
+        {
+            newScreen.removeLast()
+        }
+        let movedRows = min(max(newScreen.count - rows, 0), cursorRow)
+        newScrollback += newScreen.prefix(movedRows)
+        newScreen = Array(newScreen.dropFirst(movedRows).prefix(rows))
+        newScreen += Array(repeating: Line(), count: rows - newScreen.count)
+        for index in newAnchors.indices {
+            newAnchors[index].position.row = min(max(newAnchors[index].position.row - movedRows, 0), rows - 1)
+        }
+        scrollback = newScrollback
+        trimScrollback()
+        let paddedScreen = newScreen.map { line in
+            var line = line
+            line.append(contentsOf: repeatElement(Cell(), count: columns - line.count))
+            return line
+        }
+        return (paddedScreen, newAnchors)
     }
 
     package mutating func receive(_ bytes: [UInt8]) -> [UInt8] {
@@ -230,6 +341,9 @@ package struct Terminal: Sendable {
             if usesAutowrap {
                 let row = cursor.row
                 let scrolls = row == scrollRegion.upperBound - 1
+                if !isWrapPending, screen[row][columns - 1] == Cell() {
+                    screen[row][columns - 1] = .padding
+                }
                 screen[row].isWrapped = true
                 carriageReturn()
                 lineFeed()
@@ -349,9 +463,13 @@ package struct Terminal: Sendable {
 
     private mutating func keepInScrollback(_ lines: ArraySlice<Line>) {
         for line in lines {
-            let end = line.isWrapped ? line.count : (line.lastIndex { $0 != Cell() } ?? -1) + 1
+            let end = line.isWrapped ? line.count : (line.lastIndex { !$0.isBlank } ?? -1) + 1
             scrollback.append(end == line.count ? line : Line(line[..<end]))
         }
+        trimScrollback()
+    }
+
+    private mutating func trimScrollback() {
         if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
             removedScrollbackCount += scrollback.count - Self.maximumScrollback
             scrollback.removeFirst(scrollback.count - Self.maximumScrollback)
@@ -600,14 +718,17 @@ package struct Terminal: Sendable {
         -> [Line]
     {
         let lines = screen.dropFirst(removedRows).prefix(rows)
-            .map { line in
-                var line = Line(line.prefix(columns)) + blankLine(columns: max(columns - line.count, 0))
-                if line[columns - 1].width == 2 {
-                    line[columns - 1] = Cell()
-                }
-                return line
-            }
+            .map { fitted($0, columns: columns) }
         return lines + Array(repeating: blankLine(columns: columns), count: rows - lines.count)
+    }
+
+    private static func fitted(_ line: Line, columns: Int) -> Line {
+        var line = Line(line.prefix(columns), isWrapped: line.isWrapped)
+        line.append(contentsOf: repeatElement(Cell(), count: max(columns - line.count, 0)))
+        if line[columns - 1].width == 2 {
+            line[columns - 1] = Cell()
+        }
+        return line
     }
 
     private static func blankLine(columns: Int) -> Line {
