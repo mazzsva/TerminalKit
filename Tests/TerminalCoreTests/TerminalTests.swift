@@ -54,6 +54,17 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.width) == widths)
     }
 
+    @Test(arguments: [
+        ("中\r\u{1B}[Px", "x   "), ("中\r\u{1B}[P", "    "), ("中\u{1B}[D\u{1B}[@", "    "), ("ab中\r\u{1B}[@", " ab "),
+        ("中\u{1B}[D\u{1B}[X", "    "), ("中\r\u{1B}[X", "    "), ("中\u{1B}[D\u{1B}[K", "    "),
+    ])
+    func blanksTheOtherHalfOfABrokenWideCharacter(text: String, line: String) {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive(text)
+        #expect(lines(terminal) == [line])
+        #expect(terminal.screen[0].map(\.width) == [1, 1, 1, 1])
+    }
+
     @Test func combinesMarksWithThePreviousCharacter() {
         var terminal = Terminal(columns: 3, rows: 1)
         terminal.receive("e\u{301}x")

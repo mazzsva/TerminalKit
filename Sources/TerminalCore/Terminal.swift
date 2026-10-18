@@ -254,7 +254,7 @@ package struct Terminal: Sendable {
 
     private mutating func clearWideCharacter(at column: Int) {
         switch screen[cursor.row][column].width {
-        case 0:
+        case 0 where column > 0:
             screen[cursor.row][column - 1] = blank
         case 2 where column + 1 < columns:
             screen[cursor.row][column + 1] = blank
@@ -292,6 +292,9 @@ package struct Terminal: Sendable {
         let count = min(count, columns - cursor.column)
         screen[cursor.row].insert(contentsOf: repeatElement(blank, count: count), at: cursor.column)
         screen[cursor.row].removeLast(count)
+        for column in [cursor.column, cursor.column + count, columns] {
+            blankBrokenWideCharacter(at: column, row: cursor.row)
+        }
     }
 
     private mutating func deleteCharacters(_ count: Int) {
@@ -299,6 +302,16 @@ package struct Terminal: Sendable {
         let count = min(count, columns - cursor.column)
         screen[cursor.row].removeSubrange(cursor.column ..< cursor.column + count)
         screen[cursor.row].append(contentsOf: repeatElement(blank, count: count))
+        blankBrokenWideCharacter(at: cursor.column, row: cursor.row)
+    }
+
+    private mutating func blankBrokenWideCharacter(at column: Int, row: Int) {
+        if column > 0, screen[row][column - 1].width == 2, column == columns || screen[row][column].width != 0 {
+            screen[row][column - 1] = blank
+        }
+        if column < columns, screen[row][column].width == 0, column == 0 || screen[row][column - 1].width != 2 {
+            screen[row][column] = blank
+        }
     }
 
     private mutating func insertLines(_ count: Int) {
@@ -537,6 +550,8 @@ package struct Terminal: Sendable {
     private mutating func erase(_ range: Range<Int>, row: Int) {
         isWrapPending = false
         screen[row].replaceSubrange(range, with: repeatElement(blank, count: range.count))
+        blankBrokenWideCharacter(at: range.lowerBound, row: row)
+        blankBrokenWideCharacter(at: range.upperBound, row: row)
     }
 
     private var blank: Cell {
