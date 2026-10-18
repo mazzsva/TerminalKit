@@ -5,6 +5,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct TerminalSelectionTests {
     typealias Selection = TerminalContentView.Selection
 

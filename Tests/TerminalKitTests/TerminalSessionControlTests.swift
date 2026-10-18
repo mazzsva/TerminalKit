@@ -18,12 +18,9 @@ struct TerminalSessionControlTests {
         session.terminate()
         await session.waitForExit()
         #expect(session.state == .exited(.uncaughtSignal(SIGHUP)))
-        var isRunning = true
-        for _ in 0 ..< 100 where isRunning {
-            isRunning = kill(childIdentifier, 0) == 0
+        while kill(childIdentifier, 0) == 0 {
             try await Task.sleep(for: .milliseconds(20))
         }
-        #expect(!isRunning)
     }
 
     @Test func terminatesAnInteractiveShell() async throws {

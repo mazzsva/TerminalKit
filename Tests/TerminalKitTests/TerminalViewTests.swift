@@ -6,6 +6,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct TerminalViewTests {
     @Test func showsTheSession() throws {
         let session = TerminalSession(running: "exit")
