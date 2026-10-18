@@ -97,6 +97,13 @@ struct TerminalTests {
         #expect(!terminal.screen[0].isWrapped, "\(reason)")
     }
 
+    @Test(arguments: ["\u{1B}[H\u{1B}[2J", "\u{1B}[T", "\u{1B}[H\u{1B}[M"])
+    func unwrapsTheScrollbackWhenTheFirstLineChanges(sequence: String) {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("AAAAABBB\(sequence)")
+        #expect(terminal.scrollback.map(\.isWrapped) == [false])
+    }
+
     @Test func unwrapsTheLastLineOfARegionThatScrollsUp() {
         var terminal = Terminal(columns: 5, rows: 4)
         terminal.receive("\u{1B}[3HAAAAABB\u{1B}[2;3r\u{1B}[S")

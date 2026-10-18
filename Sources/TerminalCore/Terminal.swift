@@ -328,6 +328,7 @@ package struct Terminal: Sendable {
             return
         }
         scrollUp(count, in: cursor.row ..< scrollRegion.upperBound)
+        unwrapLine(before: cursor.row)
         carriageReturn()
     }
 
@@ -361,7 +362,9 @@ package struct Terminal: Sendable {
         let count = min(count, region.count)
         screen.removeSubrange(region.lowerBound ..< region.lowerBound + count)
         screen.insert(contentsOf: blankLines(count), at: region.upperBound - count)
-        unwrapLine(before: region.lowerBound)
+        if region.lowerBound > 0 {
+            unwrapLine(before: region.lowerBound)
+        }
         if region.upperBound < rows {
             unwrapLine(before: region.upperBound - count)
         }
@@ -378,6 +381,8 @@ package struct Terminal: Sendable {
     private mutating func unwrapLine(before row: Int) {
         if row > 0 {
             screen[row - 1].isWrapped = false
+        } else if normalScreen == nil, !scrollback.isEmpty {
+            scrollback[scrollback.count - 1].isWrapped = false
         }
     }
 
