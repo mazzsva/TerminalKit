@@ -4,6 +4,7 @@ struct EscapeSequenceParser: Sendable {
         case execute(Unicode.Scalar)
         case escape(intermediates: String, final: Unicode.Scalar)
         case controlSequence(ControlSequence)
+        case operatingSystemCommand(String)
     }
 
     struct ControlSequence: Equatable, Sendable {
@@ -33,11 +34,13 @@ struct EscapeSequenceParser: Sendable {
     private static let maximumIntermediates = 2
     private static let maximumParameters = 32
     private static let maximumParameterValue = 65_535
+    private static let maximumStringLength = 4_096
 
     private var state = State.ground
     private var intermediates = ""
     private var privateMarker: Unicode.Scalar?
     private var parameters: [Int] = []
+    private var string: [Unicode.Scalar] = []
 
     mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
@@ -45,11 +48,11 @@ struct EscapeSequenceParser: Sendable {
             state = .ground
             return .execute(scalar)
         case "\u{1B}":
+            let action = state == .operatingSystemCommand ? finishString() : nil
             enterEscape()
-            return nil
+            return action
         case "\u{7}" where state == .operatingSystemCommand:
-            state = .ground
-            return nil
+            return finishString()
         case "\u{0}" ... "\u{1F}":
             return state == .operatingSystemCommand || state == .ignoredString ? nil : .execute(scalar)
         default:
@@ -67,7 +70,12 @@ struct EscapeSequenceParser: Sendable {
             return controlSequence(scalar)
         case .ignoredControlSequence:
             return ignoredControlSequence(scalar)
-        case .operatingSystemCommand, .ignoredString:
+        case .operatingSystemCommand:
+            if string.count < Self.maximumStringLength {
+                string.append(scalar)
+            }
+            return nil
+        case .ignoredString:
             return nil
         }
     }
@@ -158,6 +166,12 @@ struct EscapeSequenceParser: Sendable {
         intermediates = ""
         privateMarker = nil
         parameters = []
+        string = []
+    }
+
+    private mutating func finishString() -> Action {
+        state = .ground
+        return .operatingSystemCommand(String(String.UnicodeScalarView(string)))
     }
 
     private mutating func collect(_ scalar: Unicode.Scalar) {

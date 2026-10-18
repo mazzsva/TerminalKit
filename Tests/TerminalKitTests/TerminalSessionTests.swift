@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import TerminalKit
@@ -59,6 +60,31 @@ struct TerminalSessionTests {
         try session.start()
         await session.waitForExit()
         #expect(session.state == .exited(.exit(3)))
+    }
+
+    @Test func showsTheTitleOfTheProcess() async throws {
+        let session = TerminalSession(running: "printf '\\033]0;Title\\007'")
+        try session.start()
+        await session.waitForExit()
+        #expect(session.title == "Title")
+    }
+
+    @Test func keepsTheTitleForOtherOutput() async throws {
+        let session = TerminalSession(running: "printf '\\033]0;Title\\007'; read line; echo more")
+        try session.start()
+        for await title in Observations({ session.title }) where title == "Title" {
+            break
+        }
+        let changes = Mutex(0)
+        withObservationTracking {
+            _ = session.title
+        } onChange: {
+            changes.withLock { $0 += 1 }
+        }
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+        #expect(session.lines.contains("more"))
+        #expect(changes.withLock { $0 } == 0)
     }
 
     @Test func sendsInputToTheProcess() async throws {

@@ -60,12 +60,21 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}[1\r0H") == [.execute("\r"), controlSequence(parameters: [10], final: "H")])
     }
 
-    @Test func ignoresOperatingSystemCommands() {
-        #expect(parse("\u{1B}]0;Café\nA\u{7}B") == [.print("B")])
+    @Test func dispatchesOperatingSystemCommands() {
+        #expect(parse("\u{1B}]0;Café\nA\u{7}B") == [.operatingSystemCommand("0;CaféA"), .print("B")])
     }
 
     @Test func endsOperatingSystemCommandsWithTheStringTerminator() {
-        #expect(parse("\u{1B}]2;Title\u{1B}\\A") == [.escape(intermediates: "", final: "\\"), .print("A")])
+        #expect(
+            parse("\u{1B}]2;Title\u{1B}\\A") == [
+                .operatingSystemCommand("2;Title"), .escape(intermediates: "", final: "\\"), .print("A"),
+            ]
+        )
+    }
+
+    @Test func limitsOperatingSystemCommands() {
+        let title = String(repeating: "A", count: 5_000)
+        #expect(parse("\u{1B}]\(title)\u{7}") == [.operatingSystemCommand(String(title.prefix(4_096)))])
     }
 
     @Test func cancelsOperatingSystemCommands() {
