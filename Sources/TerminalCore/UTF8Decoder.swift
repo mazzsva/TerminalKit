@@ -1,63 +1,24 @@
-package struct UTF8Decoder: Sendable {
-    private var scalar: UInt32 = 0
-    private var remaining = 0
-    private var continuation: ClosedRange<UInt8> = 0x80 ... 0xBF
+struct UTF8Decoder {
+    private var incompleteBytes: [UInt8] = []
 
-    package init() {}
+    mutating func decode(_ bytes: [UInt8]) -> String.UnicodeScalarView {
+        let bytes = incompleteBytes + bytes
+        let end = Self.endOfCompleteSequences(in: bytes)
+        incompleteBytes = Array(bytes[end...])
+        return String(decoding: bytes[..<end], as: UTF8.self).unicodeScalars
+    }
 
-    package mutating func decode(_ bytes: some Sequence<UInt8>) -> [Unicode.Scalar] {
-        var scalars: [Unicode.Scalar] = []
-        for byte in bytes {
-            if remaining > 0 {
-                if continuation.contains(byte) {
-                    scalar = scalar << 6 | UInt32(byte & 0x3F)
-                    remaining -= 1
-                    continuation = 0x80 ... 0xBF
-                    if remaining == 0 {
-                        scalars.append(Unicode.Scalar(scalar) ?? .replacement)
-                    }
-                    continue
+    private static func endOfCompleteSequences(in bytes: [UInt8]) -> Int {
+        for count in 1 ... min(3, bytes.count) where bytes[bytes.count - count] & 0xC0 != 0x80 {
+            let length =
+                switch bytes[bytes.count - count] {
+                case 0xC2 ... 0xDF: 2
+                case 0xE0 ... 0xEF: 3
+                case 0xF0 ... 0xF4: 4
+                default: 1
                 }
-                remaining = 0
-                continuation = 0x80 ... 0xBF
-                scalars.append(.replacement)
-            }
-
-            switch byte {
-            case 0x00 ... 0x7F:
-                scalars.append(Unicode.Scalar(byte))
-            case 0xC2 ... 0xDF:
-                begin(byte & 0x1F, remaining: 1)
-            case 0xE0:
-                begin(0, remaining: 2, continuation: 0xA0 ... 0xBF)
-            case 0xE1 ... 0xEC, 0xEE ... 0xEF:
-                begin(byte & 0x0F, remaining: 2)
-            case 0xED:
-                begin(0x0D, remaining: 2, continuation: 0x80 ... 0x9F)
-            case 0xF0:
-                begin(0, remaining: 3, continuation: 0x90 ... 0xBF)
-            case 0xF1 ... 0xF3:
-                begin(byte & 0x07, remaining: 3)
-            case 0xF4:
-                begin(0x04, remaining: 3, continuation: 0x80 ... 0x8F)
-            default:
-                scalars.append(.replacement)
-            }
+            return length > count ? bytes.count - count : bytes.count
         }
-        return scalars
+        return bytes.count
     }
-
-    private mutating func begin(
-        _ bits: UInt8,
-        remaining: Int,
-        continuation: ClosedRange<UInt8> = 0x80 ... 0xBF
-    ) {
-        scalar = UInt32(bits)
-        self.remaining = remaining
-        self.continuation = continuation
-    }
-}
-
-extension Unicode.Scalar {
-    static let replacement: Unicode.Scalar = "\u{FFFD}"
 }
