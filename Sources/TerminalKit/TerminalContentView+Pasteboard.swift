@@ -44,6 +44,10 @@ extension TerminalContentView: NSMenuItemValidation {
         guard let text = pasteboard.string(forType: .string) else {
             return
         }
+        paste(text: text)
+    }
+
+    func paste(text: String) {
         scrollToBottom()
         let lines = text.replacing("\r\n", with: "\r").replacing("\n", with: "\r")
         guard session.terminal.usesBracketedPaste else {
