@@ -11,17 +11,27 @@ extension TerminalContentView: NSMenuItemValidation {
             max(selection.anchor, selection.head).line - terminal.removedScrollbackCount,
             terminal.scrollback.count + terminal.rows - 1
         )
-        let lines = (firstRow ..< max(lastRow + 1, firstRow))
-            .compactMap { row -> String? in
+        let pieces = (firstRow ..< max(lastRow + 1, firstRow))
+            .compactMap { row -> (text: String, continues: Bool)? in
                 let line = line(at: row)
                 guard let columns = selection.columns(inLine: terminal.removedScrollbackCount + row, count: line.count)
                 else {
                     return nil
                 }
-                let end = line[columns].lastIndex { $0.character != " " }.map { $0 + 1 } ?? columns.lowerBound
-                return String(line[columns.lowerBound ..< end].filter { $0.width > 0 }.map(\.character))
+                let continues = line.isWrapped && row < lastRow
+                let end =
+                    continues
+                    ? columns.upperBound
+                    : line[columns].lastIndex { $0.character != " " }.map { $0 + 1 } ?? columns.lowerBound
+                let cells = line[columns.lowerBound ..< end].filter { $0.width > 0 && $0 != .padding }
+                return (String(cells.map(\.character)), continues)
             }
-        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+        guard !pieces.isEmpty else {
+            return nil
+        }
+        return pieces.enumerated()
+            .map { index, piece in piece.continues || index == pieces.count - 1 ? piece.text : piece.text + "\n" }
+            .joined()
     }
 
     @objc func copy(_ sender: Any?) {

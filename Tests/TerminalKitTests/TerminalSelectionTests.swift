@@ -94,6 +94,28 @@ struct TerminalSelectionTests {
         #expect(pasteboard.string(forType: .string) == "world\nsecond")
     }
 
+    @Test func copiesAWrappedLineAsOneLine() async throws {
+        let view = try await view(
+            running:
+                "c=$(stty size | cut -d' ' -f2); i=1; s=''; while [ $i -lt $c ]; do s=\"${s}a\"; i=$((i+1)); done; "
+                + "printf '%s bc\\nnext' \"$s\""
+        )
+        let columns = view.session.terminal.columns
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 2, column: 4))
+        #expect(view.selectedText == String(repeating: "a", count: columns - 1) + " bc\nnext")
+    }
+
+    @Test func copiesAWideCharacterThatWrapsWithoutItsPadding() async throws {
+        let view = try await view(
+            running:
+                "c=$(stty size | cut -d' ' -f2); i=1; s=''; while [ $i -lt $c ]; do s=\"${s}a\"; i=$((i+1)); done; "
+                + "printf '%s中' \"$s\""
+        )
+        let columns = view.session.terminal.columns
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 1, column: 2))
+        #expect(view.selectedText == String(repeating: "a", count: columns - 1) + "中")
+    }
+
     @Test func copiesWithoutTheSpacesAtTheEndOfALine() async throws {
         let view = try await view(running: "printf 'hello world   '")
         view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 40))
