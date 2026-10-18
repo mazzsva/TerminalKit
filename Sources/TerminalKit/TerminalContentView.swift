@@ -32,8 +32,16 @@ final class TerminalContentView: NSView {
     var selection: Selection? {
         didSet {
             needsDisplay = true
+            scheduleAccessibilityNotification()
         }
     }
+    var cachedAccessibilityText: AccessibilityText?
+    var isAccessibilityNotificationScheduled = false
+    var postAccessibilityNotifications = { (view: NSView) in
+        NSAccessibility.post(element: view, notification: .valueChanged)
+        NSAccessibility.post(element: view, notification: .selectedTextChanged)
+    }
+    private var accessibilityRevision = 0
 
     private(set) var isFocused = false {
         didSet {
@@ -221,6 +229,10 @@ final class TerminalContentView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        if accessibilityRevision != session.revision {
+            accessibilityRevision = session.revision
+            scheduleAccessibilityNotification()
+        }
         colors.background.setFill()
         dirtyRect.fill()
 
@@ -394,7 +406,7 @@ final class TerminalContentView: NSView {
         )
     }
 
-    private func rect(row: Int, columns: Range<Int>) -> CGRect {
+    func rect(row: Int, columns: Range<Int>) -> CGRect {
         CGRect(
             x: Self.padding + CGFloat(columns.lowerBound) * cellSize.width,
             y: Self.padding + CGFloat(row) * cellSize.height,

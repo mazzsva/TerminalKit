@@ -20,7 +20,13 @@ public final class TerminalSession {
     public private(set) var title = ""
     public private(set) var bellCount = 0
 
-    private(set) var terminal = Terminal(columns: 80, rows: 24)
+    private(set) var terminal = Terminal(columns: 80, rows: 24) {
+        didSet {
+            revision += 1
+        }
+    }
+    @ObservationIgnored private(set) var revision = 0
+    @ObservationIgnored private(set) var widthChangeCount = 0
 
     @ObservationIgnored private var pseudoTerminal: PseudoTerminal?
 
@@ -55,6 +61,9 @@ public final class TerminalSession {
     func resize(columns: Int, rows: Int) {
         guard columns != terminal.columns || rows != terminal.rows else {
             return
+        }
+        if columns != terminal.columns {
+            widthChangeCount += 1
         }
         terminal.resize(columns: columns, rows: rows)
         pseudoTerminal?.resize(columns: columns, rows: rows)
