@@ -111,8 +111,25 @@ struct SynchronizedOutputTests {
         var terminal = Terminal(columns: 4, rows: 1)
         #expect(terminal.receive(request) == "")
     }
+
+    @Test func showsNewCharactersInTheScrollbackDuringAnUpdate() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?2026he\u{301}\r\nx")
+        let displayed = terminal.displayed
+        #expect(displayed.character(of: displayed.scrollback[0][0]) == "e\u{301}")
+    }
+
+    @Test func endsTheUpdateWhenTheTableIsCompacted() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.graphemes = Terminal.Graphemes(capacity: 64)
+        terminal.receive("\u{1B}[?2026h")
+        for scalar in 0x300 ..< 0x300 + 70 {
+            terminal.receive("a" + String(Character(Unicode.Scalar(UInt32(scalar))!)) + "\r\n\u{1B}[3J")
+        }
+        #expect(!terminal.isSynchronizingOutput)
+    }
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
-    terminal.screen.map { String($0.map(\.character)) }
+    terminal.screen.map { String($0.map(terminal.character(of:))) }
 }

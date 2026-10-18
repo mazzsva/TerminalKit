@@ -136,7 +136,7 @@ private func commandKey(_ key: Int) throws -> NSEvent {
 private func topLine(of scrollView: TerminalScrollView) -> String {
     let view = scrollView.terminalView
     let row = Int((scrollView.contentView.bounds.minY / view.cellSize.height).rounded())
-    return String(view.line(at: row).map(\.character)).trimmingCharacters(in: .whitespaces)
+    return String(view.line(at: row).map(view.session.terminal.character(of:))).trimmingCharacters(in: .whitespaces)
 }
 
 @MainActor

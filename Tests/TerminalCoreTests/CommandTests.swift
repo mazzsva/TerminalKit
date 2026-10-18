@@ -150,7 +150,7 @@ struct CommandTests {
         terminal.receive(mark + "x")
         #expect(terminal.commands.isEmpty)
         #expect(terminal.currentDirectory == nil)
-        #expect(terminal.screen[0][0].character == "x")
+        #expect(terminal.character(of: terminal.screen[0][0]) == "x")
     }
 
     @Test func usesTheLastPromptOfARedraw() {
@@ -328,11 +328,11 @@ struct CommandTests {
 }
 
 private func screenLines(_ terminal: Terminal) -> [String] {
-    terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
+    terminal.screen.map { String($0.map(terminal.character(of:))).trimmingCharacters(in: .whitespaces) }
 }
 
 private func scrollbackLines(_ terminal: Terminal) -> [String] {
-    terminal.scrollback.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
+    terminal.scrollback.map { String($0.map(terminal.character(of:))).trimmingCharacters(in: .whitespaces) }
 }
 
 private func text(at position: Terminal.Position?, in terminal: Terminal) -> String {
@@ -346,5 +346,5 @@ private func text(at position: Terminal.Position?, in terminal: Terminal) -> Str
     let line =
         index < terminal.scrollback.count
         ? terminal.scrollback[index] : terminal.screen[index - terminal.scrollback.count]
-    return String(line.dropFirst(position.column).map(\.character)).trimmingCharacters(in: .whitespaces)
+    return String(line.dropFirst(position.column).map(terminal.character(of:))).trimmingCharacters(in: .whitespaces)
 }

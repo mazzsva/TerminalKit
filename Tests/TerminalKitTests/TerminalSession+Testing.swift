@@ -10,7 +10,8 @@ extension TerminalSession {
     }
 
     var lines: [String] {
-        terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
+        let terminal = terminal
+        return terminal.screen.map { String($0.map(terminal.character(of:))).trimmingCharacters(in: .whitespaces) }
     }
 
     func waitForExit() async {

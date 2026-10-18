@@ -6,6 +6,7 @@ extension TerminalContentView: NSMenuItemValidation {
             return nil
         }
         let terminal = session.terminal
+        let graphemes = terminal.graphemes
         let firstRow = max(min(selection.anchor, selection.head).line - terminal.removedScrollbackCount, 0)
         let lastRow = min(
             max(selection.anchor, selection.head).line - terminal.removedScrollbackCount,
@@ -13,7 +14,7 @@ extension TerminalContentView: NSMenuItemValidation {
         )
         let pieces = (firstRow ..< max(lastRow + 1, firstRow))
             .compactMap { row -> (text: String, continues: Bool)? in
-                let line = line(at: row)
+                let line = line(at: row, in: terminal)
                 guard let columns = selection.columns(inLine: terminal.removedScrollbackCount + row, count: line.count)
                 else {
                     return nil
@@ -22,9 +23,9 @@ extension TerminalContentView: NSMenuItemValidation {
                 let end =
                     continues
                     ? columns.upperBound
-                    : line[columns].lastIndex { $0.character != " " }.map { $0 + 1 } ?? columns.lowerBound
+                    : line[columns].lastIndex { !$0.isSpace }.map { $0 + 1 } ?? columns.lowerBound
                 let cells = line[columns.lowerBound ..< end].filter { $0.width > 0 && $0 != .padding }
-                return (String(cells.map(\.character)), continues)
+                return (String(cells.map(graphemes.character(of:))), continues)
             }
         guard !pieces.isEmpty else {
             return nil

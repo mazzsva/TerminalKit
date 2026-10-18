@@ -90,8 +90,8 @@ struct TerminalSynchronizedOutputTests {
 
 extension TerminalSession {
     fileprivate func waitForLiveText(_ isComplete: @escaping (String) -> Bool) async {
-        for await text in Observations({ String(self.liveTerminal.screen[0].map(\.character)) }) where isComplete(text)
-        {
+        for await text in Observations({ String(self.liveTerminal.screen[0].map(self.liveTerminal.character(of:))) })
+        where isComplete(text) {
             return
         }
     }
