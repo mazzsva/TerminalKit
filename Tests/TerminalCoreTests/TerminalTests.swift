@@ -179,6 +179,14 @@ struct TerminalTests {
         #expect(lines(terminal) == ["x   "])
     }
 
+    @Test func erasesTheScrollback() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("a\r\nb\r\nc\u{1B}[3J")
+        #expect(terminal.scrollback.isEmpty)
+        #expect(terminal.removedScrollbackCount == 1)
+        #expect(lines(terminal) == ["b ", "c "])
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")

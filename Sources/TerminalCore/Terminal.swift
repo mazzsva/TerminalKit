@@ -420,6 +420,9 @@ package struct Terminal: Sendable {
             for row in 0 ..< rows {
                 erase(0 ..< columns, row: row)
             }
+        case 3:
+            removedScrollbackCount += scrollback.count
+            scrollback.removeAll()
         default:
             break
         }
