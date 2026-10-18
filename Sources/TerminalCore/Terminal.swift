@@ -22,8 +22,8 @@ package struct Terminal: Sendable {
 
     package private(set) var columns: Int
     package private(set) var rows: Int
-    package private(set) var screen: [[Cell]]
-    package private(set) var scrollback: [[Cell]] = []
+    package private(set) var screen: [Line]
+    package private(set) var scrollback: [Line] = []
     package private(set) var removedScrollbackCount = 0
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var usesApplicationCursorKeys = false
@@ -49,7 +49,7 @@ package struct Terminal: Sendable {
     private var scrollRegion: Range<Int>
     private var tabStops: [Bool]
     private var replies: [UInt8] = []
-    private var normalScreen: (lines: [[Cell]], savedCursor: SavedCursor)?
+    private var normalScreen: (lines: [Line], savedCursor: SavedCursor)?
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -228,8 +228,16 @@ package struct Terminal: Sendable {
         let width = columns > 1 ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
             if usesAutowrap {
+                let row = cursor.row
+                let scrolls = row == scrollRegion.upperBound - 1
+                screen[row].isWrapped = true
                 carriageReturn()
                 lineFeed()
+                if scrolls, cursor.row > 0 {
+                    screen[cursor.row - 1].isWrapped = true
+                } else if !scrolls, cursor.row == row {
+                    screen[row].isWrapped = false
+                }
             } else {
                 cursor.column = columns - width
             }
@@ -327,6 +335,7 @@ package struct Terminal: Sendable {
             return
         }
         scrollUp(count, in: cursor.row ..< scrollRegion.upperBound)
+        unwrapLine(before: cursor.row)
         carriageReturn()
     }
 
@@ -338,10 +347,10 @@ package struct Terminal: Sendable {
         moveCursor(row: 0, column: 0)
     }
 
-    private mutating func keepInScrollback(_ lines: ArraySlice<[Cell]>) {
+    private mutating func keepInScrollback(_ lines: ArraySlice<Line>) {
         for line in lines {
-            let end = (line.lastIndex { $0 != Cell() } ?? -1) + 1
-            scrollback.append(end == line.count ? line : Array(line[..<end]))
+            let end = line.isWrapped ? line.count : (line.lastIndex { $0 != Cell() } ?? -1) + 1
+            scrollback.append(end == line.count ? line : Line(line[..<end]))
         }
         if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
             removedScrollbackCount += scrollback.count - Self.maximumScrollback
@@ -360,12 +369,28 @@ package struct Terminal: Sendable {
         let count = min(count, region.count)
         screen.removeSubrange(region.lowerBound ..< region.lowerBound + count)
         screen.insert(contentsOf: blankLines(count), at: region.upperBound - count)
+        if region.lowerBound > 0 {
+            unwrapLine(before: region.lowerBound)
+        }
+        if region.upperBound < rows {
+            unwrapLine(before: region.upperBound - count)
+        }
     }
 
     private mutating func scrollDown(_ count: Int, in region: Range<Int>) {
         let count = min(count, region.count)
         screen.removeSubrange(region.upperBound - count ..< region.upperBound)
         screen.insert(contentsOf: blankLines(count), at: region.lowerBound)
+        unwrapLine(before: region.lowerBound)
+        unwrapLine(before: region.upperBound)
+    }
+
+    private mutating func unwrapLine(before row: Int) {
+        if row > 0 {
+            screen[row - 1].isWrapped = false
+        } else if normalScreen == nil, !scrollback.isEmpty {
+            scrollback[scrollback.count - 1].isWrapped = false
+        }
     }
 
     private mutating func reverseLineFeed() {
@@ -398,6 +423,7 @@ package struct Terminal: Sendable {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.scrollback = scrollback
+        terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount
         terminal.decoder = decoder
         terminal.replies = replies
@@ -513,16 +539,21 @@ package struct Terminal: Sendable {
     private mutating func eraseInDisplay(_ mode: Int) {
         switch mode {
         case 0:
+            if cursor.column == 0 {
+                unwrapLine(before: cursor.row)
+            }
             eraseInLine(0)
             for row in cursor.row + 1 ..< rows {
                 erase(0 ..< columns, row: row)
             }
         case 1:
+            unwrapLine(before: 0)
             for row in 0 ..< cursor.row {
                 erase(0 ..< columns, row: row)
             }
             eraseInLine(1)
         case 2:
+            unwrapLine(before: 0)
             for row in 0 ..< rows {
                 erase(0 ..< columns, row: row)
             }
@@ -550,6 +581,9 @@ package struct Terminal: Sendable {
     private mutating func erase(_ range: Range<Int>, row: Int) {
         isWrapPending = false
         screen[row].replaceSubrange(range, with: repeatElement(blank, count: range.count))
+        if range.upperBound == columns {
+            screen[row].isWrapped = false
+        }
         blankBrokenWideCharacter(at: range.lowerBound, row: row)
         blankBrokenWideCharacter(at: range.upperBound, row: row)
     }
@@ -558,16 +592,16 @@ package struct Terminal: Sendable {
         Cell(style: Style(background: style.background))
     }
 
-    private func blankLines(_ count: Int) -> [[Cell]] {
-        Array(repeating: Array(repeating: blank, count: columns), count: count)
+    private func blankLines(_ count: Int) -> [Line] {
+        Array(repeating: Line(repeatElement(blank, count: columns)), count: count)
     }
 
-    private static func resized(_ screen: [[Cell]], columns: Int, rows: Int, removingFirst removedRows: Int)
-        -> [[Cell]]
+    private static func resized(_ screen: [Line], columns: Int, rows: Int, removingFirst removedRows: Int)
+        -> [Line]
     {
         let lines = screen.dropFirst(removedRows).prefix(rows)
             .map { line in
-                var line = Array(line.prefix(columns)) + blankLine(columns: max(columns - line.count, 0))
+                var line = Line(line.prefix(columns)) + blankLine(columns: max(columns - line.count, 0))
                 if line[columns - 1].width == 2 {
                     line[columns - 1] = Cell()
                 }
@@ -576,7 +610,7 @@ package struct Terminal: Sendable {
         return lines + Array(repeating: blankLine(columns: columns), count: rows - lines.count)
     }
 
-    private static func blankLine(columns: Int) -> [Cell] {
-        Array(repeating: Cell(), count: columns)
+    private static func blankLine(columns: Int) -> Line {
+        Line(repeatElement(Cell(), count: columns))
     }
 }
