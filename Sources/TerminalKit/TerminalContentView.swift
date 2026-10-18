@@ -194,6 +194,13 @@ final class TerminalContentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command,
+            let key = event.charactersIgnoringModifiers?.unicodeScalars.first,
+            [NSUpArrowFunctionKey, NSDownArrowFunctionKey].contains(Int(key.value))
+        {
+            scrollToPrompt(isPrevious: Int(key.value) == NSUpArrowFunctionKey)
+            return
+        }
         guard !event.modifierFlags.contains(.command) else {
             super.keyDown(with: event)
             return
