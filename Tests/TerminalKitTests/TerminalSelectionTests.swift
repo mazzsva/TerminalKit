@@ -122,26 +122,3 @@ private func viewInWindow() -> TerminalContentView {
     view.fit(to: window.frame.size)
     return view
 }
-
-@MainActor
-private func mouseEvent(_ type: NSEvent.EventType, row: Int, column: Int, in view: TerminalContentView) throws
-    -> NSEvent
-{
-    let point = CGPoint(
-        x: TerminalContentView.padding + CGFloat(column) * view.cellSize.width,
-        y: TerminalContentView.padding + (CGFloat(row) + 0.5) * view.cellSize.height
-    )
-    return try #require(
-        NSEvent.mouseEvent(
-            with: type,
-            location: view.convert(point, to: nil),
-            modifierFlags: [],
-            timestamp: 0,
-            windowNumber: view.window?.windowNumber ?? 0,
-            context: nil,
-            eventNumber: 0,
-            clickCount: 1,
-            pressure: 1
-        )
-    )
-}
