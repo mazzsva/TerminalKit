@@ -1,7 +1,7 @@
 import Foundation
 
 extension TerminalSession {
-    public struct Configuration: Equatable, Sendable {
+    public struct Configuration: Sendable {
         public var executableURL: URL
         public var arguments: [String]
         public var environment: [String: String]

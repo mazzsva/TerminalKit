@@ -10,7 +10,7 @@ public final class TerminalSession {
         case exited
     }
 
-    public let configuration: Configuration
+    private let configuration: Configuration
     public private(set) var state = State.idle
 
     private(set) var terminal = Terminal(columns: 80, rows: 24)

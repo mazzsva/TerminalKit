@@ -1,7 +1,7 @@
 import SwiftUI
 
 public struct TerminalView: View {
-    public let session: TerminalSession
+    let session: TerminalSession
 
     public init(session: TerminalSession) {
         self.session = session
