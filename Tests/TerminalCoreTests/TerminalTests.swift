@@ -211,6 +211,31 @@ struct TerminalTests {
         #expect(lines(terminal) == ["xbc "])
     }
 
+    @Test func resetsTheTerminal() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("a\r\nb\r\nc\u{1B}[?1h\u{1B}[?2004h\u{1B}[?25l\u{1B}[?1049h\u{1B}[1mx\u{1B}c")
+        #expect(lines(terminal) == ["    ", "    "])
+        #expect(scrollback(terminal) == ["a   "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
+        #expect(!terminal.usesApplicationCursorKeys)
+        #expect(!terminal.usesBracketedPaste)
+        #expect(terminal.isCursorVisible)
+        terminal.receive("y")
+        #expect(terminal.screen[0][0].style == Terminal.Style())
+    }
+
+    @Test func repliesBeforeAReset() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        #expect(terminal.receive("\u{1B}[6n\u{1B}c") == "\u{1B}[1;1R")
+    }
+
+    @Test func keepsAPartialCharacterAcrossAReset() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        _ = terminal.receive([0x1B, 0x63, 0xC3])
+        _ = terminal.receive([0xA9])
+        #expect(lines(terminal) == ["é   "])
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")

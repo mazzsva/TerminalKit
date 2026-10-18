@@ -105,6 +105,8 @@ package struct Terminal: Sendable {
             case .escape(intermediates: "", final: "E"):
                 carriageReturn()
                 lineFeed()
+            case .escape(intermediates: "", final: "c"):
+                reset()
             case .escape(intermediates: "", final: "H"):
                 tabStops[cursor.column] = true
             case .escape(intermediates: "", final: "M"):
@@ -361,6 +363,15 @@ package struct Terminal: Sendable {
     private mutating func moveCursor(row: Int, column: Int) {
         isWrapPending = false
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
+    }
+
+    private mutating func reset() {
+        var terminal = Terminal(columns: columns, rows: rows)
+        terminal.scrollback = scrollback
+        terminal.removedScrollbackCount = removedScrollbackCount
+        terminal.decoder = decoder
+        terminal.replies = replies
+        self = terminal
     }
 
     private mutating func moveForward(tabStops count: Int) {
