@@ -208,7 +208,7 @@ final class TerminalContentView: NSView {
         )
     }
 
-    func line(at row: Int) -> [Terminal.Cell] {
+    func line(at row: Int) -> Terminal.Line {
         let terminal = session.terminal
         return row < terminal.scrollback.count
             ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
@@ -218,7 +218,7 @@ final class TerminalContentView: NSView {
         window?.firstResponder === self ? colors.selection : .unemphasizedSelectedTextBackgroundColor
     }
 
-    private static func runs(in line: [Terminal.Cell]) -> [(columns: Range<Int>, style: Terminal.Style)] {
+    private static func runs(in line: Terminal.Line) -> [(columns: Range<Int>, style: Terminal.Style)] {
         var runs: [(columns: Range<Int>, style: Terminal.Style)] = []
         var column = 0
         while column < line.count {
@@ -237,7 +237,7 @@ final class TerminalContentView: NSView {
     }
 
     private func drawText(
-        _ line: [Terminal.Cell],
+        _ line: Terminal.Line,
         columns: Range<Int>,
         row: Int,
         style: Terminal.Style,

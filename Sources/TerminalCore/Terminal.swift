@@ -22,8 +22,8 @@ package struct Terminal: Sendable {
 
     package private(set) var columns: Int
     package private(set) var rows: Int
-    package private(set) var screen: [[Cell]]
-    package private(set) var scrollback: [[Cell]] = []
+    package private(set) var screen: [Line]
+    package private(set) var scrollback: [Line] = []
     package private(set) var removedScrollbackCount = 0
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var usesApplicationCursorKeys = false
@@ -49,7 +49,7 @@ package struct Terminal: Sendable {
     private var scrollRegion: Range<Int>
     private var tabStops: [Bool]
     private var replies: [UInt8] = []
-    private var normalScreen: (lines: [[Cell]], savedCursor: SavedCursor)?
+    private var normalScreen: (lines: [Line], savedCursor: SavedCursor)?
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -338,10 +338,10 @@ package struct Terminal: Sendable {
         moveCursor(row: 0, column: 0)
     }
 
-    private mutating func keepInScrollback(_ lines: ArraySlice<[Cell]>) {
+    private mutating func keepInScrollback(_ lines: ArraySlice<Line>) {
         for line in lines {
             let end = (line.lastIndex { $0 != Cell() } ?? -1) + 1
-            scrollback.append(end == line.count ? line : Array(line[..<end]))
+            scrollback.append(end == line.count ? line : Line(line[..<end]))
         }
         if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
             removedScrollbackCount += scrollback.count - Self.maximumScrollback
@@ -558,16 +558,16 @@ package struct Terminal: Sendable {
         Cell(style: Style(background: style.background))
     }
 
-    private func blankLines(_ count: Int) -> [[Cell]] {
-        Array(repeating: Array(repeating: blank, count: columns), count: count)
+    private func blankLines(_ count: Int) -> [Line] {
+        Array(repeating: Line(repeatElement(blank, count: columns)), count: count)
     }
 
-    private static func resized(_ screen: [[Cell]], columns: Int, rows: Int, removingFirst removedRows: Int)
-        -> [[Cell]]
+    private static func resized(_ screen: [Line], columns: Int, rows: Int, removingFirst removedRows: Int)
+        -> [Line]
     {
         let lines = screen.dropFirst(removedRows).prefix(rows)
             .map { line in
-                var line = Array(line.prefix(columns)) + blankLine(columns: max(columns - line.count, 0))
+                var line = Line(line.prefix(columns)) + blankLine(columns: max(columns - line.count, 0))
                 if line[columns - 1].width == 2 {
                     line[columns - 1] = Cell()
                 }
@@ -576,7 +576,7 @@ package struct Terminal: Sendable {
         return lines + Array(repeating: blankLine(columns: columns), count: rows - lines.count)
     }
 
-    private static func blankLine(columns: Int) -> [Cell] {
-        Array(repeating: Cell(), count: columns)
+    private static func blankLine(columns: Int) -> Line {
+        Line(repeatElement(Cell(), count: columns))
     }
 }
