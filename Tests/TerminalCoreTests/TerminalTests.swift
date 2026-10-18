@@ -160,10 +160,112 @@ struct TerminalTests {
         #expect(lines(terminal) == ["abed", "    "])
     }
 
+    @Test(arguments: ["\n", "\u{B}", "\u{C}"])
+    func movesDownALine(character: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\(character)c")
+        #expect(lines(terminal) == ["ab  ", "  c "])
+    }
+
+    @Test func repeatsThePrecedingCharacter() {
+        var terminal = Terminal(columns: 6, rows: 2)
+        terminal.receive("a\u{1B}[3b中\u{1B}[b")
+        #expect(lines(terminal) == ["aaaa中 ", "中     "])
+    }
+
+    @Test func repeatsNothingBeforeACharacter() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[3bx")
+        #expect(lines(terminal) == ["x   "])
+    }
+
+    @Test func erasesTheScrollback() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("a\r\nb\r\nc\u{1B}[3J")
+        #expect(terminal.scrollback.isEmpty)
+        #expect(terminal.removedScrollbackCount == 1)
+        #expect(lines(terminal) == ["b ", "c "])
+    }
+
+    @Test func overwritesTheLastColumnWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[?7labcdef\u{1B}[?7hgh")
+        #expect(lines(terminal) == ["abcg", "h   "])
+    }
+
+    @Test func keepsAWideCharacterOnTheLineWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[?7labc中")
+        #expect(lines(terminal) == ["ab中 ", "    "])
+    }
+
+    @Test func insertsCharactersInInsertMode() {
+        var terminal = Terminal(columns: 6, rows: 1)
+        terminal.receive("abc\r\u{1B}[4hxy\u{1B}[4lz")
+        #expect(lines(terminal) == ["xyzbc "])
+    }
+
+    @Test func keepsReplaceModeForOtherModes() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("abc\r\u{1B}[20hx")
+        #expect(lines(terminal) == ["xbc "])
+    }
+
+    @Test func resetsTheTerminal() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("a\r\nb\r\nc\u{1B}[?1h\u{1B}[?2004h\u{1B}[?25l\u{1B}[?1049h\u{1B}[1mx\u{1B}c")
+        #expect(lines(terminal) == ["    ", "    "])
+        #expect(scrollback(terminal) == ["a   "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
+        #expect(!terminal.usesApplicationCursorKeys)
+        #expect(!terminal.usesBracketedPaste)
+        #expect(terminal.isCursorVisible)
+        terminal.receive("y")
+        #expect(terminal.screen[0][0].style == Terminal.Style())
+    }
+
+    @Test func repliesBeforeAReset() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        #expect(terminal.receive("\u{1B}[6n\u{1B}c") == "\u{1B}[1;1R")
+    }
+
+    @Test func keepsAPartialCharacterAcrossAReset() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        _ = terminal.receive([0x1B, 0x63, 0xC3])
+        _ = terminal.receive([0xA9])
+        #expect(lines(terminal) == ["é   "])
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")
         #expect(lines(terminal) == ["a       b       c   "])
+    }
+
+    @Test func setsATabStop() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("\u{1B}[3g\u{1B}[5G\u{1B}H\r\tx\ty")
+        #expect(lines(terminal) == ["    x              y"])
+    }
+
+    @Test func clearsATabStop() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("\u{1B}[9G\u{1B}[g\r\tx")
+        #expect(lines(terminal) == ["                x   "])
+    }
+
+    @Test func movesByTabStops() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("\u{1B}[2Ix\u{1B}[2Zy\u{1B}[3Zz")
+        #expect(lines(terminal) == ["z       y       x   "])
+    }
+
+    @Test func addsTabStopsToNewColumns() {
+        var terminal = Terminal(columns: 10, rows: 1)
+        terminal.receive("\u{1B}[3g")
+        terminal.resize(columns: 20, rows: 1)
+        terminal.receive("\tx")
+        #expect(lines(terminal) == ["                x   "])
     }
 
     @Test func stopsTabsAtTheLastColumn() {
