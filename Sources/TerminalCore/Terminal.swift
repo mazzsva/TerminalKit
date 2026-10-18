@@ -49,7 +49,7 @@ package struct Terminal: Sendable {
     private var scrollRegion: Range<Int>
     private var tabStops: [Bool]
     private var replies: [UInt8] = []
-    private var normalScreen: (lines: [Line], savedCursor: SavedCursor)?
+    private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -79,21 +79,23 @@ package struct Terminal: Sendable {
             let saved = normalScreen.savedCursor
             let (lines, anchors) = reflow(
                 normalScreen.lines,
-                keeping: [(saved.position, saved.isWrapPending)],
+                keeping: [(normalScreen.cursor, false), (saved.position, saved.isWrapPending)],
                 columns: columns,
                 rows: rows
             )
             normalScreen.lines = lines
-            (normalScreen.savedCursor.position, normalScreen.savedCursor.isWrapPending) = anchors[0]
+            normalScreen.cursor = anchors[0].position
+            (normalScreen.savedCursor.position, normalScreen.savedCursor.isWrapPending) = anchors[1]
             self.normalScreen = normalScreen
         }
         let removedRows = max(cursor.row + 1 - rows, 0)
         if normalScreen == nil {
             keepInScrollback(screen.prefix(removedRows))
+            savedCursor.position.row = min(max(savedCursor.position.row - removedRows, 0), rows - 1)
         }
         screen = Self.resized(screen, columns: columns, rows: rows, removingFirst: removedRows)
         if var normalScreen {
-            let removedNormalRows = max(normalScreen.savedCursor.position.row + 1 - rows, 0)
+            let removedNormalRows = max(normalScreen.cursor.row + 1 - rows, 0)
             keepInScrollback(normalScreen.lines.prefix(removedNormalRows))
             normalScreen.lines = Self.resized(
                 normalScreen.lines,
@@ -101,11 +103,17 @@ package struct Terminal: Sendable {
                 rows: rows,
                 removingFirst: removedNormalRows
             )
-            normalScreen.savedCursor.position.row -= removedNormalRows
+            normalScreen.cursor.row -= removedNormalRows
+            normalScreen.savedCursor.position.row = min(
+                max(normalScreen.savedCursor.position.row - removedNormalRows, 0),
+                rows - 1
+            )
             self.normalScreen = normalScreen
         }
+        let keepsPendingWrap = isWrapPending && columns == self.columns
         setSize(columns: columns, rows: rows)
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
+        isWrapPending = keepsPendingWrap
     }
 
     private mutating func setSize(columns: Int, rows: Int) {
@@ -125,10 +133,15 @@ package struct Terminal: Sendable {
     ) -> (screen: [Line], anchors: [(position: Position, isWrapPending: Bool)]) {
         let oldLines = scrollback + screen
         let positions =
-            anchors.map { Position(row: scrollback.count + $0.position.row, column: $0.position.column) }
+            anchors.map {
+                Position(
+                    row: scrollback.count + min(max($0.position.row, 0), screen.count - 1),
+                    column: min(max($0.position.column, 0), self.columns - 1)
+                )
+            }
             + [Position(row: scrollback.count, column: 0)]
         var groupStart = positions[0].row
-        while groupStart > 0, oldLines[groupStart - 1].isWrapped {
+        while groupStart > scrollback.count, oldLines[groupStart - 1].isWrapped {
             groupStart -= 1
         }
         var groupEnd = positions[0].row
@@ -619,7 +632,7 @@ package struct Terminal: Sendable {
         guard normalScreen == nil else {
             return
         }
-        normalScreen = (screen, savedCursor)
+        normalScreen = (screen, cursor, savedCursor)
         screen = blankLines(rows)
         savedCursor = SavedCursor()
     }
@@ -628,7 +641,8 @@ package struct Terminal: Sendable {
         guard let normalScreen else {
             return
         }
-        (screen, savedCursor) = normalScreen
+        screen = normalScreen.lines
+        savedCursor = normalScreen.savedCursor
         self.normalScreen = nil
     }
 

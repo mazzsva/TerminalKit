@@ -563,6 +563,57 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 4))
     }
 
+    @Test(arguments: [(3, "\u{1B}[?47h"), (2, "\u{1B}[?1047h")])
+    func resizesTheAlternateScreenAfterTheRowsChange(rows: Int, sequence: String) {
+        var terminal = Terminal(columns: 4, rows: rows)
+        terminal.receive("\u{1B}[\(rows)H\u{1B}7\u{1B}[H")
+        terminal.resize(columns: 4, rows: 1)
+        terminal.receive(sequence)
+        terminal.resize(columns: 5, rows: 1)
+        #expect(terminal.screen.map(\.count) == [5])
+    }
+
+    @Test func reflowsTheNormalScreenAroundItsCursor() {
+        var terminal = Terminal(columns: 10, rows: 3)
+        terminal.receive("aaaaaaaa\r\nbbbbbbbb\r\n$ \u{1B}[?1047h")
+        terminal.resize(columns: 4, rows: 3)
+        terminal.receive("\u{1B}[?1047l")
+        #expect(scrollback(terminal) == ["aaaa", "aaaa"])
+        #expect(lines(terminal) == ["bbbb", "bbbb", "$   "])
+    }
+
+    @Test func keepsTheCursorLineOfTheNormalScreenWhenTheRowsChange() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("a\r\nb\r\nc\u{1B}[?1047h")
+        terminal.resize(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?1047l")
+        #expect(scrollback(terminal) == ["a", "b"])
+        #expect(lines(terminal) == ["c   "])
+    }
+
+    @Test func movesTheSavedCursorWhenTheRowsChange() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("a\r\nb\u{1B}7\r\nc")
+        terminal.resize(columns: 4, rows: 2)
+        terminal.receive("\u{1B}8X")
+        #expect(lines(terminal) == ["bX  ", "c   "])
+    }
+
+    @Test func keepsThePendingWrapWhenTheRowsChange() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("abcd")
+        terminal.resize(columns: 4, rows: 2)
+        terminal.receive("e")
+        #expect(lines(terminal) == ["abcd", "e   "])
+    }
+
+    @Test func reflowsTheScrollbackOfTheCursorLine() {
+        var terminal = Terminal(columns: 10, rows: 3)
+        terminal.receive(String(repeating: "J", count: 45) + "$ ")
+        terminal.resize(columns: 5, rows: 3)
+        #expect(scrollback(terminal) == Array(repeating: "JJJJJ", count: 4))
+    }
+
     @Test func keepsTheSavedCursorOnItsCharacter() {
         var terminal = Terminal(columns: 10, rows: 3)
         terminal.receive("0123456789abc\u{1B}7\r\n")
