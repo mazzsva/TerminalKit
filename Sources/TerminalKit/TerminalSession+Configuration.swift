@@ -23,8 +23,16 @@ extension TerminalSession {
 
 extension TerminalSession.Configuration {
     public static var loginShell: Self {
-        var environment = ProcessInfo.processInfo.environment
+        loginShell(inheriting: ProcessInfo.processInfo.environment)
+    }
+
+    static func loginShell(inheriting environment: [String: String]) -> Self {
+        var environment = environment
+        for name in ["TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID"] {
+            environment[name] = nil
+        }
         environment["TERM"] = "xterm-256color"
+        environment["COLORTERM"] = "truecolor"
         if environment["LANG"] == nil {
             environment["LANG"] = "en_US.UTF-8"
         }
