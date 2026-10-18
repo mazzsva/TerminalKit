@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import TerminalCore
 
@@ -19,6 +20,8 @@ public final class TerminalSession {
     public private(set) var state = State.idle
     public private(set) var title = ""
     public private(set) var bellCount = 0
+    public private(set) var commands: [Command] = []
+    public private(set) var currentDirectory: URL?
 
     private(set) var terminal = Terminal(columns: 80, rows: 24) {
         didSet {
@@ -37,6 +40,10 @@ public final class TerminalSession {
     public func start() throws {
         guard state == .idle else {
             return
+        }
+        var configuration = configuration
+        if configuration.usesShellIntegration, let directory = try? ShellIntegration.install() {
+            configuration = configuration.integratingShell(scriptsIn: directory)
         }
         let pseudoTerminal = try PseudoTerminal(
             executableURL: configuration.executableURL,
@@ -79,6 +86,9 @@ public final class TerminalSession {
         }
         state = .exited(Termination(termination))
         pseudoTerminal = nil
+        if let last = commands.indices.last, commands[last].endDate == nil {
+            commands[last].endDate = Date()
+        }
     }
 
     private func receive(_ bytes: [UInt8]) {
@@ -87,8 +97,52 @@ public final class TerminalSession {
         if bellCount != terminal.bellCount {
             bellCount = terminal.bellCount
         }
+        if currentDirectory != terminal.currentDirectory {
+            currentDirectory = terminal.currentDirectory
+        }
+        updateCommands()
         if !replies.isEmpty {
             pseudoTerminal?.write(replies)
+        }
+    }
+}
+
+extension TerminalSession {
+    public struct Command: Identifiable, Equatable, Sendable {
+        public let id: Int
+        public let text: String?
+        public let directory: URL?
+        public internal(set) var exitStatus: Int32?
+        public let startDate: Date
+        public internal(set) var endDate: Date?
+    }
+
+    private func updateCommands() {
+        let firstID = terminal.removedCommandCount
+        if let id = commands.first?.id, id < firstID {
+            commands.removeFirst(min(firstID - id, commands.count))
+        }
+        let date = Date()
+        let start = commands.last.map { $0.endDate == nil ? $0.id : $0.id + 1 } ?? firstID
+        for id in max(start, firstID) ..< firstID + terminal.commands.count {
+            let command = terminal.commands[id - firstID]
+            if id == commands.last?.id {
+                if command.isFinished {
+                    commands[commands.count - 1].exitStatus = command.exitStatus
+                    commands[commands.count - 1].endDate = date
+                }
+            } else {
+                commands.append(
+                    Command(
+                        id: id,
+                        text: command.text,
+                        directory: command.directory,
+                        exitStatus: command.exitStatus,
+                        startDate: date,
+                        endDate: command.isFinished ? date : nil
+                    )
+                )
+            }
         }
     }
 }
