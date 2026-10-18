@@ -28,12 +28,6 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}(\u{18}B") == [.execute("\u{18}"), .print("B")])
     }
 
-    @Test func parsesEscapeSequencesAcrossReads() {
-        var parser = EscapeSequenceParser()
-        #expect(parser.parse("\u{1B}(".unicodeScalars).isEmpty)
-        #expect(parser.parse("B".unicodeScalars) == [.escape(intermediates: "(", final: "B")])
-    }
-
     @Test func dispatchesControlSequences() {
         #expect(parse("\u{1B}[H") == [controlSequence(final: "H")])
         #expect(parse("\u{1B}[12;40H") == [controlSequence(parameters: [12, 40], final: "H")])
@@ -87,7 +81,7 @@ struct EscapeSequenceParserTests {
 
 private func parse(_ text: String) -> [EscapeSequenceParser.Action] {
     var parser = EscapeSequenceParser()
-    return parser.parse(text.unicodeScalars)
+    return text.unicodeScalars.compactMap { parser.advance($0) }
 }
 
 private func controlSequence(

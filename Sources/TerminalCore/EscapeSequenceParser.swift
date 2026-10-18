@@ -1,18 +1,18 @@
-package struct EscapeSequenceParser: Sendable {
-    package enum Action: Equatable, Sendable {
+struct EscapeSequenceParser: Sendable {
+    enum Action: Equatable, Sendable {
         case print(Unicode.Scalar)
         case execute(Unicode.Scalar)
         case escape(intermediates: String, final: Unicode.Scalar)
         case controlSequence(ControlSequence)
     }
 
-    package struct ControlSequence: Equatable, Sendable {
-        package var privateMarker: Unicode.Scalar?
-        package var parameters: [Int]
-        package var intermediates: String
-        package var final: Unicode.Scalar
+    struct ControlSequence: Equatable, Sendable {
+        var privateMarker: Unicode.Scalar?
+        var parameters: [Int]
+        var intermediates: String
+        var final: Unicode.Scalar
 
-        package func parameter(at index: Int, default defaultValue: Int) -> Int {
+        func parameter(at index: Int, default defaultValue: Int) -> Int {
             guard parameters.indices.contains(index), parameters[index] != 0 else {
                 return defaultValue
             }
@@ -39,13 +39,7 @@ package struct EscapeSequenceParser: Sendable {
     private var privateMarker: Unicode.Scalar?
     private var parameters: [Int] = []
 
-    package init() {}
-
-    package mutating func parse(_ scalars: some Sequence<Unicode.Scalar>) -> [Action] {
-        scalars.compactMap { advance($0) }
-    }
-
-    package mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
+    mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
         case "\u{18}", "\u{1A}":
             state = .ground
