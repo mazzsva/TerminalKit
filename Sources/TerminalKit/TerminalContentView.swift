@@ -3,6 +3,7 @@ import TerminalCore
 
 final class TerminalContentView: NSView {
     static let padding: CGFloat = 4
+    static let defaultFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
 
     var session: TerminalSession {
         didSet {
@@ -13,8 +14,20 @@ final class TerminalContentView: NSView {
         }
     }
 
-    let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-    let cellSize: CGSize
+    var font = defaultFont {
+        didSet {
+            cellSize = Self.cellSize(of: font)
+            enclosingScrollView?.needsLayout = true
+            needsDisplay = true
+        }
+    }
+    private(set) var cellSize: CGSize
+    var palette = TerminalPalette.standard {
+        didSet {
+            colors = Colors(palette)
+            needsDisplay = true
+        }
+    }
     var markedText = "" {
         didSet {
             needsDisplay = true
@@ -26,14 +39,28 @@ final class TerminalContentView: NSView {
         }
     }
 
+    private var colors = Colors(.standard)
     private var keyDownEvent: NSEvent?
+
+    private struct Colors {
+        let foreground: NSColor
+        let background: NSColor
+        let cursor: NSColor
+        let selection: NSColor
+        let ansiColors: [NSColor]
+
+        init(_ palette: TerminalPalette) {
+            foreground = NSColor(palette.foreground)
+            background = NSColor(palette.background)
+            cursor = NSColor(palette.cursor)
+            selection = NSColor(palette.selection)
+            ansiColors = palette.ansiColors.map(NSColor.init)
+        }
+    }
 
     init(session: TerminalSession) {
         self.session = session
-        cellSize = CGSize(
-            width: ("M" as NSString).size(withAttributes: [.font: font]).width,
-            height: ceil(font.ascender - font.descender + font.leading)
-        )
+        cellSize = Self.cellSize(of: font)
         super.init(frame: .zero)
     }
 
@@ -79,10 +106,10 @@ final class TerminalContentView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.textBackgroundColor.setFill()
+        colors.background.setFill()
         dirtyRect.fill()
 
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.textColor]
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.foreground]
         let terminal = session.terminal
         let lineCount = terminal.scrollback.count + terminal.rows
         let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height), 0)
@@ -111,7 +138,7 @@ final class TerminalContentView: NSView {
                 string: markedText,
                 attributes: attributes.merging([.underlineStyle: NSUnderlineStyle.single.rawValue]) { $1 }
             )
-            NSColor.textBackgroundColor.setFill()
+            colors.background.setFill()
             CGRect(origin: cursor.origin, size: text.size()).fill()
             text.draw(at: cursor.origin)
             return
@@ -119,8 +146,15 @@ final class TerminalContentView: NSView {
         guard terminal.isCursorVisible else {
             return
         }
-        NSColor.textColor.withAlphaComponent(0.5).setFill()
+        colors.cursor.setFill()
         cursor.fill(using: .sourceOver)
+    }
+
+    private static func cellSize(of font: NSFont) -> CGSize {
+        CGSize(
+            width: ("M" as NSString).size(withAttributes: [.font: font]).width,
+            height: ceil(font.ascender - font.descender + font.leading)
+        )
     }
 
     func line(at row: Int) -> [Terminal.Cell] {
@@ -130,7 +164,7 @@ final class TerminalContentView: NSView {
     }
 
     private var selectionColor: NSColor {
-        window?.firstResponder === self ? .selectedTextBackgroundColor : .unemphasizedSelectedTextBackgroundColor
+        window?.firstResponder === self ? colors.selection : .unemphasizedSelectedTextBackgroundColor
     }
 
     private static func runs(in line: [Terminal.Cell]) -> [(columns: Range<Int>, style: Terminal.Style)] {
@@ -146,9 +180,9 @@ final class TerminalContentView: NSView {
     }
 
     private func colors(for style: Terminal.Style) -> (foreground: NSColor, background: NSColor?) {
-        let foreground = NSColor.terminal(style.foreground) ?? .textColor
-        let background = NSColor.terminal(style.background)
-        return style.isInverse ? (background ?? .textBackgroundColor, foreground) : (foreground, background)
+        let foreground = NSColor.terminal(style.foreground, ansiColors: colors.ansiColors) ?? colors.foreground
+        let background = NSColor.terminal(style.background, ansiColors: colors.ansiColors)
+        return style.isInverse ? (background ?? colors.background, foreground) : (foreground, background)
     }
 
     private func drawText(_ line: [Terminal.Cell], columns: Range<Int>, row: Int, style: Terminal.Style) {

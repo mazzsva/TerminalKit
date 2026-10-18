@@ -129,6 +129,50 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.minY < top)
     }
 
+    @Test func hidesTheScrollIndicator() throws {
+        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let hostingView = NSHostingView(rootView: TerminalView(session: session).scrollIndicators(.automatic))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+        let scrollView = try #require(contentView(in: hostingView)?.enclosingScrollView)
+        #expect(scrollView.hasVerticalScroller)
+        hostingView.rootView = TerminalView(session: session).scrollIndicators(.hidden)
+        hostingView.layoutSubtreeIfNeeded()
+        #expect(!scrollView.hasVerticalScroller)
+    }
+
+    @Test func usesTheTerminalFont() throws {
+        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let large = NSFont.monospacedSystemFont(ofSize: 20, weight: .regular)
+        let hostingView = NSHostingView(rootView: TerminalView(session: session).terminalFont(large))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+        let view = try #require(contentView(in: hostingView))
+        let visibleWidth = try #require(view.enclosingScrollView).contentSize.width
+        #expect(view.font == large)
+        #expect(session.terminal.columns == Int((visibleWidth - 8) / view.cellSize.width))
+
+        let small = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
+        hostingView.rootView = TerminalView(session: session).terminalFont(small)
+        hostingView.layoutSubtreeIfNeeded()
+        #expect(view.font == small)
+        #expect(session.terminal.columns == Int((visibleWidth - 8) / view.cellSize.width))
+    }
+
+    @Test func usesTheTerminalPalette() throws {
+        var palette = TerminalPalette.standard
+        palette.foreground = .orange
+        let hostingView = NSHostingView(
+            rootView: TerminalView(
+                session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+            )
+            .terminalPalette(palette)
+        )
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+        #expect(try #require(contentView(in: hostingView)).palette == palette)
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),

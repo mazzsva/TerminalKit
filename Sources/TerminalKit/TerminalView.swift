@@ -23,5 +23,14 @@ private struct Representable: NSViewRepresentable {
         if view.terminalView.session !== session {
             view.terminalView.session = session
         }
+        let font = context.environment.terminalFont ?? TerminalContentView.defaultFont
+        if view.terminalView.font != font {
+            view.terminalView.font = font
+        }
+        if view.terminalView.palette != context.environment.terminalPalette {
+            view.terminalView.palette = context.environment.terminalPalette
+        }
+        let scrollIndicatorVisibility = context.environment.verticalScrollIndicatorVisibility
+        view.hasVerticalScroller = scrollIndicatorVisibility != .hidden && scrollIndicatorVisibility != .never
     }
 }
