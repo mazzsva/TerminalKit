@@ -37,7 +37,7 @@ extension TerminalContentView {
 
     override func mouseDragged(with event: NSEvent) {
         if reportsMouse(for: event) {
-            if session.terminal.mouseTracking == .drags, mousePosition(of: event) != lastMousePosition {
+            if session.liveTerminal.mouseTracking == .drags, mousePosition(of: event) != lastMousePosition {
                 reportMouse(event, button: 32)
             }
             return

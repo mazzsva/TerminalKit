@@ -9,7 +9,7 @@ extension TerminalContentView {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        let terminal = session.terminal
+        let terminal = session.liveTerminal
         guard terminal.mouseTracking != .off || terminal.isAlternateScreenActive else {
             super.scrollWheel(with: event)
             return
@@ -29,7 +29,7 @@ extension TerminalContentView {
     }
 
     func reportsMouse(for event: NSEvent) -> Bool {
-        session.terminal.mouseTracking != .off && !event.modifierFlags.contains(.shift)
+        session.liveTerminal.mouseTracking != .off && !event.modifierFlags.contains(.shift)
     }
 
     func reportMouse(_ event: NSEvent, button: Int, isRelease: Bool = false) {
@@ -37,7 +37,7 @@ extension TerminalContentView {
         let modifiers = [(NSEvent.ModifierFlags.option, 8), (.control, 16)]
             .reduce(0) { event.modifierFlags.contains($1.0) ? $0 | $1.1 : $0 }
         lastMousePosition = position
-        if let report = session.terminal.mouseReport(
+        if let report = session.liveTerminal.mouseReport(
             button: button | modifiers,
             column: position.column,
             row: position.row,
