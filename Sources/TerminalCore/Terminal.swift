@@ -567,7 +567,11 @@ package struct Terminal: Sendable {
     {
         let lines = screen.dropFirst(removedRows).prefix(rows)
             .map { line in
-                Array(line.prefix(columns)) + blankLine(columns: max(columns - line.count, 0))
+                var line = Array(line.prefix(columns)) + blankLine(columns: max(columns - line.count, 0))
+                if line[columns - 1].width == 2 {
+                    line[columns - 1] = Cell()
+                }
+                return line
             }
         return lines + Array(repeating: blankLine(columns: columns), count: rows - lines.count)
     }

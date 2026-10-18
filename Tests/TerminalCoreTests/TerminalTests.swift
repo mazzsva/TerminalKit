@@ -65,6 +65,14 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.width) == [1, 1, 1, 1])
     }
 
+    @Test func blanksAWideCharacterThatAResizeCuts() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("ab中")
+        terminal.resize(columns: 3, rows: 1)
+        #expect(lines(terminal) == ["ab "])
+        #expect(terminal.screen[0].map(\.width) == [1, 1, 1])
+    }
+
     @Test func combinesMarksWithThePreviousCharacter() {
         var terminal = Terminal(columns: 3, rows: 1)
         terminal.receive("e\u{301}x")
