@@ -2,6 +2,7 @@ import Synchronization
 
 extension Terminal {
     package struct Cell: Equatable, Sendable {
+        package static let padding = Cell(scalar: "\u{0}")
         private static let firstGraphemeIndex: UInt32 = 0x11_0000
 
         package var style = Style()
@@ -14,10 +15,14 @@ extension Terminal {
             content = scalar.value
         }
 
+        package var isBlank: Bool {
+            self == Cell() || self == .padding
+        }
+
         package var character: Character {
             get {
                 guard content >= Self.firstGraphemeIndex else {
-                    return Unicode.Scalar(content).map(Character.init) ?? " "
+                    return content == 0 ? " " : Unicode.Scalar(content).map(Character.init) ?? " "
                 }
                 return graphemes.withLock { $0.characters[Int(content - Self.firstGraphemeIndex)] }
             }

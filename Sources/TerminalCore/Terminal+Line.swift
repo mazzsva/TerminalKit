@@ -28,5 +28,23 @@ extension Terminal {
         package mutating func replaceSubrange(_ subrange: Range<Int>, with newElements: some Collection<Cell>) {
             cells.replaceSubrange(subrange, with: newElements)
         }
+
+        package mutating func append(_ cell: Cell) {
+            cells.append(cell)
+        }
+
+        package mutating func append(contentsOf newElements: some Sequence<Cell>) {
+            cells.append(contentsOf: newElements)
+        }
+
+        package mutating func reserveCapacity(_ capacity: Int) {
+            cells.reserveCapacity(capacity)
+        }
+
+        package func withContiguousStorageIfAvailable<Result>(
+            _ body: (UnsafeBufferPointer<Cell>) throws -> Result
+        ) rethrows -> Result? {
+            try cells.withContiguousStorageIfAvailable(body)
+        }
     }
 }

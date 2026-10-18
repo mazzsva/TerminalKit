@@ -76,6 +76,15 @@ struct TerminalSelectionTests {
         #expect(representation.colorAt(x: x, y: y) != before)
     }
 
+    @Test func clearsTheSelectionWhenTheLinesReflow() async throws {
+        let view = try await view(running: "printf 'hello world'")
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 5))
+        view.fit(to: CGSize(width: 400, height: 200))
+        #expect(view.selection != nil)
+        view.fit(to: CGSize(width: 200, height: 200))
+        #expect(view.selection == nil)
+    }
+
     @Test func copiesTheSelectedText() async throws {
         let view = try await view(running: "printf 'hello world   \\r\\nsecond line'")
         view.selection = Selection(anchor: .init(line: 0, column: 6), head: .init(line: 1, column: 6))
