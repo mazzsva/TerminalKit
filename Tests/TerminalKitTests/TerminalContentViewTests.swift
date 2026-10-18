@@ -55,6 +55,55 @@ struct TerminalContentViewTests {
         #expect(window.firstResponder === view)
     }
 
+    @Test func drawsAnUnderlineCursor() async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[4 q'")
+        let rect = view.cursorRect
+        let representation = try representation(of: view)
+        let background = color(in: representation, at: CGPoint(x: 190, y: 90))
+        #expect(!isClose(color(in: representation, at: CGPoint(x: rect.midX, y: rect.maxY - 1)), to: background))
+        #expect(isClose(color(in: representation, at: CGPoint(x: rect.midX, y: rect.maxY - 3)), to: background))
+        #expect(isClose(color(in: representation, at: CGPoint(x: rect.midX, y: rect.midY)), to: background))
+        #expect(window.firstResponder === view)
+    }
+
+    @Test func drawsABarCursor() async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[6 q'")
+        let rect = view.cursorRect
+        let representation = try representation(of: view)
+        let background = color(in: representation, at: CGPoint(x: 190, y: 90))
+        #expect(!isClose(color(in: representation, at: CGPoint(x: rect.minX + 1, y: rect.midY)), to: background))
+        #expect(isClose(color(in: representation, at: CGPoint(x: rect.minX + 3, y: rect.midY)), to: background))
+        #expect(isClose(color(in: representation, at: CGPoint(x: rect.midX, y: rect.midY)), to: background))
+        #expect(window.firstResponder === view)
+    }
+
+    @Test(arguments: [("4", CGRect(x: 0, y: 0, width: 0, height: 3)), ("6", CGRect(x: 3, y: 0, width: 0, height: 0))])
+    func drawsTheTextUnderAThinCursor(shape: String, inset: CGRect) async throws {
+        let (thin, thinWindow) = try await focusedView(running: "printf 'X\\b\\033[\(shape) q'")
+        let (hidden, hiddenWindow) = try await focusedView(running: "printf 'X\\b\\033[?25l'")
+        let rect = CGRect(
+            x: thin.cursorRect.minX + inset.minX,
+            y: thin.cursorRect.minY,
+            width: thin.cursorRect.width - inset.minX,
+            height: thin.cursorRect.height - inset.height
+        )
+        #expect(try pixels(in: rect, of: thin) == pixels(in: rect, of: hidden))
+        #expect(try Set(pixels(in: rect, of: thin).map { $0?.description }).count > 1)
+        #expect(thinWindow.firstResponder === thin && hiddenWindow.firstResponder === hidden)
+    }
+
+    @Test(arguments: ["4", "6"])
+    func drawsAHollowCursorOfEachShapeWithoutTheFocus(shape: String) async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[\(shape) q'")
+        window.isKey = false
+        let rect = view.cursorRect
+        let representation = try representation(of: view)
+        let background = color(in: representation, at: CGPoint(x: 190, y: 90))
+        #expect(!isClose(color(in: representation, at: CGPoint(x: rect.maxX - 0.5, y: rect.midY)), to: background))
+        #expect(!isClose(color(in: representation, at: CGPoint(x: rect.midX, y: rect.minY + 0.5)), to: background))
+        #expect(isClose(color(in: representation, at: CGPoint(x: rect.midX, y: rect.midY)), to: background))
+    }
+
     @Test func drawsAHollowCursorWithoutTheFocus() async throws {
         let (view, window) = try await focusedView(running: "exit")
         let edge = CGPoint(x: view.cursorRect.minX + 0.5, y: view.cursorRect.midY)

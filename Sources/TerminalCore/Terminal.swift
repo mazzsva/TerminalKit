@@ -29,6 +29,7 @@ package struct Terminal: Sendable {
     package private(set) var usesApplicationCursorKeys = false
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
+    package private(set) var cursorShape = CursorShape.block
     package private(set) var usesFocusReporting = false
     package private(set) var title = ""
     package private(set) var mouseTracking = MouseTracking.off
@@ -266,6 +267,10 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
+        if sequence.privateMarker == nil, sequence.intermediates == " ", sequence.final == "q" {
+            setCursorShape(sequence.parameter(at: 0, default: 0))
+            return
+        }
         guard sequence.intermediates.isEmpty else {
             return
         }
@@ -594,6 +599,19 @@ package struct Terminal: Sendable {
 
     private static func defaultTabStops(_ columns: Range<Int>) -> [Bool] {
         columns.map { $0 % tabWidth == 0 }
+    }
+
+    private mutating func setCursorShape(_ shape: Int) {
+        switch shape {
+        case 0 ... 2:
+            cursorShape = .block
+        case 3, 4:
+            cursorShape = .underline
+        case 5, 6:
+            cursorShape = .bar
+        default:
+            break
+        }
     }
 
     private mutating func setPrivateMode(_ mode: Int, isEnabled: Bool) {
