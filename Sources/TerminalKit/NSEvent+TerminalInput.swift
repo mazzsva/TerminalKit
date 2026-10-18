@@ -13,28 +13,15 @@ extension NSEvent {
     }
 
     func metaInput(applicationCursorKeys: Bool) -> [UInt8]? {
-        let modifierFlags = modifierFlags.subtracting(.option)
-        guard
-            let event = NSEvent.keyEvent(
-                with: type,
-                location: locationInWindow,
-                modifierFlags: modifierFlags,
-                timestamp: timestamp,
-                windowNumber: windowNumber,
-                context: nil,
-                characters: characters(byApplyingModifiers: modifierFlags) ?? "",
-                charactersIgnoringModifiers: charactersIgnoringModifiers ?? "",
-                isARepeat: isARepeat,
-                keyCode: keyCode
-            ),
-            let input = event.terminalInput(applicationCursorKeys: applicationCursorKeys)
-        else {
-            return nil
-        }
-        return [0x1B] + input
+        let characters = characters(byApplyingModifiers: modifierFlags.subtracting(.option))
+        return terminalInput(characters: characters, applicationCursorKeys: applicationCursorKeys).map { [0x1B] + $0 }
     }
 
     func terminalInput(applicationCursorKeys: Bool = false) -> [UInt8]? {
+        terminalInput(characters: characters, applicationCursorKeys: applicationCursorKeys)
+    }
+
+    private func terminalInput(characters: String?, applicationCursorKeys: Bool) -> [UInt8]? {
         guard !modifierFlags.contains(.command), let characters, !characters.isEmpty else {
             return nil
         }
