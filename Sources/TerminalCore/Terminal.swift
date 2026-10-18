@@ -531,16 +531,21 @@ package struct Terminal: Sendable {
     private mutating func eraseInDisplay(_ mode: Int) {
         switch mode {
         case 0:
+            if cursor.column == 0 {
+                unwrapLine(before: cursor.row)
+            }
             eraseInLine(0)
             for row in cursor.row + 1 ..< rows {
                 erase(0 ..< columns, row: row)
             }
         case 1:
+            unwrapLine(before: 0)
             for row in 0 ..< cursor.row {
                 erase(0 ..< columns, row: row)
             }
             eraseInLine(1)
         case 2:
+            unwrapLine(before: 0)
             for row in 0 ..< rows {
                 erase(0 ..< columns, row: row)
             }
@@ -570,9 +575,6 @@ package struct Terminal: Sendable {
         screen[row].replaceSubrange(range, with: repeatElement(blank, count: range.count))
         if range.upperBound == columns {
             screen[row].isWrapped = false
-        }
-        if range.lowerBound == 0 {
-            unwrapLine(before: row)
         }
         blankBrokenWideCharacter(at: range.lowerBound, row: row)
         blankBrokenWideCharacter(at: range.upperBound, row: row)

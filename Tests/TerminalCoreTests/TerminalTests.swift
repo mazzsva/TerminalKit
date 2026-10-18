@@ -87,7 +87,7 @@ struct TerminalTests {
     }
 
     @Test(arguments: [
-        ("\r\u{1B}[2K", "the next line is erased"), ("\u{1B}[A\u{1B}[K", "the end of the line is erased"),
+        ("\r\u{1B}[J", "the screen below it is erased"), ("\u{1B}[A\u{1B}[K", "the end of the line is erased"),
         ("\u{1B}[L", "a line is inserted after it"), ("\u{1B}[M", "the next line is deleted"),
         ("\u{1B}[2;3r\u{1B}[T", "the region below it scrolls down"),
     ])
@@ -97,11 +97,17 @@ struct TerminalTests {
         #expect(!terminal.screen[0].isWrapped, "\(reason)")
     }
 
-    @Test(arguments: ["\u{1B}[H\u{1B}[2J", "\u{1B}[T", "\u{1B}[H\u{1B}[M"])
+    @Test(arguments: ["\u{1B}[H\u{1B}[2J", "\u{1B}[1J", "\u{1B}[T", "\u{1B}[H\u{1B}[M"])
     func unwrapsTheScrollbackWhenTheFirstLineChanges(sequence: String) {
         var terminal = Terminal(columns: 5, rows: 1)
         terminal.receive("AAAAABBB\(sequence)")
         #expect(terminal.scrollback.map(\.isWrapped) == [false])
+    }
+
+    @Test func keepsTheWrapThatZshMakes() {
+        var terminal = Terminal(columns: 5, rows: 2)
+        terminal.receive("abcde \r\u{1B}[Kf")
+        #expect(terminal.screen.map(\.isWrapped) == [true, false])
     }
 
     @Test func unwrapsTheLastLineOfARegionThatScrollsUp() {
