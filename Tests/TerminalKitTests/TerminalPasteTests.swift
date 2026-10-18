@@ -11,18 +11,18 @@ struct TerminalPasteTests {
         let pasteboard = pasteboard(containing: "hello\nworld\n")
         defer { pasteboard.releaseGlobally() }
         view.paste(from: pasteboard)
-        #expect(await lines(afterExitOf: session).contains("hello+world"))
+        #expect(await session.linesAfterExit().contains("hello+world"))
     }
 
     @Test func sendsAReturnForEachLineBreak() async throws {
         let (view, session) = try startedView(
             running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1"
         )
-        await waitForText("ready", in: session)
+        await session.waitForText("ready")
         let pasteboard = pasteboard(containing: "a\nb\r\nc")
         defer { pasteboard.releaseGlobally() }
         view.paste(from: pasteboard)
-        #expect(await lines(afterExitOf: session).contains("61  0d  62  0d  63"))
+        #expect(await session.linesAfterExit().contains("61  0d  62  0d  63"))
     }
 
     @Test func bracketsThePasteInBracketedPasteMode() async throws {
@@ -41,18 +41,16 @@ private func pastedBytes(_ text: String, mode: String, count: Int) async throws 
     let (view, session) = try startedView(
         running: "printf '\(mode)'; stty raw -echo; echo ready; head -c \(count) | od -An -tx1"
     )
-    await waitForText("ready", in: session)
+    await session.waitForText("ready")
     let pasteboard = pasteboard(containing: text)
     defer { pasteboard.releaseGlobally() }
     view.paste(from: pasteboard)
-    return await lines(afterExitOf: session).first { !$0.isEmpty && $0 != "ready" }
+    return await session.linesAfterExit().first { !$0.isEmpty && $0 != "ready" }
 }
 
 @MainActor
 func startedView(running script: String) throws -> (TerminalContentView, TerminalSession) {
-    let session = TerminalSession(
-        configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", script])
-    )
+    let session = TerminalSession(running: script)
     let view = TerminalContentView(session: session)
     view.fit(to: CGSize(width: 800, height: 300))
     try session.start()
@@ -65,20 +63,4 @@ func pasteboard(containing text: String) -> NSPasteboard {
     pasteboard.clearContents()
     pasteboard.setString(text, forType: .string)
     return pasteboard
-}
-
-@MainActor
-private func lines(afterExitOf session: TerminalSession) async -> [String] {
-    for await state in Observations({ session.state }) where state != .running {
-        break
-    }
-    return session.terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
-}
-
-@MainActor
-func waitForText(_ text: String, in session: TerminalSession) async {
-    for await lines in Observations({ session.terminal.screen.map { String($0.map(\.character)) } })
-    where lines.contains(where: { $0.contains(text) }) {
-        break
-    }
 }

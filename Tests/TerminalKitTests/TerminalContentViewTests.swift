@@ -9,7 +9,7 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct TerminalContentViewTests {
     @Test func fitsTheScreenToTheView() {
-        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let session = TerminalSession(running: "exit")
         let view = TerminalContentView(session: session)
         view.fit(to: CGSize(width: 8 + view.cellSize.width * 100.5, height: 8 + view.cellSize.height * 30.5))
         #expect(session.terminal.columns == 100)
@@ -17,29 +17,25 @@ struct TerminalContentViewTests {
     }
 
     @Test func keepsAtLeastOneCell() {
-        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let session = TerminalSession(running: "exit")
         TerminalContentView(session: session).fit(to: .zero)
         #expect(session.terminal.columns == 1)
         #expect(session.terminal.rows == 1)
     }
 
     @Test func drawsTheScreen() async throws {
-        let session = TerminalSession(
-            configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "printf 'hello\\r'"])
-        )
+        let session = TerminalSession(running: "printf 'hello\\r'")
         let view = TerminalContentView(session: session)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
         let blankImage = try image(of: view)
 
         try session.start()
-        for await state in Observations({ session.state }) where state != .running {
-            break
-        }
+        await session.waitForExit()
         #expect(try image(of: view) != blankImage)
     }
 
     @Test func drawsTheCursor() throws {
-        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let session = TerminalSession(running: "exit")
         let view = TerminalContentView(session: session)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
         let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
@@ -78,18 +74,11 @@ struct TerminalContentViewTests {
     }
 
     @Test func drawsTheScrollback() async throws {
-        let session = TerminalSession(
-            configuration: .init(
-                executableURL: URL(filePath: "/bin/sh"),
-                arguments: ["-c", "printf '\\033[41m  \\033[m'; seq 1 30"]
-            )
-        )
+        let session = TerminalSession(running: "printf '\\033[41m  \\033[m'; seq 1 30")
         let view = TerminalContentView(session: session)
         view.fit(to: CGSize(width: 200, height: 100))
         try session.start()
-        for await state in Observations({ session.state }) where state != .running {
-            break
-        }
+        await session.waitForExit()
         view.fit(to: CGSize(width: 200, height: 100))
         #expect(!session.terminal.scrollback.isEmpty)
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
@@ -142,42 +131,30 @@ struct TerminalContentViewTests {
         for characters in ["h", "i", "\r"] {
             view.keyDown(with: try keyDown(characters))
         }
-        #expect(await lines(afterExitOf: session).contains("got hi"))
+        #expect(await session.linesAfterExit().contains("got hi"))
     }
 
     @Test func sendsTheCursorKeysInTheModeOfTheProcess() async throws {
         let session = TerminalSession(
-            configuration: .init(
-                executableURL: URL(filePath: "/bin/sh"),
-                arguments: ["-c", "printf '\\033[?1h'; stty raw -echo; dd bs=3 count=1 2>/dev/null | od -An -tx1"]
-            )
-        )
+            running: "printf '\\033[?1h'; stty raw -echo; dd bs=3 count=1 2>/dev/null | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         for await isEnabled in Observations({ session.terminal.usesApplicationCursorKeys }) where isEnabled {
             break
         }
         view.keyDown(with: try keyDown(NSUpArrowFunctionKey))
-        #expect(await lines(afterExitOf: session).contains("1b  4f  41"))
+        #expect(await session.linesAfterExit().contains("1b  4f  41"))
     }
 
     @Test(arguments: [(true, "1b  61"), (false, "c3  a5")])
     func sendsTheOptionKeyAsMetaWhenItIsOn(isOn: Bool, bytes: String) async throws {
-        let session = TerminalSession(
-            configuration: .init(
-                executableURL: URL(filePath: "/bin/sh"),
-                arguments: ["-c", "stty raw -echo; echo ready; head -c 2 | od -An -tx1"]
-            )
-        )
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 2 | od -An -tx1")
         let view = TerminalContentView(session: session)
         view.usesOptionAsMetaKey = isOn
         try session.start()
-        for await lines in Observations({ session.terminal.screen.map { String($0.map(\.character)) } })
-        where lines.contains(where: { $0.hasPrefix("ready") }) {
-            break
-        }
+        await session.waitForText("ready")
         view.keyDown(with: try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option))
-        #expect(await lines(afterExitOf: session).contains(bytes))
+        #expect(await session.linesAfterExit().contains(bytes))
     }
 
     @Test func sendsTextFromTheInputSystem() async throws {
@@ -186,7 +163,7 @@ struct TerminalContentViewTests {
         try session.start()
         view.insertText("é", replacementRange: NSRange(location: NSNotFound, length: 0))
         view.keyDown(with: try keyDown("\r"))
-        #expect(await lines(afterExitOf: session).contains("got é"))
+        #expect(await session.linesAfterExit().contains("got é"))
     }
 
     @Test func keepsTheMarkedTextUntilTheInsert() {
@@ -214,7 +191,7 @@ struct TerminalContentViewTests {
         view.unmarkText()
         view.keyDown(with: try keyDown("\r"))
         #expect(!view.hasMarkedText())
-        #expect(await lines(afterExitOf: session).contains("got"))
+        #expect(await session.linesAfterExit().contains("got"))
     }
 
     @Test func drawsTheMarkedText() throws {
@@ -246,38 +223,23 @@ struct TerminalContentViewTests {
     }
 
     @Test func acceptsFirstResponder() {
-        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let session = TerminalSession(running: "exit")
         #expect(TerminalContentView(session: session).acceptsFirstResponder)
     }
 }
 
 @MainActor
 private func readingSession() -> TerminalSession {
-    TerminalSession(
-        configuration: .init(
-            executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "read line; echo \"got $line\""])
-    )
-}
-
-@MainActor
-private func lines(afterExitOf session: TerminalSession) async -> [String] {
-    for await state in Observations({ session.state }) where state != .running {
-        break
-    }
-    return session.terminal.screen.map { String($0.map(\.character)).trimmingCharacters(in: .whitespaces) }
+    TerminalSession(running: "read line; echo \"got $line\"")
 }
 
 @MainActor
 private func drawnView(running script: String) async throws -> TerminalContentView {
-    let session = TerminalSession(
-        configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", script])
-    )
+    let session = TerminalSession(running: script)
     let view = TerminalContentView(session: session)
     view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
     try session.start()
-    for await state in Observations({ session.state }) where state != .running {
-        break
-    }
+    await session.waitForExit()
     return view
 }
 

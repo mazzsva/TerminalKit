@@ -107,30 +107,19 @@ struct TerminalSelectionTests {
 
 @MainActor
 private func view(running script: String) async throws -> TerminalContentView {
-    let session = TerminalSession(
-        configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", script])
-    )
+    let session = TerminalSession(running: script)
     let view = TerminalContentView(session: session)
     view.fit(to: CGSize(width: 400, height: 300))
     try session.start()
-    for await state in Observations({ session.state }) where state != .running {
-        break
-    }
+    await session.waitForExit()
     return view
 }
 
 @MainActor
 private func viewInWindow() -> TerminalContentView {
-    let view = TerminalContentView(
-        session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh"))))
-    let window = NSWindow(
-        contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-        styleMask: [],
-        backing: .buffered,
-        defer: true
-    )
-    window.contentView = view
-    view.fit(to: CGSize(width: 400, height: 300))
+    let view = TerminalContentView(session: TerminalSession(running: "exit"))
+    let window = NSWindow(contentView: view)
+    view.fit(to: window.frame.size)
     return view
 }
 
