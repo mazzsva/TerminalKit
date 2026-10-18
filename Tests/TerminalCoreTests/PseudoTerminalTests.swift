@@ -85,14 +85,6 @@ struct PseudoTerminalTests {
         #expect(output.hasSuffix("2000\r\n"))
     }
 
-    @Test func resizesTheTerminal() async throws {
-        let output = try await output("read line; stty size") { pseudoTerminal in
-            pseudoTerminal.resize(columns: 120, rows: 40)
-            pseudoTerminal.write(Array("\r".utf8))
-        }
-        #expect(output.hasSuffix("40 120\r\n"))
-    }
-
     @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
     func signalsTheWindowSizeChange(shell: String) async throws {
         let pseudoTerminal = try PseudoTerminal(

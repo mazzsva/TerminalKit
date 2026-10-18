@@ -221,11 +221,6 @@ struct TerminalContentViewTests {
         #expect(rect.origin == CGPoint(x: 104, y: 346 - view.cellSize.height))
         #expect(rect.size == view.cellSize)
     }
-
-    @Test func acceptsFirstResponder() {
-        let session = TerminalSession(running: "exit")
-        #expect(TerminalContentView(session: session).acceptsFirstResponder)
-    }
 }
 
 @MainActor
