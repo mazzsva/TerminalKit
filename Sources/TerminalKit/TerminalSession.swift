@@ -83,6 +83,23 @@ public final class TerminalSession {
         pseudoTerminal?.resize(columns: columns, rows: rows)
     }
 
+    public func terminate() {
+        pseudoTerminal?.hangUp()
+    }
+
+    public func send(_ text: String) {
+        send(Array(text.utf8))
+    }
+
+    public func paste(_ text: String) {
+        let lines = text.replacing("\r\n", with: "\r").replacing("\n", with: "\r")
+        guard liveTerminal.usesBracketedPaste else {
+            send(lines)
+            return
+        }
+        send("\u{1B}[200~\(lines.replacing("\u{1B}", with: ""))\u{1B}[201~")
+    }
+
     func send(_ bytes: [UInt8]) {
         pseudoTerminal?.write(bytes)
     }

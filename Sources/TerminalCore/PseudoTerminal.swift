@@ -77,6 +77,12 @@ package final class PseudoTerminal: Sendable {
         wakeUp.finish()
     }
 
+    package func hangUp() {
+        queue.async { [weak self] in
+            self?.cancelSources()
+        }
+    }
+
     package func write(_ bytes: [UInt8]) {
         queue.async { [weak self] in
             guard let self else {
