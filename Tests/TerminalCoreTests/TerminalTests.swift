@@ -199,6 +199,18 @@ struct TerminalTests {
         #expect(lines(terminal) == ["ab中 ", "    "])
     }
 
+    @Test func insertsCharactersInInsertMode() {
+        var terminal = Terminal(columns: 6, rows: 1)
+        terminal.receive("abc\r\u{1B}[4hxy\u{1B}[4lz")
+        #expect(lines(terminal) == ["xyzbc "])
+    }
+
+    @Test func keepsReplaceModeForOtherModes() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("abc\r\u{1B}[20hx")
+        #expect(lines(terminal) == ["xbc "])
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")

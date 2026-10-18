@@ -32,6 +32,7 @@ package struct Terminal: Sendable {
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
     private var usesAutowrap = true
+    private var usesInsertMode = false
 
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
@@ -190,6 +191,10 @@ package struct Terminal: Sendable {
             scrollDown(count, in: scrollRegion)
         case "c" where sequence.parameter(at: 0, default: 0) == 0:
             replies += "\u{1B}[?1;2c".utf8
+        case "h" where sequence.parameters.contains(4):
+            usesInsertMode = true
+        case "l" where sequence.parameters.contains(4):
+            usesInsertMode = false
         case "m":
             style.apply(sequence.parameters)
         case "n":
@@ -219,6 +224,9 @@ package struct Terminal: Sendable {
             } else {
                 cursor.column = columns - width
             }
+        }
+        if usesInsertMode {
+            insertCharacters(width)
         }
         let character = scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar)
         for column in cursor.column ..< cursor.column + width {
