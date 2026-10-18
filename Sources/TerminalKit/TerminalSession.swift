@@ -18,6 +18,7 @@ public final class TerminalSession {
     private let configuration: Configuration
     public private(set) var state = State.idle
     public private(set) var title = ""
+    public private(set) var bellCount = 0
 
     private(set) var terminal = Terminal(columns: 80, rows: 24)
 
@@ -74,6 +75,9 @@ public final class TerminalSession {
     private func receive(_ bytes: [UInt8]) {
         let replies = terminal.receive(bytes)
         title = terminal.title
+        if bellCount != terminal.bellCount {
+            bellCount = terminal.bellCount
+        }
         if !replies.isEmpty {
             pseudoTerminal?.write(replies)
         }

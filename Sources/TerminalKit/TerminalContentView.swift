@@ -45,12 +45,15 @@ final class TerminalContentView: NSView {
             }
         }
     }
+    var ringBell = { NSSound.beep() }
     var lastMousePosition: Terminal.Position?
     var scrollWheelLines: CGFloat = 0
 
     private var colors = Colors(.standard)
     private(set) var fonts = Fonts(defaultFont)
     private var keyDownEvent: NSEvent?
+    private var bellTask: Task<Void, Never>?
+    private var lastBellDate: Date?
 
     private struct Colors {
         let foreground: NSColor
@@ -136,6 +139,28 @@ final class TerminalContentView: NSView {
             window.makeFirstResponder(self)
         }
         windowKeyStateDidChange()
+        bellTask?.cancel()
+        bellTask = nil
+        if window != nil {
+            bellTask = Task { [weak self, session] in
+                for await _ in Observations({ session.bellCount }).dropFirst() {
+                    self?.bellDidRing()
+                }
+            }
+        }
+    }
+
+    static func ringsBell(at date: Date, lastBellDate: Date?) -> Bool {
+        lastBellDate.map { date.timeIntervalSince($0) >= 0.5 } ?? true
+    }
+
+    private func bellDidRing() {
+        let date = Date()
+        guard Self.ringsBell(at: date, lastBellDate: lastBellDate) else {
+            return
+        }
+        lastBellDate = date
+        ringBell()
     }
 
     override func becomeFirstResponder() -> Bool {

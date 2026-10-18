@@ -62,6 +62,13 @@ struct TerminalSessionTests {
         #expect(session.state == .exited(.exit(3)))
     }
 
+    @Test func countsTheBellsOfTheProcess() async throws {
+        let session = TerminalSession(running: "printf 'a\\a\\033]0;t\\007\\a'")
+        try session.start()
+        await session.waitForExit()
+        #expect(session.bellCount == 2)
+    }
+
     @Test func showsTheTitleOfTheProcess() async throws {
         let session = TerminalSession(running: "printf '\\033]0;Title\\007'")
         try session.start()
