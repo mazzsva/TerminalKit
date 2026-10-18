@@ -265,6 +265,7 @@ final class TerminalContentView: NSView {
         if accessibilityRevision != session.revision {
             accessibilityRevision = session.revision
             scheduleAccessibilityNotification()
+            textFinder?.noteClientStringWillChange()
         }
         colors.background.setFill()
         dirtyRect.fill()
@@ -370,7 +371,7 @@ final class TerminalContentView: NSView {
         isFocused ? colors.selection : .unemphasizedSelectedTextBackgroundColor
     }
 
-    private static func runs(in line: Terminal.Line) -> [(columns: Range<Int>, style: Terminal.Style)] {
+    static func runs(in line: Terminal.Line) -> [(columns: Range<Int>, style: Terminal.Style)] {
         var runs: [(columns: Range<Int>, style: Terminal.Style)] = []
         var column = 0
         while column < line.count {
@@ -388,7 +389,7 @@ final class TerminalContentView: NSView {
         return style.isInverse ? (background ?? colors.background, foreground) : (foreground, background)
     }
 
-    private func drawText(
+    func drawText(
         _ line: Terminal.Line,
         columns: Range<Int>,
         row: Int,
