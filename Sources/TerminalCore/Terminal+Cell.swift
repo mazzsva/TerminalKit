@@ -1,13 +1,11 @@
-import Synchronization
-
 extension Terminal {
     package struct Cell: Equatable, Sendable {
         package static let padding = Cell(scalar: "\u{0}")
-        private static let firstGraphemeIndex: UInt32 = 0x11_0000
+        fileprivate static let firstGraphemeIndex: UInt32 = 0x11_0000
 
         package var style = Style()
         package var width: UInt8 = 1
-        private var content: UInt32 = 0x20
+        fileprivate var content: UInt32 = 0x20
 
         package init(scalar: Unicode.Scalar = " ", style: Style = Style(), width: UInt8 = 1) {
             self.style = style
@@ -19,43 +17,101 @@ extension Terminal {
             self == Cell() || self == .padding
         }
 
-        package var character: Character {
-            get {
-                guard content >= Self.firstGraphemeIndex else {
-                    return content == 0 ? " " : Unicode.Scalar(content).map(Character.init) ?? " "
-                }
-                return graphemes.withLock { $0.characters[Int(content - Self.firstGraphemeIndex)] }
-            }
-            set {
-                let scalars = newValue.unicodeScalars
-                if scalars.count > 1, let index = graphemes.withLock({ $0.index(of: newValue) }) {
-                    content = Self.firstGraphemeIndex + index
-                } else if let scalar = scalars.first {
-                    content = scalar.value
-                }
-            }
+        package var isSpace: Bool {
+            content == 0x20 || content == 0
+        }
+
+        package var isASCII: Bool {
+            content < 0x80
+        }
+
+        fileprivate var graphemeIndex: Int? {
+            content >= Self.firstGraphemeIndex ? Int(content - Self.firstGraphemeIndex) : nil
         }
     }
-}
 
-private let graphemes = Mutex(Graphemes())
+    package struct Graphemes: Sendable {
+        let capacity: Int
+        private var characters: [Character] = []
+        private var indices: [Character: UInt32] = [:]
+        private var additionsSinceCompaction = 0
 
-private struct Graphemes {
-    static let capacity = 65_536
+        init(capacity: Int = 65_536) {
+            self.capacity = capacity
+        }
 
-    var characters: [Character] = []
-    var indices: [Character: UInt32] = [:]
+        var count: Int {
+            characters.count
+        }
 
-    mutating func index(of character: Character) -> UInt32? {
-        if let index = indices[character] {
+        package func character(of cell: Cell) -> Character {
+            guard let index = cell.graphemeIndex else {
+                return cell.content == 0 ? " " : Unicode.Scalar(cell.content).map(Character.init) ?? " "
+            }
+            return characters[index]
+        }
+
+        func needsCompaction(for character: Character) -> Bool {
+            characters.count >= capacity && additionsSinceCompaction >= capacity / 64
+                && character.unicodeScalars.count > 1 && indices[character] == nil
+        }
+
+        mutating func cell(_ cell: Cell, with character: Character) -> Cell {
+            var cell = cell
+            let scalars = character.unicodeScalars
+            if scalars.count == 1, let scalar = scalars.first {
+                cell.content = scalar.value
+            } else if let index = index(of: character) {
+                cell.content = Cell.firstGraphemeIndex + index
+            }
+            return cell
+        }
+
+        static func markIndices(in lines: [Line], into used: inout [Bool]) {
+            for line in lines {
+                for cell in line {
+                    if let index = cell.graphemeIndex {
+                        used[index] = true
+                    }
+                }
+            }
+        }
+
+        mutating func compact(keeping used: [Bool]) -> [UInt32] {
+            var newIndices = Array(repeating: UInt32(0), count: characters.count)
+            var kept: [Character] = []
+            for (index, character) in characters.enumerated() where used[index] {
+                newIndices[index] = UInt32(kept.count)
+                kept.append(character)
+            }
+            characters = kept
+            indices = Dictionary(uniqueKeysWithValues: kept.enumerated().map { ($1, UInt32($0)) })
+            additionsSinceCompaction = 0
+            return newIndices
+        }
+
+        static func remapIndices(in lines: inout [Line], with newIndices: [UInt32]) {
+            for row in lines.indices where lines[row].contains(where: { $0.graphemeIndex != nil }) {
+                for column in lines[row].indices {
+                    if let index = lines[row][column].graphemeIndex {
+                        lines[row][column].content = Cell.firstGraphemeIndex + newIndices[index]
+                    }
+                }
+            }
+        }
+
+        private mutating func index(of character: Character) -> UInt32? {
+            if let index = indices[character] {
+                return index
+            }
+            additionsSinceCompaction += 1
+            guard characters.count < capacity else {
+                return nil
+            }
+            let index = UInt32(characters.count)
+            characters.append(character)
+            indices[character] = index
             return index
         }
-        guard characters.count < Self.capacity else {
-            return nil
-        }
-        let index = UInt32(characters.count)
-        characters.append(character)
-        indices[character] = index
-        return index
     }
 }

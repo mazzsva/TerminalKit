@@ -98,7 +98,8 @@ extension Terminal {
             let cells = line[start ..< (row == end.row ? max(min(end.column, line.count), start) : line.count)]
             let isWrapped = line.isWrapped && row < end.row
             let stop = isWrapped ? cells.endIndex : (cells.lastIndex { !$0.isBlank }).map { $0 + 1 } ?? start
-            text += String(cells[start ..< stop].filter { $0.width > 0 && $0 != .padding }.map(\.character))
+            text += String(
+                cells[start ..< stop].filter { $0.width > 0 && $0 != .padding }.map(graphemes.character(of:)))
             if !isWrapped, row < end.row {
                 text += "\n"
             }

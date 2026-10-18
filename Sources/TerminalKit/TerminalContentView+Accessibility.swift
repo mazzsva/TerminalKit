@@ -28,6 +28,7 @@ extension TerminalContentView {
             self.widthChangeCount = widthChangeCount
             firstLine = terminal.removedScrollbackCount
             let reusable = previous?.widthChangeCount == widthChangeCount ? previous : nil
+            let graphemes = terminal.graphemes
             scrollback = terminal.scrollback.indices.map { index in
                 let line = terminal.scrollback[index]
                 if let reusable,
@@ -37,7 +38,7 @@ extension TerminalContentView {
                 {
                     return reusable.scrollback[cached]
                 }
-                return Self.row(line, continues: line.isWrapped, cursorColumn: nil)
+                return Self.row(line, continues: line.isWrapped, cursorColumn: nil, graphemes: graphemes)
             }
             let cursorRow = terminal.cursor.row
             let screen = terminal.screen.indices.map { row in
@@ -45,7 +46,8 @@ extension TerminalContentView {
                 return Self.row(
                     line,
                     continues: line.isWrapped && row < terminal.rows - 1,
-                    cursorColumn: row == cursorRow ? terminal.cursor.column : nil
+                    cursorColumn: row == cursorRow ? terminal.cursor.column : nil,
+                    graphemes: graphemes
                 )
             }
             let allRows = scrollback + screen
@@ -77,7 +79,12 @@ extension TerminalContentView {
             self.lineOfRow = lineOfRow
         }
 
-        private static func row(_ line: Terminal.Line, continues: Bool, cursorColumn: Int?) -> Row {
+        private static func row(
+            _ line: Terminal.Line,
+            continues: Bool,
+            cursorColumn: Int?,
+            graphemes: Terminal.Graphemes
+        ) -> Row {
             var end = textEnd(of: line, continues: continues)
             if let cursorColumn {
                 end = max(end, min(cursorColumn, line.count))
@@ -85,7 +92,7 @@ extension TerminalContentView {
             var text = ""
             var length = 0
             for cell in line[..<end] where isText(cell) {
-                let character = cell.character
+                let character = graphemes.character(of: cell)
                 text.append(character)
                 length += character.utf16.count
             }
@@ -118,7 +125,7 @@ extension TerminalContentView {
             guard !continues else {
                 return line.count
             }
-            return (line.lastIndex { $0.character != " " }).map { $0 + 1 } ?? 0
+            return (line.lastIndex { !$0.isSpace }).map { $0 + 1 } ?? 0
         }
     }
 
@@ -231,8 +238,10 @@ extension TerminalContentView {
             return NSRange(location: index, length: 1)
         }
         var location = text.rows[row].location
-        for cell in line(at: row) where AccessibilityText.isText(cell) {
-            let length = cell.character.utf16.count
+        let terminal = session.terminal
+        let graphemes = terminal.graphemes
+        for cell in line(at: row, in: terminal) where AccessibilityText.isText(cell) {
+            let length = graphemes.character(of: cell).utf16.count
             if index < location + length {
                 return NSRange(location: location, length: length)
             }
@@ -280,8 +289,10 @@ extension TerminalContentView {
             return text.length
         }
         var index = text.rows[row].location
-        for cell in line(at: row).prefix(max(column, 0)) where AccessibilityText.isText(cell) {
-            index += cell.character.utf16.count
+        let terminal = session.terminal
+        let graphemes = terminal.graphemes
+        for cell in line(at: row, in: terminal).prefix(max(column, 0)) where AccessibilityText.isText(cell) {
+            index += graphemes.character(of: cell).utf16.count
         }
         return min(index, text.rows[row].upperBound)
     }
@@ -289,9 +300,11 @@ extension TerminalContentView {
     private func position(of index: Int, in text: AccessibilityText) -> (row: Int, column: Int) {
         let row = text.row(containing: index)
         var location = text.rows[row].location
-        let line = line(at: row)
+        let terminal = session.terminal
+        let graphemes = terminal.graphemes
+        let line = line(at: row, in: terminal)
         for column in line.indices where AccessibilityText.isText(line[column]) {
-            location += line[column].character.utf16.count
+            location += graphemes.character(of: line[column]).utf16.count
             if index < location {
                 return (row, column)
             }

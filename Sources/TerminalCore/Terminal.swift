@@ -35,6 +35,7 @@ package struct Terminal: Sendable {
     package private(set) var cursorShape = CursorShape.block
     package private(set) var usesFocusReporting = false
     package private(set) var title = ""
+    package internal(set) var graphemes = Graphemes()
     package private(set) var bellCount = 0
     package internal(set) var commands: [Command] = []
     package internal(set) var removedCommandCount = 0
@@ -57,6 +58,7 @@ package struct Terminal: Sendable {
         }
         snapshot.scrollback = scrollback
         snapshot.removedScrollbackCount = removedScrollbackCount
+        snapshot.graphemes = graphemes
         return snapshot
     }
     private var usesAutowrap = true
@@ -479,13 +481,37 @@ package struct Terminal: Sendable {
         guard column >= 0 else {
             return
         }
-        var text = String(screen[cursor.row][column].character)
+        var text = String(graphemes.character(of: screen[cursor.row][column]))
         guard text.unicodeScalars.count < Self.maximumScalarsPerCell else {
             return
         }
         text.unicodeScalars.append(scalar)
         if let character = text.first, text.count == 1 {
-            screen[cursor.row][column].character = character
+            if graphemes.needsCompaction(for: character) {
+                compactGraphemes()
+            }
+            screen[cursor.row][column] = graphemes.cell(screen[cursor.row][column], with: character)
+        }
+    }
+
+    package func character(of cell: Cell) -> Character {
+        graphemes.character(of: cell)
+    }
+
+    private mutating func compactGraphemes() {
+        endSynchronizedOutput()
+        var used = Array(repeating: false, count: graphemes.count)
+        Graphemes.markIndices(in: scrollback, into: &used)
+        Graphemes.markIndices(in: screen, into: &used)
+        if let normalScreen {
+            Graphemes.markIndices(in: normalScreen.lines, into: &used)
+        }
+        let newIndices = graphemes.compact(keeping: used)
+        Graphemes.remapIndices(in: &scrollback, with: newIndices)
+        Graphemes.remapIndices(in: &screen, with: newIndices)
+        if var normalScreen {
+            Graphemes.remapIndices(in: &normalScreen.lines, with: newIndices)
+            self.normalScreen = normalScreen
         }
     }
 
@@ -654,6 +680,7 @@ package struct Terminal: Sendable {
         terminal.prompt = prompt
         terminal.input = input
         terminal.synchronizedOutputCount = synchronizedOutputCount
+        terminal.graphemes = graphemes
         terminal.scrollback = scrollback
         terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount

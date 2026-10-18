@@ -246,11 +246,12 @@ final class TerminalContentView: NSView {
 
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.foreground]
         let terminal = session.terminal
+        let graphemes = terminal.graphemes
         let lineCount = terminal.scrollback.count + terminal.rows
         let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height), 0)
         let lastRow = min(Int((dirtyRect.maxY - Self.padding) / cellSize.height), lineCount - 1)
         for row in firstRow ..< max(lastRow + 1, firstRow) {
-            let line = line(at: row)
+            let line = line(at: row, in: terminal)
             let runs = Self.runs(in: line)
             for (columns, style) in runs {
                 if let background = colors(for: style).background {
@@ -268,7 +269,14 @@ final class TerminalContentView: NSView {
                 rect(row: row, columns: columns).fill()
             }
             for (columns, style) in runs {
-                drawText(line, columns: columns, row: row, style: style, foreground: colors(for: style).foreground)
+                drawText(
+                    line,
+                    columns: columns,
+                    row: row,
+                    style: style,
+                    foreground: colors(for: style).foreground,
+                    graphemes: graphemes
+                )
             }
         }
 
@@ -313,7 +321,8 @@ final class TerminalContentView: NSView {
             columns: cursorColumns,
             row: terminal.scrollback.count + terminal.cursor.row,
             style: style,
-            foreground: colors(for: style).background ?? colors.background
+            foreground: colors(for: style).background ?? colors.background,
+            graphemes: graphemes
         )
     }
 
@@ -325,9 +334,11 @@ final class TerminalContentView: NSView {
     }
 
     func line(at row: Int) -> Terminal.Line {
-        let terminal = session.terminal
-        return row < terminal.scrollback.count
-            ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
+        line(at: row, in: session.terminal)
+    }
+
+    func line(at row: Int, in terminal: Terminal) -> Terminal.Line {
+        row < terminal.scrollback.count ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
     }
 
     private var selectionColor: NSColor {
@@ -357,7 +368,8 @@ final class TerminalContentView: NSView {
         columns: Range<Int>,
         row: Int,
         style: Terminal.Style,
-        foreground: NSColor
+        foreground: NSColor,
+        graphemes: Terminal.Graphemes
     ) {
         guard !style.isHidden else {
             return
@@ -375,16 +387,16 @@ final class TerminalContentView: NSView {
         var column = columns.lowerBound
         while column < columns.upperBound {
             let end =
-                line[column ..< columns.upperBound].firstIndex { $0.width != 1 || !$0.character.isASCII }
+                line[column ..< columns.upperBound].firstIndex { $0.width != 1 || !$0.isASCII }
                 ?? columns.upperBound
             if end > column {
-                let text = String(line[column ..< end].map(\.character))
+                let text = String(line[column ..< end].map(graphemes.character(of:)))
                 NSAttributedString(string: text, attributes: attributes)
                     .draw(at: rect(row: row, columns: column ..< end).origin)
                 column = end
             } else {
                 if line[column].width > 0 {
-                    NSAttributedString(string: String(line[column].character), attributes: attributes)
+                    NSAttributedString(string: String(graphemes.character(of: line[column])), attributes: attributes)
                         .draw(at: rect(row: row, columns: column ..< column + 1).origin)
                 }
                 column += 1

@@ -157,7 +157,7 @@ struct TerminalTests {
     @Test func combinesMarksWithAWideCharacter() {
         var terminal = Terminal(columns: 3, rows: 1)
         terminal.receive("❤\u{FE0F}中\u{FE0F}")
-        #expect(terminal.screen[0].map(\.character) == ["❤\u{FE0F}", "中\u{FE0F}", " "])
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["❤\u{FE0F}", "中\u{FE0F}", " "])
     }
 
     @Test func combinesMarksWithTheLastCharacterOfALine() {
@@ -178,14 +178,14 @@ struct TerminalTests {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive(cluster)
         let cells = terminal.screen[0].filter { $0.width > 0 && !$0.isBlank }
-        #expect(String(cells.map(\.character)) == cluster)
+        #expect(String(cells.map(terminal.character(of:))) == cluster)
     }
 
     @Test func dropsTheMarksAfterSixteenScalars() {
         var terminal = Terminal(columns: 2, rows: 1)
         terminal.receive("a" + String(repeating: "\u{301}", count: 50_000) + "b")
-        #expect(terminal.screen[0][0].character.unicodeScalars.count == 16)
-        #expect(terminal.screen[0][1].character == "b")
+        #expect(terminal.character(of: terminal.screen[0][0]).unicodeScalars.count == 16)
+        #expect(terminal.character(of: terminal.screen[0][1]) == "b")
     }
 
     @Test func ignoresMarksWithoutAPreviousCharacter() {
@@ -1014,7 +1014,7 @@ struct TerminalTests {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("a\u{7}b\u{7}\u{7}")
         #expect(terminal.bellCount == 3)
-        #expect(terminal.screen[0].prefix(2).map(\.character) == ["a", "b"])
+        #expect(terminal.screen[0].prefix(2).map(terminal.character(of:)) == ["a", "b"])
     }
 
     @Test(arguments: ["\u{1B}]0;title\u{7}", "\u{1B}P1;2\u{7}x\u{1B}\\", "\u{1B}_\u{7}\u{1B}\\"])
@@ -1063,7 +1063,7 @@ struct TerminalTests {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{1B}[5 q" + sequence + "x")
         #expect(terminal.cursorShape == .bar)
-        #expect(terminal.screen[0][0].character == "x")
+        #expect(terminal.character(of: terminal.screen[0][0]) == "x")
     }
 
     @Test func keepsTheCursorShapeOnTheAlternateScreen() {
@@ -1162,9 +1162,9 @@ struct TerminalTests {
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
-    terminal.screen.map { String($0.map(\.character)) }
+    terminal.screen.map { String($0.map(terminal.character(of:))) }
 }
 
 private func scrollback(_ terminal: Terminal) -> [String] {
-    terminal.scrollback.map { String($0.map(\.character)) }
+    terminal.scrollback.map { String($0.map(terminal.character(of:))) }
 }

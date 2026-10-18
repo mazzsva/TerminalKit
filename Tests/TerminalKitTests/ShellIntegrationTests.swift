@@ -112,7 +112,7 @@ struct ShellIntegrationTests {
         let prompts = session.terminal.commands.compactMap(\.prompt)
         #expect(prompts.count == 2)
         let terminal = session.terminal
-        let lines = (terminal.scrollback + terminal.screen).map { String($0.map(\.character)) }
+        let lines = (terminal.scrollback + terminal.screen).map { String($0.map(terminal.character(of:))) }
         #expect(prompts.allSatisfy { lines[$0.row - terminal.removedScrollbackCount].hasPrefix("top line") })
     }
 

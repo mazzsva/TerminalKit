@@ -75,8 +75,11 @@ struct TerminalDropTests {
         view.paste(text: "printf '<%s>\\n' " + text)
         session.send(Array("\rexit\r".utf8))
         await session.waitForExit()
-        let output = (session.terminal.scrollback + session.terminal.screen)
-            .map { String($0.filter { $0.width > 0 }.map(\.character)).trimmingCharacters(in: .whitespaces) }
+        let terminal = session.terminal
+        let output = (terminal.scrollback + terminal.screen)
+            .map {
+                String($0.filter { $0.width > 0 }.map(terminal.character(of:))).trimmingCharacters(in: .whitespaces)
+            }
             .joined(separator: "\n")
         for name in names {
             #expect(output.contains("</x/" + name.replacing("\t", with: " ") + ">"), "\(name)")
