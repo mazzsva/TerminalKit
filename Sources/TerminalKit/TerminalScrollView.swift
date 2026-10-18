@@ -24,7 +24,11 @@ final class TerminalScrollView: NSScrollView {
         let removedLines = terminalView.session.terminal.removedScrollbackCount - removedScrollbackCount
         removedScrollbackCount = terminalView.session.terminal.removedScrollbackCount
         super.layout()
-        terminalView.fit(to: contentSize)
+        let size = contentSize
+        terminalView.fit(to: size)
+        if contentSize != size {
+            terminalView.fit(to: contentSize)
+        }
         if isAtBottom {
             terminalView.scroll(CGPoint(x: 0, y: terminalView.frame.height - contentSize.height))
         } else if removedLines > 0 {
