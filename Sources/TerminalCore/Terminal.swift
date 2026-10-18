@@ -160,7 +160,12 @@ package struct Terminal: Sendable {
                         column: min(positions[index].column, columns - 1)
                     )
                 }
-                lines += oldLines[part].map { Self.fitted($0, columns: columns) }
+                lines += oldLines[part]
+                    .map { line in
+                        var line = Self.fitted(line, columns: columns)
+                        line.isWrapped = false
+                        return line
+                    }
             }
         }
         let firstRow = mapped[mapped.count - 1].row

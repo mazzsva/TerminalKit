@@ -559,6 +559,7 @@ struct TerminalTests {
         terminal.receive("$ echo 0123456789")
         terminal.resize(columns: 5, rows: 3)
         #expect(lines(terminal) == ["$ ech", "34567", "     "])
+        #expect(terminal.screen.map(\.isWrapped) == [false, false, false])
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 4))
     }
 
