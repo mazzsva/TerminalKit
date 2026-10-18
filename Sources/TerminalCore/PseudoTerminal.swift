@@ -28,6 +28,7 @@ package final class PseudoTerminal: Sendable {
 
     private struct Input {
         var bytes: [UInt8] = []
+        var offset = 0
         var writeSource: (any DispatchSourceWrite)?
     }
 
@@ -96,16 +97,21 @@ package final class PseudoTerminal: Sendable {
 
     private func writeInput() {
         input.withLock { input in
-            while !input.bytes.isEmpty, !readSource.isCancelled {
+            while input.offset < input.bytes.count, !readSource.isCancelled {
                 var error: Int32 = 0
-                let count = input.bytes.withUnsafeBytes { buffer in
-                    let count = Darwin.write(fileDescriptor, buffer.baseAddress, buffer.count)
-                    error = errno
-                    return count
-                }
+                let count = input.bytes[input.offset...]
+                    .withUnsafeBytes { buffer in
+                        let count = Darwin.write(fileDescriptor, buffer.baseAddress, buffer.count)
+                        error = errno
+                        return count
+                    }
                 if count > 0 {
-                    input.bytes.removeFirst(count)
+                    input.offset += count
                 } else if count < 0 && error == EAGAIN {
+                    if input.offset > input.bytes.count / 2 {
+                        input.bytes.removeFirst(input.offset)
+                        input.offset = 0
+                    }
                     if input.writeSource == nil {
                         let writeSource = DispatchSource.makeWriteSource(fileDescriptor: fileDescriptor, queue: queue)
                         writeSource.setEventHandler { [weak self] in
@@ -116,9 +122,11 @@ package final class PseudoTerminal: Sendable {
                     }
                     return
                 } else if count == 0 || error != EINTR {
-                    input.bytes.removeAll()
+                    break
                 }
             }
+            input.bytes.removeAll()
+            input.offset = 0
             input.writeSource?.cancel()
             input.writeSource = nil
         }
