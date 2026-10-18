@@ -23,6 +23,14 @@ struct TerminalContentViewTests {
         #expect(session.terminal.rows == 1)
     }
 
+    @Test func makesTheStyledFontsFromTheFont() {
+        let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        view.font = .monospacedSystemFont(ofSize: 20, weight: .regular)
+        #expect(view.fonts.bold.pointSize == 20)
+        #expect(view.fonts.bold.fontDescriptor.symbolicTraits.contains(.bold))
+        #expect(view.fonts.boldItalic.fontDescriptor.symbolicTraits.contains([.bold, .italic]))
+    }
+
     @Test func drawsTheScreen() async throws {
         let session = TerminalSession(running: "printf 'hello\\r'")
         let view = TerminalContentView(session: session)
