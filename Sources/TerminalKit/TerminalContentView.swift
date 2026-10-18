@@ -49,7 +49,7 @@ final class TerminalContentView: NSView {
                 return
             }
             needsDisplay = true
-            if session.terminal.usesFocusReporting {
+            if session.liveTerminal.usesFocusReporting {
                 session.send(Array((isFocused ? "\u{1B}[I" : "\u{1B}[O").utf8))
             }
         }
@@ -215,7 +215,7 @@ final class TerminalContentView: NSView {
             return
         }
         if usesOptionAsMetaKey, event.modifierFlags.contains(.option),
-            let input = event.metaInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys)
+            let input = event.metaInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
         {
             session.send(input)
             return
@@ -230,7 +230,9 @@ final class TerminalContentView: NSView {
     }
 
     override func doCommand(by selector: Selector) {
-        if let input = keyDownEvent?.terminalInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys) {
+        if let input = keyDownEvent?
+            .terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
+        {
             session.send(input)
             keyDownEvent = nil
         }
