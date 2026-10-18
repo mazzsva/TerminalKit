@@ -32,6 +32,7 @@ package struct Terminal: Sendable {
     package private(set) var cursorShape = CursorShape.block
     package private(set) var usesFocusReporting = false
     package private(set) var title = ""
+    package private(set) var bellCount = 0
     package private(set) var mouseTracking = MouseTracking.off
     private(set) var usesSGRMouseEncoding = false
 
@@ -232,6 +233,8 @@ package struct Terminal: Sendable {
                 lineFeed()
             case .execute("\r"):
                 carriageReturn()
+            case .execute("\u{7}"):
+                bellCount += 1
             case .execute("\u{8}"):
                 moveCursor(row: cursor.row, column: cursor.column - 1)
             case .execute("\t"):
@@ -564,6 +567,7 @@ package struct Terminal: Sendable {
     private mutating func reset() {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
+        terminal.bellCount = bellCount
         terminal.scrollback = scrollback
         terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount

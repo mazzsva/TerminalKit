@@ -932,6 +932,26 @@ struct TerminalTests {
         #expect(terminal.receive("\u{1B}[1c\u{1B}[>c") == "")
     }
 
+    @Test func countsTheBells() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("a\u{7}b\u{7}\u{7}")
+        #expect(terminal.bellCount == 3)
+        #expect(terminal.screen[0].prefix(2).map(\.character) == ["a", "b"])
+    }
+
+    @Test(arguments: ["\u{1B}]0;title\u{7}", "\u{1B}P1;2\u{7}x\u{1B}\\", "\u{1B}_\u{7}\u{1B}\\"])
+    func ignoresABellInAString(string: String) {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive(string)
+        #expect(terminal.bellCount == 0)
+    }
+
+    @Test func keepsTheBellCountAfterAReset() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{7}\u{1B}c\u{7}")
+        #expect(terminal.bellCount == 2)
+    }
+
     @Test func hidesAndShowsTheCursor() {
         var terminal = Terminal(columns: 1, rows: 1)
         #expect(terminal.isCursorVisible)
