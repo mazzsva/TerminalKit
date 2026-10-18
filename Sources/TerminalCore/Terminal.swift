@@ -323,7 +323,10 @@ package struct Terminal: Sendable {
     }
 
     private mutating func keepInScrollback(_ lines: ArraySlice<[Cell]>) {
-        scrollback += lines
+        for line in lines {
+            let end = (line.lastIndex { $0 != Cell() } ?? -1) + 1
+            scrollback.append(end == line.count ? line : Array(line[..<end]))
+        }
         if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
             removedScrollbackCount += scrollback.count - Self.maximumScrollback
             scrollback.removeFirst(scrollback.count - Self.maximumScrollback)

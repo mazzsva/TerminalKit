@@ -215,7 +215,7 @@ struct TerminalTests {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("a\r\nb\r\nc\u{1B}[?1h\u{1B}[?2004h\u{1B}[?25l\u{1B}[?1049h\u{1B}[1mx\u{1B}c")
         #expect(lines(terminal) == ["    ", "    "])
-        #expect(scrollback(terminal) == ["a   "])
+        #expect(scrollback(terminal) == ["a"])
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
         #expect(!terminal.usesApplicationCursorKeys)
         #expect(!terminal.usesBracketedPaste)
@@ -714,10 +714,16 @@ struct TerminalTests {
         #expect(terminal.scrollback.isEmpty)
     }
 
+    @Test func keepsTheScrollbackWithoutBlankCellsAtTheEnd() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("ab\r\n\u{1B}[41m \u{1B}[m\r\nabcd\r\n")
+        #expect(terminal.scrollback.map(\.count) == [2, 1, 4])
+    }
+
     @Test func keepsTheLinesThatScrollOffAScrollRegionAtTheTop() {
         var terminal = Terminal(columns: 1, rows: 3)
         terminal.receive("\u{1B}[1;2r\u{1B}[2Ha\nb")
-        #expect(scrollback(terminal) == [" "])
+        #expect(scrollback(terminal) == [""])
     }
 
     @Test func keepsNoLinesFromTheAlternateScreen() {
