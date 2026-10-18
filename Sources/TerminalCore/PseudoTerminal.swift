@@ -4,6 +4,11 @@ import Foundation
 import Synchronization
 
 package final class PseudoTerminal: Sendable {
+    package enum Termination: Equatable, Sendable {
+        case exit(Int32)
+        case uncaughtSignal(Int32)
+    }
+
     private static let readSize = 65_536
 
     package let processIdentifier: pid_t
@@ -15,6 +20,11 @@ package final class PseudoTerminal: Sendable {
     private let readSource: any DispatchSourceRead
     private let buffer: OutputBuffer
     private let input = Mutex(Input())
+    private let finalTermination = Mutex<Termination?>(nil)
+
+    package var termination: Termination? {
+        finalTermination.withLock { $0 }
+    }
 
     private struct Input {
         var bytes: [UInt8] = []
@@ -117,13 +127,15 @@ package final class PseudoTerminal: Sendable {
     private func monitorExit(secondary: Int32) {
         let processIdentifier = processIdentifier
         Thread { [weak self] in
-            while waitpid(processIdentifier, nil, 0) == -1 && errno == EINTR {}
+            var status: Int32 = 0
+            while waitpid(processIdentifier, &status, 0) == -1 && errno == EINTR {}
+            let termination = Termination(status: status)
             close(secondary)
             guard let self else {
                 return
             }
             queue.async {
-                self.finish()
+                self.finish(termination)
             }
         }
         .start()
@@ -162,7 +174,8 @@ package final class PseudoTerminal: Sendable {
         buffer.cancel()
     }
 
-    private func finish() {
+    private func finish(_ termination: Termination) {
+        finalTermination.withLock { $0 = termination }
         while readOutput() {}
         cancelSources()
         wakeUp.finish()
@@ -244,6 +257,13 @@ package final class PseudoTerminal: Sendable {
             throw POSIXError(result)
         }
         return processIdentifier
+    }
+}
+
+extension PseudoTerminal.Termination {
+    fileprivate init(status: Int32) {
+        let signal = status & 0x7F
+        self = signal == 0 ? .exit(status >> 8 & 0xFF) : .uncaughtSignal(signal)
     }
 }
 
