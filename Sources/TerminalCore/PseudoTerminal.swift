@@ -77,6 +77,16 @@ package final class PseudoTerminal: Sendable {
         wakeUp.finish()
     }
 
+    package var foregroundProcessGroup: pid_t? {
+        queue.sync {
+            guard !readSource.isCancelled else {
+                return nil
+            }
+            let group = tcgetpgrp(fileDescriptor)
+            return group > 0 ? group : nil
+        }
+    }
+
     package func hangUp() {
         queue.async { [weak self] in
             self?.cancelSources()

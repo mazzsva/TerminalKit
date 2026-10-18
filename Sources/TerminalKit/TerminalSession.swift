@@ -96,6 +96,13 @@ public final class TerminalSession {
         pseudoTerminal?.resize(columns: columns, rows: rows)
     }
 
+    public var hasForegroundProcess: Bool {
+        guard let pseudoTerminal, let group = pseudoTerminal.foregroundProcessGroup else {
+            return false
+        }
+        return group != pseudoTerminal.processIdentifier
+    }
+
     public func terminate() {
         pseudoTerminal?.hangUp()
     }

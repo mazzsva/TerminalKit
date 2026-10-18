@@ -63,6 +63,25 @@ extension TerminalContentView: NSMenuItemValidation {
         session.paste(text)
     }
 
+    @objc override func selectAll(_ sender: Any?) {
+        let terminal = session.terminal
+        let lastRow = (terminal.scrollback + terminal.screen).lastIndex { !$0.allSatisfy(\.isBlank) } ?? 0
+        selection = Selection(
+            anchor: Selection.Point(line: terminal.removedScrollbackCount, column: 0),
+            head: Selection.Point(line: terminal.removedScrollbackCount + lastRow, column: terminal.columns)
+        )
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = NSMenu()
+        for (title, action) in [
+            ("Copy", #selector(copy(_:))), ("Paste", #selector(paste(_:))), ("Select All", #selector(selectAll(_:))),
+        ] {
+            menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self
+        }
+        return menu
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(copy(_:)):
