@@ -8,7 +8,7 @@ import Testing
 @MainActor
 struct TerminalViewTests {
     @Test func showsTheSession() throws {
-        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let session = TerminalSession(running: "exit")
         let hostingView = NSHostingView(rootView: TerminalView(session: session))
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         hostingView.layoutSubtreeIfNeeded()
@@ -20,35 +20,39 @@ struct TerminalViewTests {
         #expect(session.terminal.rows == Int((visibleSize.height - 8) / view.cellSize.height))
     }
 
-    @Test func showsANewSessionInTheSameView() throws {
-        let hostingView = NSHostingView(
-            rootView: TerminalView(
-                session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh"))))
-        )
+    @Test func showsANewSessionInANewView() throws {
+        let hostingView = NSHostingView(rootView: TerminalView(session: TerminalSession(running: "exit")))
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         hostingView.layoutSubtreeIfNeeded()
         let view = try #require(contentView(in: hostingView))
 
-        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let session = TerminalSession(running: "exit")
         hostingView.rootView = TerminalView(session: session)
         hostingView.layoutSubtreeIfNeeded()
-        let visibleSize = try #require(view.enclosingScrollView).contentSize
-        #expect(contentView(in: hostingView) === view)
-        #expect(view.session === session)
-        #expect(session.terminal.columns == Int((visibleSize.width - 8) / view.cellSize.width))
+        let newView = try #require(contentView(in: hostingView))
+        let visibleSize = try #require(newView.enclosingScrollView).contentSize
+        #expect(newView !== view)
+        #expect(newView.session === session)
+        #expect(session.terminal.columns == Int((visibleSize.width - 8) / newView.cellSize.width))
+    }
+
+    @Test func focusesTheNewSession() throws {
+        let hostingView = NSHostingView(rootView: TerminalView(session: TerminalSession(running: "exit")))
+        let window = NSWindow(contentView: hostingView)
+        hostingView.layoutSubtreeIfNeeded()
+        hostingView.rootView = TerminalView(session: TerminalSession(running: "exit"))
+        hostingView.layoutSubtreeIfNeeded()
+        let view = try #require(contentView(in: hostingView))
+        #expect(window.firstResponder === view)
     }
 
     @Test func growsWithTheScrollback() async throws {
-        let session = TerminalSession(
-            configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "seq 1 50"])
-        )
+        let session = TerminalSession(running: "seq 1 50")
         let scrollView = TerminalScrollView(session: session)
         scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         scrollView.layoutSubtreeIfNeeded()
         try session.start()
-        for await state in Observations({ session.state }) where state != .running {
-            break
-        }
+        await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         let view = scrollView.terminalView
         let lineCount = session.terminal.scrollback.count + session.terminal.rows
@@ -59,7 +63,7 @@ struct TerminalViewTests {
     @Test func followsNewOutputAtTheBottom() async throws {
         let (scrollView, session) = try await scrollView(running: "seq 1 50; read line; seq 51 100")
         session.send(Array("\r".utf8))
-        await waitForExit(of: session)
+        await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
     }
@@ -68,24 +72,21 @@ struct TerminalViewTests {
         let (scrollView, session) = try await scrollView(running: "seq 1 50; read line; seq 51 100")
         scrollView.terminalView.scroll(.zero)
         session.send(Array("\r".utf8))
-        await waitForExit(of: session)
+        await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         #expect(scrollView.contentView.bounds.minY == 0)
     }
 
     @Test func keepsThePositionWhenOldLinesAreRemoved() async throws {
         let (scrollView, session) = try await scrollView(running: "seq 1 10500; read line; seq 1 2000")
-        for await lines in Observations({ session.terminal.screen.map { String($0.map(\.character)) } })
-        where lines.contains(where: { $0.hasPrefix("10500") }) {
-            break
-        }
+        await session.waitForText("10500")
         scrollView.layoutSubtreeIfNeeded()
         let view = scrollView.terminalView
         view.scroll(CGPoint(x: 0, y: 4 + 5_000 * view.cellSize.height))
         let firstLine = { session.terminal.scrollback[Int(scrollView.contentView.bounds.minY / view.cellSize.height)] }
         let line = firstLine()
         session.send(Array("\r".utf8))
-        await waitForExit(of: session)
+        await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         #expect(session.terminal.removedScrollbackCount > 0)
         #expect(firstLine() == line)
@@ -96,19 +97,13 @@ struct TerminalViewTests {
         scrollView.terminalView.scroll(.zero)
         scrollView.terminalView.keyDown(with: try keyDown("\r"))
         #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
-        await waitForExit(of: session)
+        await session.waitForExit()
     }
 
     @Test func scrollsWhenYouSelectAboveTheView() async throws {
         let (scrollView, session) = try await scrollView(running: "seq 1 50")
-        await waitForExit(of: session)
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-            styleMask: [],
-            backing: .buffered,
-            defer: true
-        )
-        window.contentView = scrollView
+        await session.waitForExit()
+        let window = NSWindow(contentView: scrollView)
         scrollView.layoutSubtreeIfNeeded()
         let view = scrollView.terminalView
         let top = scrollView.contentView.bounds.minY
@@ -130,7 +125,7 @@ struct TerminalViewTests {
     }
 
     @Test func hidesTheScrollIndicator() throws {
-        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let session = TerminalSession(running: "exit")
         let hostingView = NSHostingView(rootView: TerminalView(session: session).scrollIndicators(.automatic))
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         hostingView.layoutSubtreeIfNeeded()
@@ -142,7 +137,7 @@ struct TerminalViewTests {
     }
 
     @Test func usesTheTerminalFont() throws {
-        let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+        let session = TerminalSession(running: "exit")
         let large = NSFont.monospacedSystemFont(ofSize: 20, weight: .regular)
         let hostingView = NSHostingView(rootView: TerminalView(session: session).terminalFont(large))
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
@@ -163,10 +158,8 @@ struct TerminalViewTests {
         var palette = TerminalPalette.standard
         palette.foreground = .orange
         let hostingView = NSHostingView(
-            rootView: TerminalView(
-                session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
-            )
-            .terminalPalette(palette)
+            rootView: TerminalView(session: TerminalSession(running: "exit"))
+                .terminalPalette(palette)
         )
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         hostingView.layoutSubtreeIfNeeded()
@@ -175,10 +168,8 @@ struct TerminalViewTests {
 
     @Test func usesOptionAsTheMetaKey() throws {
         let hostingView = NSHostingView(
-            rootView: TerminalView(
-                session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
-            )
-            .optionAsMetaKey()
+            rootView: TerminalView(session: TerminalSession(running: "exit"))
+                .optionAsMetaKey()
         )
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         hostingView.layoutSubtreeIfNeeded()
@@ -187,42 +178,24 @@ struct TerminalViewTests {
 
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-            styleMask: [],
-            backing: .buffered,
-            defer: true
-        )
-        window.contentView = NSHostingView(
-            rootView: TerminalView(
-                session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh"))))
-        )
+            contentView: NSHostingView(rootView: TerminalView(session: TerminalSession(running: "exit"))))
         window.contentView?.layoutSubtreeIfNeeded()
         let view = try #require(window.contentView.flatMap(contentView(in:)))
         #expect(window.firstResponder === view)
     }
 
     @Test func keepsTheFocusOfAnotherView() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-            styleMask: [],
-            backing: .buffered,
-            defer: true
-        )
         let textView = NSTextView()
-        window.contentView = textView
+        let window = NSWindow(contentView: textView)
         window.makeFirstResponder(textView)
-        textView.addSubview(
-            TerminalContentView(session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh"))))
-        )
+        textView.addSubview(TerminalContentView(session: TerminalSession(running: "exit")))
         #expect(window.firstResponder === textView)
     }
 }
 
 @MainActor
 private func scrollView(running script: String) async throws -> (TerminalScrollView, TerminalSession) {
-    let session = TerminalSession(
-        configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", script])
-    )
+    let session = TerminalSession(running: script)
     let scrollView = TerminalScrollView(session: session)
     scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
     scrollView.layoutSubtreeIfNeeded()
@@ -232,13 +205,6 @@ private func scrollView(running script: String) async throws -> (TerminalScrollV
     }
     scrollView.layoutSubtreeIfNeeded()
     return (scrollView, session)
-}
-
-@MainActor
-private func waitForExit(of session: TerminalSession) async {
-    for await state in Observations({ session.state }) where state != .running {
-        break
-    }
 }
 
 @MainActor

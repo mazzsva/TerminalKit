@@ -9,10 +9,9 @@ struct TerminalColorTests {
         #expect(NSColor.terminal(.default, ansiColors: ansiColors) == nil)
     }
 
-    @Test func usesTheStandardColorsOfTerminal() {
-        #expect(components(.indexed(0)) == [0, 0, 0])
-        #expect(components(.indexed(1)) == [194, 54, 33])
-        #expect(components(.indexed(15)) == [233, 235, 235])
+    @Test func usesTheANSIColorsOfThePalette() {
+        #expect(NSColor.terminal(.indexed(0), ansiColors: ansiColors) === ansiColors[0])
+        #expect(NSColor.terminal(.indexed(15), ansiColors: ansiColors) === ansiColors[15])
     }
 
     @Test func usesTheColorCube() {

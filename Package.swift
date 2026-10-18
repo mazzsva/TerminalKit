@@ -2,6 +2,10 @@
 
 import PackageDescription
 
+let swiftSettings: [SwiftSetting] = [
+    .enableUpcomingFeature("ApproachableConcurrency"),
+]
+
 let package = Package(
     name: "TerminalKit",
     platforms: [
@@ -18,30 +22,22 @@ let package = Package(
         .target(
             name: "TerminalCore",
             dependencies: ["CTerminalCore"],
-            swiftSettings: [
-                .enableUpcomingFeature("ApproachableConcurrency"),
-            ],
+            swiftSettings: swiftSettings,
         ),
         .testTarget(
             name: "TerminalCoreTests",
             dependencies: ["TerminalCore"],
-            swiftSettings: [
-                .enableUpcomingFeature("ApproachableConcurrency"),
-            ],
+            swiftSettings: swiftSettings,
         ),
         .target(
             name: "TerminalKit",
             dependencies: ["TerminalCore"],
-            swiftSettings: [
-                .enableUpcomingFeature("ApproachableConcurrency"),
-            ],
+            swiftSettings: swiftSettings,
         ),
         .testTarget(
             name: "TerminalKitTests",
             dependencies: ["TerminalKit"],
-            swiftSettings: [
-                .enableUpcomingFeature("ApproachableConcurrency"),
-            ],
+            swiftSettings: swiftSettings,
         ),
     ]
 )
