@@ -423,6 +423,7 @@ package struct Terminal: Sendable {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.scrollback = scrollback
+        terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount
         terminal.decoder = decoder
         terminal.replies = replies

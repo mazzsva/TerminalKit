@@ -123,6 +123,12 @@ struct TerminalTests {
         #expect(terminal.scrollback.map(\.isWrapped) == [true])
     }
 
+    @Test func unwrapsTheScrollbackOnAReset() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive(String(repeating: "A", count: 25) + "\u{1B}c")
+        #expect(terminal.scrollback.last?.isWrapped == false)
+    }
+
     @Test func keepsTheWrapThatZshMakes() {
         var terminal = Terminal(columns: 5, rows: 2)
         terminal.receive("abcde \r\u{1B}[Kf")
