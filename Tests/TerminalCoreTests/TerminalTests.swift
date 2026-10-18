@@ -160,6 +160,13 @@ struct TerminalTests {
         #expect(lines(terminal) == ["abed", "    "])
     }
 
+    @Test(arguments: ["\n", "\u{B}", "\u{C}"])
+    func movesDownALine(character: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\(character)c")
+        #expect(lines(terminal) == ["ab  ", "  c "])
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")

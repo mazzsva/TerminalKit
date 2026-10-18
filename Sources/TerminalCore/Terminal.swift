@@ -84,7 +84,7 @@ package struct Terminal: Sendable {
             switch action {
             case .print(let scalar):
                 print(usesLineDrawing ? scalar.lineDrawingCharacter : scalar)
-            case .execute("\n"):
+            case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
                 lineFeed()
             case .execute("\r"):
                 carriageReturn()
