@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Synchronization
 import TerminalCore
 import Testing
 
@@ -7,6 +8,29 @@ import Testing
 struct PseudoTerminalTests {
     @Test func readsTheOutput() async throws {
         #expect(try await output("printf 'hello\\nworld'") == "hello\r\nworld")
+    }
+
+    @Test func opensTerminalsWhileOtherTerminalsOpenAndClose() {
+        let failures = Mutex(0)
+        let group = DispatchGroup()
+        for _ in 0 ..< 32 {
+            group.enter()
+            Thread {
+                for _ in 0 ..< 200 {
+                    do {
+                        let (primary, secondary) = try PseudoTerminal.openTerminal(columns: 80, rows: 24)
+                        close(secondary)
+                        close(primary)
+                    } catch {
+                        failures.withLock { $0 += 1 }
+                    }
+                }
+                group.leave()
+            }
+            .start()
+        }
+        group.wait()
+        #expect(failures.withLock { $0 } == 0)
     }
 
     @Test func reportsTheExitStatus() async throws {

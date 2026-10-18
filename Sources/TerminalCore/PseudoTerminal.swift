@@ -10,6 +10,8 @@ package final class PseudoTerminal: Sendable {
     }
 
     private static let readSize = 65_536
+    private static let maximumOpenRetries = 10
+    private static let redriveOpenError: Int32 = -6
 
     package let processIdentifier: pid_t
     package let output: Output
@@ -189,8 +191,13 @@ package final class PseudoTerminal: Sendable {
         wakeUp.finish()
     }
 
-    private static func openTerminal(columns: Int, rows: Int) throws(POSIXError) -> (primary: Int32, secondary: Int32) {
-        let primary = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC)
+    package static func openTerminal(columns: Int, rows: Int) throws(POSIXError) -> (primary: Int32, secondary: Int32) {
+        var primary = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC)
+        var retries = 0
+        while primary == -1, errno == ENXIO || errno == redriveOpenError, retries < maximumOpenRetries {
+            retries += 1
+            primary = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC)
+        }
         guard primary != -1 else {
             throw POSIXError(errno)
         }
