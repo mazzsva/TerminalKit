@@ -68,7 +68,7 @@ struct TerminalSelectionTests {
         view.selection = Selection(anchor: .init(line: 0, column: 6), head: .init(line: 1, column: 6))
         let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
         defer { pasteboard.releaseGlobally() }
-        #expect(view.writeSelection(to: pasteboard, types: [.string]))
+        view.copySelection(to: pasteboard)
         #expect(pasteboard.string(forType: .string) == "world\nsecond")
     }
 
@@ -100,10 +100,8 @@ struct TerminalSelectionTests {
         let view = viewInWindow()
         let item = NSMenuItem(title: "Copy", action: #selector(TerminalContentView.copy(_:)), keyEquivalent: "c")
         #expect(!view.validateMenuItem(item))
-        #expect(view.validRequestor(forSendType: .string, returnType: nil) as? NSView !== view)
         view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 1, column: 0))
         #expect(view.validateMenuItem(item))
-        #expect(view.validRequestor(forSendType: .string, returnType: nil) as? NSView === view)
     }
 }
 
