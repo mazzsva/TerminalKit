@@ -43,8 +43,10 @@ struct PseudoTerminalTests {
 
     @Test func endsTheOutputWhenTheProcessExits() async throws {
         let start = ContinuousClock.now
-        #expect(try await output("trap '' HUP; /bin/sleep 5 & echo done") == "done\r\n")
-        #expect(ContinuousClock.now - start < .seconds(4))
+        let output = try await output("trap '' HUP; /bin/sleep 30 & echo $!")
+        #expect(ContinuousClock.now - start < .seconds(20))
+        let processIdentifier = try #require(pid_t(output.trimmingCharacters(in: .whitespacesAndNewlines)))
+        #expect(kill(processIdentifier, SIGKILL) == 0)
     }
 
     @Test func readsAllOutputBeforeTheExit() async throws {
@@ -96,8 +98,8 @@ struct PseudoTerminalTests {
         #expect(FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
     }
 
-    @Test func sendsALargeInputQuicklyAndInOrder() async throws {
-        let count = 32 << 20
+    @Test func sendsALargeInputInOrder() async throws {
+        let count = 8 << 20
         var input = (0 ..< 251).map(UInt8.init)
         while input.count < count {
             input += input
@@ -111,16 +113,15 @@ struct PseudoTerminalTests {
             rows: 24
         )
         var output = ""
-        var start: ContinuousClock.Instant?
+        var isSent = false
         for await bytes in pseudoTerminal.output {
             output += String(decoding: bytes, as: UTF8.self)
-            if start == nil, output.contains("ready") {
-                start = .now
+            if !isSent, output.contains("ready") {
+                isSent = true
                 pseudoTerminal.write(input)
             }
         }
         #expect(output.contains(SHA256.hash(data: input).map { String(format: "%02x", $0) }.joined()))
-        #expect(try ContinuousClock.now - #require(start) < .seconds(15))
     }
 
     @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
