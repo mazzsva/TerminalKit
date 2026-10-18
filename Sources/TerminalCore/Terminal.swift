@@ -87,6 +87,7 @@ package struct Terminal: Sendable {
             normalScreen.cursor = anchors[0].position
             (normalScreen.savedCursor.position, normalScreen.savedCursor.isWrapPending) = anchors[1]
             self.normalScreen = normalScreen
+            savedCursor.isWrapPending = false
         }
         let removedRows = max(cursor.row + 1 - rows, 0)
         if normalScreen == nil {
@@ -280,17 +281,17 @@ package struct Terminal: Sendable {
         let count = sequence.parameter(at: 0, default: 1)
         switch sequence.final {
         case "A":
-            moveCursor(row: cursor.row - count, column: cursor.column)
+            moveCursor(row: max(cursor.row - count, topLimit), column: cursor.column)
         case "B":
-            moveCursor(row: cursor.row + count, column: cursor.column)
+            moveCursor(row: min(cursor.row + count, bottomLimit), column: cursor.column)
         case "C":
             moveCursor(row: cursor.row, column: cursor.column + count)
         case "D":
             moveCursor(row: cursor.row, column: cursor.column - count)
         case "E":
-            moveCursor(row: cursor.row + count, column: 0)
+            moveCursor(row: min(cursor.row + count, bottomLimit), column: 0)
         case "F":
-            moveCursor(row: cursor.row - count, column: 0)
+            moveCursor(row: max(cursor.row - count, topLimit), column: 0)
         case "G":
             moveCursor(row: cursor.row, column: count - 1)
         case "I":
@@ -536,6 +537,14 @@ package struct Terminal: Sendable {
         } else if cursor.row > 0 {
             cursor.row -= 1
         }
+    }
+
+    private var topLimit: Int {
+        cursor.row >= scrollRegion.lowerBound ? scrollRegion.lowerBound : 0
+    }
+
+    private var bottomLimit: Int {
+        cursor.row < scrollRegion.upperBound ? scrollRegion.upperBound - 1 : rows - 1
     }
 
     private mutating func carriageReturn() {

@@ -381,6 +381,18 @@ struct TerminalTests {
         #expect(terminal.cursor == position)
     }
 
+    @Test(arguments: [
+        ("A", 3, 1), ("A", 1, 1), ("A", 5, 1), ("A", 0, 0),
+        ("B", 2, 4), ("B", 4, 4), ("B", 0, 4), ("B", 5, 5),
+        ("F", 3, 1), ("F", 5, 1), ("F", 0, 0),
+        ("E", 2, 4), ("E", 0, 4), ("E", 5, 5),
+    ])
+    func stopsTheCursorAtTheMarginsOfTheScrollRegion(final: String, row: Int, stop: Int) {
+        var terminal = Terminal(columns: 10, rows: 6)
+        terminal.receive("\u{1B}[2;5r\u{1B}[\(row + 1);3H\u{1B}[10\(final)")
+        #expect(terminal.cursor.row == stop)
+    }
+
     @Test func movesTheCursorOneStepByDefault() {
         var terminal = Terminal(columns: 10, rows: 10)
         terminal.receive("\u{1B}[B\u{1B}[0C")
@@ -669,6 +681,23 @@ struct TerminalTests {
         var terminal = Terminal(columns: 2, rows: 2)
         terminal.receive("ab\u{1B}7\r\u{1B}8c")
         #expect(lines(terminal) == ["ab", "c "])
+    }
+
+    @Test(arguments: [(8, ["abcX    ", "        ", "        "]), (2, ["aX", "  ", "  "])])
+    func cancelsTheSavedPendingWrapOnTheAlternateScreen(columns: Int, lines expected: [String]) {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("\u{1B}[?1049habcd\u{1B}7")
+        terminal.resize(columns: columns, rows: 3)
+        terminal.receive("\u{1B}8X")
+        #expect(lines(terminal) == expected)
+    }
+
+    @Test func keepsTheSavedPendingWrapOnTheAlternateScreenWhenTheRowsChange() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("\u{1B}[?1049habcd\u{1B}7")
+        terminal.resize(columns: 4, rows: 2)
+        terminal.receive("\u{1B}8X")
+        #expect(lines(terminal) == ["abcd", "X   "])
     }
 
     @Test func restoresTheHomePositionWithoutASave() {
