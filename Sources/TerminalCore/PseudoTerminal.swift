@@ -10,10 +10,10 @@ package final class PseudoTerminal: Sendable {
     package let output: Output
 
     private let fileDescriptor: Int32
-    private let continuation: AsyncStream<[UInt8]>.Continuation
+    private let wakeUp: AsyncStream<Void>.Continuation
     private let queue = DispatchQueue(label: "PseudoTerminal")
     private let readSource: any DispatchSourceRead
-    private let flowControl: FlowControl
+    private let buffer: OutputBuffer
     private let input = Mutex(Input())
 
     private struct Input {
@@ -44,11 +44,11 @@ package final class PseudoTerminal: Sendable {
             throw error
         }
         fileDescriptor = primary
-        let stream: AsyncStream<[UInt8]>
-        (stream, continuation) = AsyncStream.makeStream(of: [UInt8].self)
+        let wakeUps: AsyncStream<Void>
+        (wakeUps, wakeUp) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
         readSource = DispatchSource.makeReadSource(fileDescriptor: primary, queue: queue)
-        flowControl = FlowControl(source: readSource)
-        output = Output(stream: stream, flowControl: flowControl)
+        buffer = OutputBuffer(source: readSource, wakeUp: wakeUp)
+        output = Output(wakeUps: wakeUps, buffer: buffer)
         readSource.setEventHandler { [weak self] in
             self?.readOutput()
         }
@@ -61,7 +61,7 @@ package final class PseudoTerminal: Sendable {
 
     deinit {
         cancelSources()
-        continuation.finish()
+        wakeUp.finish()
     }
 
     package func write(_ bytes: [UInt8]) {
@@ -142,8 +142,7 @@ package final class PseudoTerminal: Sendable {
             count = max(result, 0)
         }
         if result > 0 {
-            continuation.yield(bytes)
-            flowControl.didYield()
+            buffer.append(bytes)
             return true
         }
         if result < 0 && error == EINTR {
@@ -160,13 +159,13 @@ package final class PseudoTerminal: Sendable {
             input.writeSource?.cancel()
             input.writeSource = nil
         }
-        flowControl.cancel()
+        buffer.cancel()
     }
 
     private func finish() {
         while readOutput() {}
         cancelSources()
-        continuation.finish()
+        wakeUp.finish()
     }
 
     private static func openTerminal(columns: Int, rows: Int) throws(POSIXError) -> (primary: Int32, secondary: Int32) {
