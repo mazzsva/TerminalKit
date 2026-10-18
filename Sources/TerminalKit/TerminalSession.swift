@@ -23,15 +23,22 @@ public final class TerminalSession {
     public private(set) var commands: [Command] = []
     public private(set) var currentDirectory: URL?
 
-    private(set) var terminal = Terminal(columns: 80, rows: 24) {
+    private(set) var liveTerminal = Terminal(columns: 80, rows: 24) {
         didSet {
             revision += 1
         }
     }
+    @ObservationIgnored var synchronizedOutputTimeout = Duration.seconds(1)
     @ObservationIgnored private(set) var revision = 0
     @ObservationIgnored private(set) var widthChangeCount = 0
 
     @ObservationIgnored private var pseudoTerminal: PseudoTerminal?
+    @ObservationIgnored private var synchronizedOutputTimer: Task<Void, Never>?
+    @ObservationIgnored private var timedSynchronizedOutputCount = 0
+
+    var terminal: Terminal {
+        liveTerminal.displayed
+    }
 
     public init(configuration: Configuration = .loginShell) {
         self.configuration = configuration
@@ -50,8 +57,8 @@ public final class TerminalSession {
             arguments: configuration.arguments,
             environment: configuration.environment,
             currentDirectoryURL: configuration.currentDirectoryURL,
-            columns: terminal.columns,
-            rows: terminal.rows
+            columns: liveTerminal.columns,
+            rows: liveTerminal.rows
         )
         self.pseudoTerminal = pseudoTerminal
         state = .running
@@ -66,13 +73,13 @@ public final class TerminalSession {
     }
 
     func resize(columns: Int, rows: Int) {
-        guard columns != terminal.columns || rows != terminal.rows else {
+        guard columns != liveTerminal.columns || rows != liveTerminal.rows else {
             return
         }
-        if columns != terminal.columns {
+        if columns != liveTerminal.columns {
             widthChangeCount += 1
         }
-        terminal.resize(columns: columns, rows: rows)
+        liveTerminal.resize(columns: columns, rows: rows)
         pseudoTerminal?.resize(columns: columns, rows: rows)
     }
 
@@ -89,20 +96,35 @@ public final class TerminalSession {
         if let last = commands.indices.last, commands[last].endDate == nil {
             commands[last].endDate = Date()
         }
+        if liveTerminal.isSynchronizingOutput {
+            liveTerminal.endSynchronizedOutput()
+        }
     }
 
     private func receive(_ bytes: [UInt8]) {
-        let replies = terminal.receive(bytes)
-        title = terminal.title
-        if bellCount != terminal.bellCount {
-            bellCount = terminal.bellCount
+        let replies = liveTerminal.receive(bytes)
+        title = liveTerminal.title
+        if bellCount != liveTerminal.bellCount {
+            bellCount = liveTerminal.bellCount
         }
-        if currentDirectory != terminal.currentDirectory {
-            currentDirectory = terminal.currentDirectory
+        if currentDirectory != liveTerminal.currentDirectory {
+            currentDirectory = liveTerminal.currentDirectory
         }
         updateCommands()
         if !replies.isEmpty {
             pseudoTerminal?.write(replies)
+        }
+        let count = liveTerminal.synchronizedOutputCount
+        if liveTerminal.isSynchronizingOutput, count != timedSynchronizedOutputCount {
+            timedSynchronizedOutputCount = count
+            synchronizedOutputTimer?.cancel()
+            synchronizedOutputTimer = Task { [weak self, synchronizedOutputTimeout] in
+                try? await Task.sleep(for: synchronizedOutputTimeout)
+                guard let self, !Task.isCancelled, liveTerminal.isSynchronizingOutput else {
+                    return
+                }
+                liveTerminal.endSynchronizedOutput()
+            }
         }
     }
 }
@@ -118,14 +140,14 @@ extension TerminalSession {
     }
 
     private func updateCommands() {
-        let firstID = terminal.removedCommandCount
+        let firstID = liveTerminal.removedCommandCount
         if let id = commands.first?.id, id < firstID {
             commands.removeFirst(min(firstID - id, commands.count))
         }
         let date = Date()
         let start = commands.last.map { $0.endDate == nil ? $0.id : $0.id + 1 } ?? firstID
-        for id in max(start, firstID) ..< firstID + terminal.commands.count {
-            let command = terminal.commands[id - firstID]
+        for id in max(start, firstID) ..< firstID + liveTerminal.commands.count {
+            let command = liveTerminal.commands[id - firstID]
             if id == commands.last?.id {
                 if command.isFinished {
                     commands[commands.count - 1].exitStatus = command.exitStatus

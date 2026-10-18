@@ -40,10 +40,24 @@ package struct Terminal: Sendable {
     package internal(set) var removedCommandCount = 0
     package internal(set) var currentDirectory: URL?
     package private(set) var mouseTracking = MouseTracking.off
+    package private(set) var synchronizedOutputCount = 0
     private(set) var usesSGRMouseEncoding = false
 
     package var isAlternateScreenActive: Bool {
         normalScreen != nil
+    }
+
+    package var isSynchronizingOutput: Bool {
+        !synchronizedSnapshot.isEmpty
+    }
+
+    package var displayed: Terminal {
+        guard var snapshot = synchronizedSnapshot.first else {
+            return self
+        }
+        snapshot.scrollback = scrollback
+        snapshot.removedScrollbackCount = removedScrollbackCount
+        return snapshot
     }
     private var usesAutowrap = true
     private var usesInsertMode = false
@@ -62,6 +76,7 @@ package struct Terminal: Sendable {
     var prompt: Position?
     var input: Position?
     var redrawnPrompt: Position?
+    private var synchronizedSnapshot: [Terminal] = []
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -74,6 +89,7 @@ package struct Terminal: Sendable {
 
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
+        endSynchronizedOutput()
         if columns != self.columns {
             guard var normalScreen else {
                 let (lines, anchors) = reflow(
@@ -296,9 +312,19 @@ package struct Terminal: Sendable {
         return replies
     }
 
+    package mutating func endSynchronizedOutput() {
+        synchronizedSnapshot = []
+    }
+
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
         if sequence.privateMarker == nil, sequence.intermediates == " ", sequence.final == "q" {
             setCursorShape(sequence.parameter(at: 0, default: 0))
+            return
+        }
+        if sequence.intermediates == "$", sequence.final == "p",
+            sequence.privateMarker == nil || sequence.privateMarker == "?"
+        {
+            reportMode(sequence.parameter(at: 0, default: 0), isPrivate: sequence.privateMarker == "?")
             return
         }
         guard sequence.intermediates.isEmpty else {
@@ -627,6 +653,7 @@ package struct Terminal: Sendable {
         terminal.currentDirectory = currentDirectory
         terminal.prompt = prompt
         terminal.input = input
+        terminal.synchronizedOutputCount = synchronizedOutputCount
         terminal.scrollback = scrollback
         terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount
@@ -708,6 +735,13 @@ package struct Terminal: Sendable {
         case (1049, false):
             exitAlternateScreen()
             restoreCursor()
+        case (2026, true) where synchronizedSnapshot.isEmpty:
+            var snapshot = self
+            snapshot.scrollback = []
+            synchronizedSnapshot = [snapshot]
+            synchronizedOutputCount += 1
+        case (2026, false):
+            endSynchronizedOutput()
         default:
             break
         }
@@ -729,6 +763,28 @@ package struct Terminal: Sendable {
         screen = normalScreen.lines
         savedCursor = normalScreen.savedCursor
         self.normalScreen = nil
+    }
+
+    private mutating func reportMode(_ mode: Int, isPrivate: Bool) {
+        let isEnabled = isPrivate ? isPrivateModeEnabled(mode) : mode == 4 ? usesInsertMode : nil
+        let status = isEnabled.map { $0 ? 1 : 2 } ?? 0
+        replies += "\u{1B}[\(isPrivate ? "?" : "")\(mode);\(status)$y".utf8
+    }
+
+    private func isPrivateModeEnabled(_ mode: Int) -> Bool? {
+        switch mode {
+        case 1: usesApplicationCursorKeys
+        case 7: usesAutowrap
+        case 25: isCursorVisible
+        case 47, 1047, 1049: isAlternateScreenActive
+        case 1000: mouseTracking == .clicks
+        case 1002: mouseTracking == .drags
+        case 1004: usesFocusReporting
+        case 1006: usesSGRMouseEncoding
+        case 2004: usesBracketedPaste
+        case 2026: isSynchronizingOutput
+        default: nil
+        }
     }
 
     private mutating func reportStatus(_ request: Int) {
