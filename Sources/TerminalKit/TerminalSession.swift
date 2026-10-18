@@ -53,6 +53,38 @@ public final class TerminalSession {
         self.configuration = configuration
     }
 
+    public init(configuration: Configuration = .loginShell, restoring state: RestorationState) {
+        var configuration = configuration
+        var isDirectory: ObjCBool = false
+        if let directory = state.terminal.currentDirectory?.path(percentEncoded: false),
+            FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory), isDirectory.boolValue,
+            FileManager.default.isExecutableFile(atPath: directory)
+        {
+            configuration.currentDirectoryURL = URL(filePath: directory)
+        }
+        self.configuration = configuration
+        liveTerminal = Terminal(restoring: state.terminal)
+        currentDirectory = liveTerminal.currentDirectory
+        let firstID = liveTerminal.removedCommandCount
+        let savedCommands = Dictionary(state.commands.map { ($0.id, $0) }) { $1 }
+        commands = liveTerminal.commands.enumerated()
+            .map { index, command in
+                let saved = savedCommands[firstID + index]
+                return Command(
+                    id: firstID + index,
+                    text: command.text,
+                    directory: command.directory,
+                    exitStatus: command.exitStatus,
+                    startDate: saved?.startDate ?? state.date,
+                    endDate: saved?.endDate ?? state.date
+                )
+            }
+    }
+
+    public var restorationState: RestorationState {
+        RestorationState(terminal: liveTerminal.restoration, commands: commands, date: Date())
+    }
+
     public func start() throws {
         guard state == .idle else {
             return
@@ -168,7 +200,13 @@ public final class TerminalSession {
 }
 
 extension TerminalSession {
-    public struct Command: Identifiable, Hashable, Sendable {
+    public struct RestorationState: Codable, Equatable, Sendable {
+        let terminal: Terminal.Restoration
+        let commands: [Command]
+        let date: Date
+    }
+
+    public struct Command: Identifiable, Codable, Hashable, Sendable {
         public let id: Int
         public let text: String?
         public let directory: URL?
