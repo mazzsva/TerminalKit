@@ -104,6 +104,25 @@ struct TerminalTests {
         #expect(terminal.scrollback.map(\.isWrapped) == [false])
     }
 
+    @Test func marksALineThatWrapsAtTheBottomOfARegion() {
+        var terminal = Terminal(columns: 5, rows: 5)
+        terminal.receive("\u{1B}[1;4r\u{1B}[4HAAAAABB")
+        #expect(terminal.screen.map(\.isWrapped) == [false, false, true, false, false])
+    }
+
+    @Test func marksNoLineThatCannotMoveDown() {
+        var terminal = Terminal(columns: 5, rows: 3)
+        terminal.receive("\u{1B}[1;2r\u{1B}[3HAAAAABB")
+        #expect(terminal.screen.map(\.isWrapped) == [false, false, false])
+    }
+
+    @Test func marksALineThatWrapsIntoTheScrollback() {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("ab cd")
+        #expect(scrollback(terminal) == ["ab "])
+        #expect(terminal.scrollback.map(\.isWrapped) == [true])
+    }
+
     @Test func keepsTheWrapThatZshMakes() {
         var terminal = Terminal(columns: 5, rows: 2)
         terminal.receive("abcde \r\u{1B}[Kf")

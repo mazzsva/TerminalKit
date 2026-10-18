@@ -228,9 +228,16 @@ package struct Terminal: Sendable {
         let width = columns > 1 ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
             if usesAutowrap {
-                screen[cursor.row].isWrapped = true
+                let row = cursor.row
+                let scrolls = row == scrollRegion.upperBound - 1
+                screen[row].isWrapped = true
                 carriageReturn()
                 lineFeed()
+                if scrolls, cursor.row > 0 {
+                    screen[cursor.row - 1].isWrapped = true
+                } else if !scrolls, cursor.row == row {
+                    screen[row].isWrapped = false
+                }
             } else {
                 cursor.column = columns - width
             }
