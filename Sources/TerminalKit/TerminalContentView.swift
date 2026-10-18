@@ -9,6 +9,7 @@ final class TerminalContentView: NSView {
 
     var font = defaultFont {
         didSet {
+            fonts = Fonts(font)
             cellSize = Self.cellSize(of: font)
             enclosingScrollView?.needsLayout = true
             needsDisplay = true
@@ -37,6 +38,7 @@ final class TerminalContentView: NSView {
     var scrollWheelLines: CGFloat = 0
 
     private var colors = Colors(.standard)
+    private(set) var fonts = Fonts(defaultFont)
     private var keyDownEvent: NSEvent?
 
     private struct Colors {
@@ -52,6 +54,33 @@ final class TerminalContentView: NSView {
             cursor = NSColor(palette.cursor)
             selection = NSColor(palette.selection)
             ansiColors = palette.ansiColors.map(NSColor.init)
+        }
+    }
+
+    struct Fonts {
+        let regular: NSFont
+        let bold: NSFont
+        let italic: NSFont
+        let boldItalic: NSFont
+
+        init(_ font: NSFont) {
+            regular = font
+            bold = Self.font(font, traits: .bold)
+            italic = Self.font(font, traits: .italic)
+            boldItalic = Self.font(font, traits: [.bold, .italic])
+        }
+
+        func font(for style: Terminal.Style) -> NSFont {
+            switch (style.isBold, style.isItalic) {
+            case (false, false): regular
+            case (true, false): bold
+            case (false, true): italic
+            case (true, true): boldItalic
+            }
+        }
+
+        private static func font(_ font: NSFont, traits: NSFontDescriptor.SymbolicTraits) -> NSFont {
+            NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(traits), size: font.pointSize) ?? font
         }
     }
 
@@ -218,7 +247,7 @@ final class TerminalContentView: NSView {
             return
         }
         var attributes: [NSAttributedString.Key: Any] = [
-            .font: font(for: style),
+            .font: fonts.font(for: style),
             .foregroundColor: style.isFaint ? foreground.withAlphaComponent(0.5) : foreground,
         ]
         if style.isUnderlined {
@@ -245,20 +274,6 @@ final class TerminalContentView: NSView {
                 column += 1
             }
         }
-    }
-
-    private func font(for style: Terminal.Style) -> NSFont {
-        var traits: NSFontDescriptor.SymbolicTraits = []
-        if style.isBold {
-            traits.insert(.bold)
-        }
-        if style.isItalic {
-            traits.insert(.italic)
-        }
-        guard !traits.isEmpty else {
-            return font
-        }
-        return NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(traits), size: font.pointSize) ?? font
     }
 
     var cursorRect: CGRect {
