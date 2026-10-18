@@ -88,6 +88,8 @@ extension TerminalContentView: NSMenuItemValidation {
             selectedText != nil
         case #selector(paste(_:)):
             NSPasteboard.general.availableType(from: [.string]) != nil
+        case #selector(performTextFinderAction(_:)):
+            (enclosingScrollView as? TerminalScrollView)?.validateMenuItem(menuItem) ?? false
         default:
             true
         }

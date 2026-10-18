@@ -283,7 +283,7 @@ extension TerminalContentView {
         min(max(Int((y - Self.padding) / cellSize.height), 0), text.rows.count - 1)
     }
 
-    private func index(row: Int, column: Int, in text: AccessibilityText) -> Int {
+    func index(row: Int, column: Int, in text: AccessibilityText) -> Int {
         guard row >= 0 else {
             return 0
         }
@@ -299,7 +299,7 @@ extension TerminalContentView {
         return min(index, text.rows[row].upperBound)
     }
 
-    private func position(of index: Int, in text: AccessibilityText) -> (row: Int, column: Int) {
+    func position(of index: Int, in text: AccessibilityText) -> (row: Int, column: Int) {
         let row = text.row(containing: index)
         var location = text.rows[row].location
         let terminal = session.terminal
