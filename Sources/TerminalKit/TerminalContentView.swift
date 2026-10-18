@@ -58,6 +58,7 @@ final class TerminalContentView: NSView {
         }
     }
     var ringBell = { NSSound.beep() }
+    var currentDate = { Date() }
     private var fittedColumns: Int?
     var lastMousePosition: Terminal.Position?
     var scrollWheelLines: CGFloat = 0
@@ -181,7 +182,7 @@ final class TerminalContentView: NSView {
     }
 
     private func bellDidRing() {
-        let date = Date()
+        let date = currentDate()
         guard Self.ringsBell(at: date, lastBellDate: lastBellDate) else {
             return
         }

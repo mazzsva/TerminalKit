@@ -10,6 +10,7 @@ struct TerminalSynchronizedOutputTests {
         let session = TerminalSession(
             running: "stty -echo; printf 'a\\033[?2026h'; read x; printf b; read y; printf '\\033[?2026l'; read z"
         )
+        session.synchronizedOutputClock = ManualClock()
         let view = TerminalContentView(session: session)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
         try session.start()
@@ -30,14 +31,17 @@ struct TerminalSynchronizedOutputTests {
 
     @Test func showsTheScreenAfterTheTimeout() async throws {
         let session = TerminalSession(running: "stty -echo; printf 'a\\033[?2026hb'; read x")
-        session.synchronizedOutputTimeout = .milliseconds(200)
+        let clock = ManualClock()
+        session.synchronizedOutputClock = clock
         try session.start()
         await session.waitForLiveText { $0.hasPrefix("ab") }
-        let start = ContinuousClock.now
+        try await clock.waitForSleepers(1)
+        clock.advance(by: .milliseconds(999))
+        await yieldToTheTimer()
         #expect(session.lines.first == "a")
 
+        clock.advance(by: .milliseconds(1))
         await session.waitForText("ab")
-        #expect(ContinuousClock.now - start > .milliseconds(100))
         session.send(Array("\r".utf8))
         await session.waitForExit()
     }
@@ -54,13 +58,25 @@ struct TerminalSynchronizedOutputTests {
 
     @Test func startsTheTimeoutAgainForEachUpdate() async throws {
         let session = TerminalSession(
-            running: "stty -echo; printf '\\033[?2026h'; sleep 0.6; printf '\\033[?2026l\\033[?2026hb'; read x"
+            running: "stty -echo; printf '\\033[?2026h'; read x; printf '\\033[?2026l\\033[?2026hb'; read y"
         )
+        let clock = ManualClock()
+        session.synchronizedOutputClock = clock
         try session.start()
+        for await isSynchronizing in Observations({ session.liveTerminal.isSynchronizingOutput }) where isSynchronizing
+        {
+            break
+        }
+        try await clock.waitForSleepers(1)
+        clock.advance(by: .milliseconds(600))
+        session.send(Array("\r".utf8))
         await session.waitForLiveText { $0.hasPrefix("b") }
-        try await Task.sleep(for: .milliseconds(600))
+        try await clock.waitForSleepers(2)
+        clock.advance(by: .milliseconds(600))
+        await yieldToTheTimer()
         #expect(session.lines.first == "")
 
+        clock.advance(by: .milliseconds(400))
         await session.waitForText("b")
         session.send(Array("\r".utf8))
         await session.waitForExit()
@@ -102,4 +118,11 @@ private func image(of view: NSView) throws -> Data {
     let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
     view.cacheDisplay(in: view.bounds, to: representation)
     return try #require(representation.tiffRepresentation)
+}
+
+@MainActor
+private func yieldToTheTimer() async {
+    for _ in 0 ..< 20 {
+        await Task.yield()
+    }
 }

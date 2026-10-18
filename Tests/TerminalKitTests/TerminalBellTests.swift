@@ -11,6 +11,7 @@ struct TerminalBellTests {
         let session = TerminalSession(running: "read line; printf 'a\\a\\a\\a'")
         let view = TerminalContentView(session: session)
         let bell = Bell(view)
+        view.currentDate = { Date(timeIntervalSince1970: 0) }
         let window = NSWindow(contentView: view)
         try session.start()
         try await Task.sleep(for: .milliseconds(100))
@@ -26,17 +27,31 @@ struct TerminalBellTests {
     }
 
     @Test func ringsTheBellAtMostTwiceASecond() async throws {
-        let session = TerminalSession(running: "read line; printf '\\a'; sleep 0.05; printf '\\a'")
+        let session = TerminalSession(
+            running: "read a; printf '\\a'; read b; printf '\\a'; read c; printf '\\a'; read d")
         let view = TerminalContentView(session: session)
         let bell = Bell(view)
+        var date = Date(timeIntervalSince1970: 0)
+        view.currentDate = { date }
         let window = NSWindow(contentView: view)
         try session.start()
-        try await Task.sleep(for: .milliseconds(100))
+        for (count, interval, rings) in [(1, 0.0, 1), (2, 0.1, 1), (3, 0.5, 2)] {
+            date += interval
+            session.send(Array("\r".utf8))
+            for await bellCount in Observations({ session.bellCount }) where bellCount == count {
+                break
+            }
+            while bell.rings < rings {
+                try Task.checkCancellation()
+                await Task.yield()
+            }
+            for _ in 0 ..< 20 {
+                await Task.yield()
+            }
+            #expect(bell.rings == rings)
+        }
         session.send(Array("\r".utf8))
         await session.waitForExit()
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(bell.rings == 1)
-        #expect(session.bellCount == 2)
         #expect(window.contentView === view)
     }
 
@@ -86,9 +101,9 @@ struct TerminalBellTests {
             try session.start()
             _ = NSWindow(contentView: view)
         }
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(weakView == nil)
-        #expect(weakSession == nil)
+        while weakView != nil || weakSession != nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
     }
 
     @Test(arguments: [(nil, true), (0.0, false), (0.49, false), (0.5, true), (5.0, true), (-1.0, false)])

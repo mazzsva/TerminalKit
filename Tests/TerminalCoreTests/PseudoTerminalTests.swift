@@ -54,14 +54,20 @@ struct PseudoTerminalTests {
     }
 
     @Test func joinsTheOutputOfManyReads() async throws {
+        let marker = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: marker) }
         let pseudoTerminal = try PseudoTerminal(
             executableURL: URL(filePath: "/bin/sh"),
-            arguments: ["-c", "head -c 50000 /dev/zero | tr '\\0' a"],
+            arguments: [
+                "-c", "head -c 50000 /dev/zero | tr '\\0' a; touch \"$0\"", marker.path(percentEncoded: false),
+            ],
             environment: [:],
             columns: 80,
             rows: 24
         )
-        try await Task.sleep(for: .milliseconds(500))
+        while !FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         var iterator = pseudoTerminal.output.makeAsyncIterator()
         #expect(try #require(await iterator.next()).count > 1_024)
     }
