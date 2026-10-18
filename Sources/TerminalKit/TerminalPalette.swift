@@ -19,7 +19,7 @@ public struct TerminalPalette: Equatable, Sendable {
     public static let standard = TerminalPalette(
         foreground: Color(nsColor: .textColor),
         background: Color(nsColor: .textBackgroundColor),
-        cursor: Color(nsColor: .textColor.withAlphaComponent(0.5)),
+        cursor: Color(nsColor: .textColor).opacity(0.5),
         selection: Color(nsColor: .selectedTextBackgroundColor),
         ansiColors: [
             (0, 0, 0), (194, 54, 33), (37, 188, 36), (173, 173, 39),

@@ -14,6 +14,15 @@ struct TerminalColorTests {
         #expect(NSColor.terminal(.indexed(15), ansiColors: ansiColors) === ansiColors[15])
     }
 
+    @Test(arguments: [(NSAppearance.Name.aqua, CGFloat(0)), (.darkAqua, 1)])
+    func showsTheStandardCursorInEachAppearance(appearance: NSAppearance.Name, white: CGFloat) throws {
+        let cursor = NSColor(TerminalPalette.standard.cursor)
+        try #require(NSAppearance(named: appearance))
+            .performAsCurrentDrawingAppearance {
+                #expect(cursor.usingColorSpace(.sRGB)?.redComponent == white)
+            }
+    }
+
     @Test func usesTheColorCube() {
         #expect(components(.indexed(16)) == [0, 0, 0])
         #expect(components(.indexed(17)) == [0, 0, 95])
