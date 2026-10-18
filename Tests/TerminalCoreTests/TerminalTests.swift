@@ -73,6 +73,42 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.width) == [1, 1, 1])
     }
 
+    @Test func marksTheLinesThatWrap() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("abcdef\r\ngh")
+        #expect(terminal.screen.map(\.isWrapped) == [true, false, false])
+    }
+
+    @Test func keepsTheEndOfAWrappedLineInTheScrollback() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("ab  cd\r\nx")
+        #expect(scrollback(terminal) == ["ab  ", "cd"])
+        #expect(terminal.scrollback.map(\.isWrapped) == [true, false])
+    }
+
+    @Test(arguments: [
+        ("\r\u{1B}[2K", "the next line is erased"), ("\u{1B}[A\u{1B}[K", "the end of the line is erased"),
+        ("\u{1B}[L", "a line is inserted after it"), ("\u{1B}[M", "the next line is deleted"),
+        ("\u{1B}[2;3r\u{1B}[T", "the region below it scrolls down"),
+    ])
+    func unwrapsALineWhenItsContinuationChanges(sequence: String, reason: String) {
+        var terminal = Terminal(columns: 5, rows: 4)
+        terminal.receive("AAAAABB\(sequence)")
+        #expect(!terminal.screen[0].isWrapped, "\(reason)")
+    }
+
+    @Test func unwrapsTheLastLineOfARegionThatScrollsUp() {
+        var terminal = Terminal(columns: 5, rows: 4)
+        terminal.receive("\u{1B}[3HAAAAABB\u{1B}[2;3r\u{1B}[S")
+        #expect(terminal.screen.map(\.isWrapped) == [false, false, false, false])
+    }
+
+    @Test func unwrapsTheLastLineOfARegionThatScrollsDown() {
+        var terminal = Terminal(columns: 5, rows: 4)
+        terminal.receive("\u{1B}[2HAAAAABB\u{1B}[2;3r\u{1B}[T")
+        #expect(terminal.screen.map(\.isWrapped) == [false, false, false, false])
+    }
+
     @Test func combinesMarksWithThePreviousCharacter() {
         var terminal = Terminal(columns: 3, rows: 1)
         terminal.receive("e\u{301}x")

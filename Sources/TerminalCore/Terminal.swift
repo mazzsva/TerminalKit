@@ -228,6 +228,7 @@ package struct Terminal: Sendable {
         let width = columns > 1 ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
             if usesAutowrap {
+                screen[cursor.row].isWrapped = true
                 carriageReturn()
                 lineFeed()
             } else {
@@ -340,7 +341,7 @@ package struct Terminal: Sendable {
 
     private mutating func keepInScrollback(_ lines: ArraySlice<Line>) {
         for line in lines {
-            let end = (line.lastIndex { $0 != Cell() } ?? -1) + 1
+            let end = line.isWrapped ? line.count : (line.lastIndex { $0 != Cell() } ?? -1) + 1
             scrollback.append(end == line.count ? line : Line(line[..<end]))
         }
         if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
@@ -360,12 +361,24 @@ package struct Terminal: Sendable {
         let count = min(count, region.count)
         screen.removeSubrange(region.lowerBound ..< region.lowerBound + count)
         screen.insert(contentsOf: blankLines(count), at: region.upperBound - count)
+        unwrapLine(before: region.lowerBound)
+        if region.upperBound < rows {
+            unwrapLine(before: region.upperBound - count)
+        }
     }
 
     private mutating func scrollDown(_ count: Int, in region: Range<Int>) {
         let count = min(count, region.count)
         screen.removeSubrange(region.upperBound - count ..< region.upperBound)
         screen.insert(contentsOf: blankLines(count), at: region.lowerBound)
+        unwrapLine(before: region.lowerBound)
+        unwrapLine(before: region.upperBound)
+    }
+
+    private mutating func unwrapLine(before row: Int) {
+        if row > 0 {
+            screen[row - 1].isWrapped = false
+        }
     }
 
     private mutating func reverseLineFeed() {
@@ -550,6 +563,12 @@ package struct Terminal: Sendable {
     private mutating func erase(_ range: Range<Int>, row: Int) {
         isWrapPending = false
         screen[row].replaceSubrange(range, with: repeatElement(blank, count: range.count))
+        if range.upperBound == columns {
+            screen[row].isWrapped = false
+        }
+        if range.lowerBound == 0 {
+            unwrapLine(before: row)
+        }
         blankBrokenWideCharacter(at: range.lowerBound, row: row)
         blankBrokenWideCharacter(at: range.upperBound, row: row)
     }
