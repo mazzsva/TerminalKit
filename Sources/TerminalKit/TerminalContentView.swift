@@ -190,6 +190,10 @@ final class TerminalContentView: NSView {
             return
         }
         scrollToBottom()
+        if markedText.isEmpty, let input = event.controlInput {
+            session.send(input)
+            return
+        }
         if let input = event.wordMovementInput {
             session.send(input)
             return

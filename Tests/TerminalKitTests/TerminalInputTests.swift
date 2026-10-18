@@ -20,6 +20,34 @@ struct TerminalInputTests {
         #expect(try keyDown("\u{7F}").terminalInput() == [0x7F])
     }
 
+    @Test(
+        arguments: [
+            ("/", 0x1F), ("2", 0x00), ("6", 0x1E), ("@", 0x00), ("^", 0x1E), ("?", 0x7F), ("-", 0x1F), ("_", 0x1F),
+            (" ", 0x00), ("3", 0x1B), ("4", 0x1C), ("5", 0x1D), ("7", 0x1F), ("8", 0x7F), ("a", 0x01), ("z", 0x1A),
+            ("A", 0x01), ("Z", 0x1A), ("[", 0x1B), ("\\", 0x1C), ("]", 0x1D),
+        ] as [(String, UInt8)])
+    func sendsControlKeys(key: String, byte: UInt8) throws {
+        #expect(try keyDown(key, modifierFlags: .control).controlInput == [byte])
+        #expect(try keyDown(key, modifierFlags: [.control, .shift]).controlInput == [byte])
+        #expect(try keyDown(key, modifierFlags: [.control, .capsLock]).controlInput == [byte])
+    }
+
+    @Test func leavesOtherKeysOutOfTheControlInput() throws {
+        #expect(try keyDown("/").controlInput == nil)
+        #expect(try keyDown("/", modifierFlags: .shift).controlInput == nil)
+        #expect(try keyDown("/", modifierFlags: [.control, .option]).controlInput == nil)
+        #expect(try keyDown("/", modifierFlags: [.control, .command]).controlInput == nil)
+        #expect(try keyDown("1", modifierFlags: .control).controlInput == nil)
+        #expect(try keyDown("9", modifierFlags: .control).controlInput == nil)
+        #expect(try keyDown("ç", modifierFlags: .control).controlInput == nil)
+        #expect(try keyDown("\t", modifierFlags: .control).controlInput == nil)
+        #expect(try keyDown("\r", modifierFlags: .control).controlInput == nil)
+        #expect(
+            try keyDown("6", charactersIgnoringModifiers: "", modifierFlags: [.control, .shift]).controlInput == nil)
+        #expect(try keyDown("ab", modifierFlags: .control).controlInput == nil)
+        #expect(try keyDown(NSUpArrowFunctionKey, modifierFlags: .control).controlInput == nil)
+    }
+
     @Test func sendsMetaForTheOptionKey() throws {
         let optionA = try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option)
         #expect(optionA.metaInput(applicationCursorKeys: false) == [0x1B, 0x61])

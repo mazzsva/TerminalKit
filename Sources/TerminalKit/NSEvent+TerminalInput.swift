@@ -12,6 +12,26 @@ extension NSEvent {
         }
     }
 
+    var controlInput: [UInt8]? {
+        guard modifierFlags.intersection([.control, .option, .command]) == .control,
+            let characters = charactersIgnoringModifiers, characters.unicodeScalars.count == 1,
+            let key = characters.unicodeScalars.first
+        else {
+            return nil
+        }
+        return switch key {
+        case "2", "@", " ": [0x00]
+        case "3": [0x1B]
+        case "4": [0x1C]
+        case "5": [0x1D]
+        case "6", "^": [0x1E]
+        case "7", "/", "-", "_": [0x1F]
+        case "8", "?": [0x7F]
+        case "a" ... "z", "A" ... "Z", "[", "\\", "]": [UInt8(key.value) & 0x1F]
+        default: nil
+        }
+    }
+
     func metaInput(applicationCursorKeys: Bool) -> [UInt8]? {
         guard let key = charactersIgnoringModifiers?.unicodeScalars.first, !(0xF700 ... 0xF8FF).contains(key.value)
         else {
