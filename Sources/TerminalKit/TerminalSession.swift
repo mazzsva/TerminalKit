@@ -5,13 +5,13 @@ import TerminalCore
 @MainActor
 @Observable
 public final class TerminalSession {
-    public enum State: Equatable, Sendable {
+    public enum State: Hashable, Sendable {
         case idle
         case running
         case exited(Termination)
     }
 
-    public enum Termination: Equatable, Sendable {
+    public enum Termination: Hashable, Sendable {
         case exit(Int32)
         case uncaughtSignal(Int32)
     }
@@ -153,7 +153,7 @@ public final class TerminalSession {
 }
 
 extension TerminalSession {
-    public struct Command: Identifiable, Equatable, Sendable {
+    public struct Command: Identifiable, Hashable, Sendable {
         public let id: Int
         public let text: String?
         public let directory: URL?
@@ -189,6 +189,16 @@ extension TerminalSession {
                 )
             }
         }
+    }
+}
+
+extension TerminalSession: Identifiable, Hashable {
+    public nonisolated static func == (lhs: TerminalSession, rhs: TerminalSession) -> Bool {
+        lhs === rhs
+    }
+
+    public nonisolated func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(self))
     }
 }
 
