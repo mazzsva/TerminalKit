@@ -31,6 +31,7 @@ public final class TerminalSession {
         }
     }
     @ObservationIgnored var synchronizedOutputTimeout = Duration.seconds(1)
+    @ObservationIgnored var synchronizedOutputClock: any Clock<Duration> = ContinuousClock()
     @ObservationIgnored private(set) var revision = 0
     @ObservationIgnored private(set) var widthChangeCount = 0
     @ObservationIgnored weak var sizingView: TerminalContentView? {
@@ -155,8 +156,8 @@ public final class TerminalSession {
         if liveTerminal.isSynchronizingOutput, count != timedSynchronizedOutputCount {
             timedSynchronizedOutputCount = count
             synchronizedOutputTimer?.cancel()
-            synchronizedOutputTimer = Task { [weak self, synchronizedOutputTimeout] in
-                try? await Task.sleep(for: synchronizedOutputTimeout)
+            synchronizedOutputTimer = Task { [weak self, synchronizedOutputTimeout, synchronizedOutputClock] in
+                try? await synchronizedOutputClock.sleep(for: synchronizedOutputTimeout)
                 guard let self, !Task.isCancelled, liveTerminal.isSynchronizingOutput else {
                     return
                 }
