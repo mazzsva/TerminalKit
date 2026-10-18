@@ -75,7 +75,6 @@ package struct Terminal: Sendable {
         moveCursor(row: cursor.row - removedRows, column: cursor.column)
     }
 
-    @discardableResult
     package mutating func receive(_ bytes: [UInt8]) -> [UInt8] {
         defer { replies.removeAll() }
         for scalar in decoder.decode(bytes) {
