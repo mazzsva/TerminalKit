@@ -83,8 +83,40 @@ struct TerminalInputTests {
         #expect(try keyDown("'\u{7F}", charactersIgnoringModifiers: "\u{7F}").terminalInput() == [0x7F])
     }
 
-    @Test func ignoresFunctionKeys() throws {
-        #expect(try keyDown(NSF1FunctionKey).terminalInput() == nil)
+    @Test func sendsTheFunctionKeys() throws {
+        #expect(try keyDown(NSF1FunctionKey).terminalInput() == Array("\u{1B}OP".utf8))
+        #expect(try keyDown(NSF4FunctionKey).terminalInput() == Array("\u{1B}OS".utf8))
+        #expect(try keyDown(NSF5FunctionKey).terminalInput() == Array("\u{1B}[15~".utf8))
+        #expect(try keyDown(NSF12FunctionKey).terminalInput() == Array("\u{1B}[24~".utf8))
+    }
+
+    @Test func ignoresOtherFunctionKeys() throws {
+        #expect(try keyDown(NSF13FunctionKey).terminalInput() == nil)
+    }
+
+    @Test func sendsTheModifiersOfSpecialKeys() throws {
+        #expect(try keyDown(NSUpArrowFunctionKey, modifierFlags: .shift).terminalInput() == Array("\u{1B}[1;2A".utf8))
+        #expect(
+            try keyDown(NSLeftArrowFunctionKey, modifierFlags: .control).terminalInput() == Array("\u{1B}[1;5D".utf8))
+        #expect(
+            try keyDown(NSF1FunctionKey, modifierFlags: [.option, .shift]).terminalInput()
+                == Array("\u{1B}[1;4P".utf8))
+        #expect(
+            try keyDown(NSPageUpFunctionKey, modifierFlags: .shift).terminalInput() == Array("\u{1B}[5;2~".utf8))
+        #expect(
+            try keyDown(NSF5FunctionKey, modifierFlags: [.shift, .option, .control]).terminalInput()
+                == Array("\u{1B}[15;8~".utf8))
+    }
+
+    @Test func sendsModifiedCursorKeysInApplicationMode() throws {
+        #expect(
+            try keyDown(NSUpArrowFunctionKey, modifierFlags: .shift).terminalInput(applicationCursorKeys: true)
+                == Array("\u{1B}[1;2A".utf8))
+    }
+
+    @Test func leavesSpecialKeysOutOfTheMetaInput() throws {
+        #expect(
+            try keyDown(NSUpArrowFunctionKey, modifierFlags: .option).metaInput(applicationCursorKeys: false) == nil)
     }
 }
 

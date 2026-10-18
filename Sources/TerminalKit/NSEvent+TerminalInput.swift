@@ -13,6 +13,10 @@ extension NSEvent {
     }
 
     func metaInput(applicationCursorKeys: Bool) -> [UInt8]? {
+        guard let key = charactersIgnoringModifiers?.unicodeScalars.first, !(0xF700 ... 0xF8FF).contains(key.value)
+        else {
+            return nil
+        }
         let characters = characters(byApplyingModifiers: modifierFlags.subtracting(.option))
         return terminalInput(characters: characters, applicationCursorKeys: applicationCursorKeys).map { [0x1B] + $0 }
     }
@@ -27,7 +31,7 @@ extension NSEvent {
         }
         if let key = charactersIgnoringModifiers?.unicodeScalars.first,
             let sequence = NSEvent.SpecialKey(rawValue: Int(key.value))
-                .terminalSequence(applicationCursorKeys: applicationCursorKeys)
+                .terminalSequence(applicationCursorKeys: applicationCursorKeys, modifiers: terminalModifiers)
         {
             return Array(sequence.utf8)
         }
@@ -36,6 +40,11 @@ extension NSEvent {
         }
         return Array(characters.utf8)
     }
+
+    private var terminalModifiers: Int {
+        [(NSEvent.ModifierFlags.shift, 1), (.option, 2), (.control, 4)]
+            .reduce(1) { modifierFlags.contains($1.0) ? $0 + $1.1 : $0 }
+    }
 }
 
 extension NSEvent.SpecialKey {
@@ -43,23 +52,57 @@ extension NSEvent.SpecialKey {
         Self(rawValue: 0x1B)
     }
 
-    fileprivate func terminalSequence(applicationCursorKeys: Bool) -> String? {
-        let cursorKey = applicationCursorKeys ? "\u{1B}O" : "\u{1B}["
-        return switch self {
+    fileprivate func terminalSequence(applicationCursorKeys: Bool, modifiers: Int) -> String? {
+        switch self {
         case .carriageReturn, .enter: "\r"
         case .tab: "\t"
         case .delete: "\u{7F}"
         case .escape: "\u{1B}"
-        case .upArrow: cursorKey + "A"
-        case .downArrow: cursorKey + "B"
-        case .rightArrow: cursorKey + "C"
-        case .leftArrow: cursorKey + "D"
-        case .home: "\u{1B}OH"
-        case .end: "\u{1B}OF"
-        case .pageUp: "\u{1B}[5~"
-        case .pageDown: "\u{1B}[6~"
-        case .deleteForward: "\u{1B}[3~"
         case .backTab: "\u{1B}[Z"
+        default:
+            if let final = cursorFinal {
+                if modifiers > 1 {
+                    "\u{1B}[1;\(modifiers)\(final)"
+                } else {
+                    (applicationCursorKeys || !"ABCD".contains(final) ? "\u{1B}O" : "\u{1B}[") + final
+                }
+            } else if let number = tildeNumber {
+                modifiers > 1 ? "\u{1B}[\(number);\(modifiers)~" : "\u{1B}[\(number)~"
+            } else {
+                nil
+            }
+        }
+    }
+
+    private var cursorFinal: String? {
+        switch self {
+        case .upArrow: "A"
+        case .downArrow: "B"
+        case .rightArrow: "C"
+        case .leftArrow: "D"
+        case .home: "H"
+        case .end: "F"
+        case .f1: "P"
+        case .f2: "Q"
+        case .f3: "R"
+        case .f4: "S"
+        default: nil
+        }
+    }
+
+    private var tildeNumber: Int? {
+        switch self {
+        case .deleteForward: 3
+        case .pageUp: 5
+        case .pageDown: 6
+        case .f5: 15
+        case .f6: 17
+        case .f7: 18
+        case .f8: 19
+        case .f9: 20
+        case .f10: 21
+        case .f11: 23
+        case .f12: 24
         default: nil
         }
     }
