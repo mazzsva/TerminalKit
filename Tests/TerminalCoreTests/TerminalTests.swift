@@ -166,6 +166,28 @@ struct TerminalTests {
         #expect(lines(terminal) == ["aé"])
     }
 
+    @Test(arguments: [
+        "🏴\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}",
+        "1\u{FE0F}\u{20E3}",
+        "น\u{E49}\u{E33}",
+        "\u{1100}\u{1161}\u{11A8}",
+        "क\u{94D}ष\u{93F}",
+        "a" + String(repeating: "\u{301}", count: 15),
+    ])
+    func keepsEveryScalarOfACluster(cluster: String) {
+        var terminal = Terminal(columns: 10, rows: 1)
+        terminal.receive(cluster)
+        let cells = terminal.screen[0].filter { $0.width > 0 && !$0.isBlank }
+        #expect(String(cells.map(\.character)) == cluster)
+    }
+
+    @Test func dropsTheMarksAfterSixteenScalars() {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("a" + String(repeating: "\u{301}", count: 50_000) + "b")
+        #expect(terminal.screen[0][0].character.unicodeScalars.count == 16)
+        #expect(terminal.screen[0][1].character == "b")
+    }
+
     @Test func ignoresMarksWithoutAPreviousCharacter() {
         var terminal = Terminal(columns: 2, rows: 1)
         terminal.receive("\u{301}a\u{200B}")
@@ -264,6 +286,33 @@ struct TerminalTests {
         var terminal = Terminal(columns: 6, rows: 2)
         terminal.receive("a\u{1B}[3b中\u{1B}[b")
         #expect(lines(terminal) == ["aaaa中 ", "中     "])
+    }
+
+    @Test(arguments: [(4, 3, "a"), (5, 2, "中"), (1, 3, "中"), (7, 1, "x"), (3, 4, "é")])
+    func repeatsLikePrintingTheCharacter(columns: Int, rows: Int, character: String) {
+        for start in ["", "\u{1B}[2;3H", "\u{1B}[2;3r\u{1B}[1;2H", "\u{1B}[?7l", "\u{1B}[4h\u{1B}[1;2H"] {
+            for count in [1, 9, 10, 11, 23, 64, 1_000] {
+                var repeated = Terminal(columns: columns, rows: rows)
+                var printed = repeated
+                repeated.receive("\(start)zz\u{1B}[\(rows);1Hyy\u{1B}[H\(start)\(character)\u{1B}[\(count)b")
+                printed.receive(
+                    "\(start)zz\u{1B}[\(rows);1Hyy\u{1B}[H\(start)" + String(repeating: character, count: count + 1)
+                )
+                #expect(lines(repeated) == lines(printed))
+                #expect(repeated.screen.map(\.isWrapped) == printed.screen.map(\.isWrapped))
+                #expect(repeated.cursor == printed.cursor)
+                repeated.receive("w")
+                printed.receive("w")
+                #expect(lines(repeated) == lines(printed))
+            }
+        }
+    }
+
+    @Test func repeatsAtMostAScreen() {
+        var terminal = Terminal(columns: 80, rows: 24)
+        terminal.receive("a" + String(repeating: "\u{1B}[65535b", count: 200))
+        #expect(terminal.removedScrollbackCount == 0)
+        #expect(terminal.scrollback.count < 6_000)
     }
 
     @Test func repeatsNothingBeforeACharacter() {
