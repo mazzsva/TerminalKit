@@ -172,6 +172,31 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains(bytes))
     }
 
+    @Test func sendsAKeyWithTwoCommandsOnce() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 7 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        let up = String(try #require(UnicodeScalar(NSUpArrowFunctionKey)))
+        let optionUp = try #require(
+            NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: [.option, .function, .numericPad],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: up,
+                charactersIgnoringModifiers: up,
+                isARepeat: false,
+                keyCode: 126
+            )
+        )
+        view.keyDown(with: optionUp)
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("1b  5b  31  3b  33  41  78"))
+    }
+
     @Test func sendsTextFromTheInputSystem() async throws {
         let session = readingSession()
         let view = TerminalContentView(session: session)
