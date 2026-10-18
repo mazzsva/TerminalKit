@@ -45,6 +45,21 @@ struct TerminalContentViewTests {
         #expect(color(in: representation, at: center) != color(in: representation, at: corner))
     }
 
+    @Test func drawsTheCharacterUnderTheCursor() async throws {
+        var palette = TerminalPalette.standard
+        palette.cursor = .red
+        let character = try await drawnView(running: "printf 'X\\b'")
+        let space = try await drawnView(running: "printf ' \\b'")
+        character.palette = palette
+        space.palette = palette
+        #expect(try pixels(in: character.cursorRect, of: character) != pixels(in: space.cursorRect, of: space))
+    }
+
+    @Test func coversAWideCharacterWithTheCursor() async throws {
+        let view = try await drawnView(running: "printf '中\\b\\b'")
+        #expect(view.cursorRect.width == 2 * view.cellSize.width)
+    }
+
     @Test func hidesTheCursor() async throws {
         let view = try await drawnView(running: "printf '\\033[?25l'")
         let representation = try representation(of: view)
@@ -53,8 +68,8 @@ struct TerminalContentViewTests {
     }
 
     @Test func drawsTheTextAfterAWideCharacterInItsCell() async throws {
-        let wide = try await drawnView(running: "printf '中x\\r'")
-        let narrow = try await drawnView(running: "printf '  x\\r'")
+        let wide = try await drawnView(running: "printf '中x\\n'")
+        let narrow = try await drawnView(running: "printf '  x\\n'")
         let cell = CGRect(
             x: 4 + 2 * wide.cellSize.width,
             y: 4,

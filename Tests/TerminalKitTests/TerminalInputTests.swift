@@ -59,8 +59,8 @@ struct TerminalInputTests {
     }
 
     @Test func sendsTheNavigationKeys() throws {
-        #expect(try keyDown(NSHomeFunctionKey).terminalInput() == Array("\u{1B}[H".utf8))
-        #expect(try keyDown(NSEndFunctionKey).terminalInput() == Array("\u{1B}[F".utf8))
+        #expect(try keyDown(NSHomeFunctionKey).terminalInput() == Array("\u{1B}OH".utf8))
+        #expect(try keyDown(NSEndFunctionKey).terminalInput() == Array("\u{1B}OF".utf8))
         #expect(try keyDown(NSPageUpFunctionKey).terminalInput() == Array("\u{1B}[5~".utf8))
         #expect(try keyDown(NSPageDownFunctionKey).terminalInput() == Array("\u{1B}[6~".utf8))
         #expect(try keyDown(NSDeleteFunctionKey).terminalInput() == Array("\u{1B}[3~".utf8))

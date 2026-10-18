@@ -14,9 +14,26 @@ struct TerminalSessionTests {
     }
 
     @Test func describesTheTerminalToTheLoginShell() {
-        let environment = TerminalSession.Configuration.loginShell.environment
-        #expect(environment["TERM"] == "xterm-256color")
-        #expect(environment["LANG"] != nil)
+        let environment = TerminalSession.Configuration.loginShell(inheriting: ["TERM": "dumb", "PATH": "/bin"])
+            .environment
+        #expect(
+            environment == ["TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8", "PATH": "/bin"])
+    }
+
+    @Test func keepsTheLanguageOfTheUser() {
+        let environment = TerminalSession.Configuration.loginShell(inheriting: ["LANG": "pt_BR.UTF-8"]).environment
+        #expect(environment["LANG"] == "pt_BR.UTF-8")
+    }
+
+    @Test func removesTheIdentityOfTheParentTerminal() {
+        let environment = TerminalSession.Configuration
+            .loginShell(
+                inheriting: ["TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "470", "TERM_SESSION_ID": "1"]
+            )
+            .environment
+        #expect(environment["TERM_PROGRAM"] == nil)
+        #expect(environment["TERM_PROGRAM_VERSION"] == nil)
+        #expect(environment["TERM_SESSION_ID"] == nil)
     }
 
     @Test func startsIdle() {

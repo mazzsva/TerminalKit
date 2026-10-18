@@ -132,7 +132,7 @@ final class TerminalContentView: NSView {
                 rect(row: row, columns: columns).fill()
             }
             for (columns, style) in runs {
-                drawText(line, columns: columns, row: row, style: style)
+                drawText(line, columns: columns, row: row, style: style, foreground: colors(for: style).foreground)
             }
         }
 
@@ -152,6 +152,15 @@ final class TerminalContentView: NSView {
         }
         colors.cursor.setFill()
         cursor.fill(using: .sourceOver)
+        let line = terminal.screen[terminal.cursor.row]
+        let style = line[terminal.cursor.column].style
+        drawText(
+            line,
+            columns: cursorColumns,
+            row: terminal.scrollback.count + terminal.cursor.row,
+            style: style,
+            foreground: colors(for: style).background ?? colors.background
+        )
     }
 
     private static func cellSize(of font: NSFont) -> CGSize {
@@ -189,11 +198,16 @@ final class TerminalContentView: NSView {
         return style.isInverse ? (background ?? colors.background, foreground) : (foreground, background)
     }
 
-    private func drawText(_ line: [Terminal.Cell], columns: Range<Int>, row: Int, style: Terminal.Style) {
+    private func drawText(
+        _ line: [Terminal.Cell],
+        columns: Range<Int>,
+        row: Int,
+        style: Terminal.Style,
+        foreground: NSColor
+    ) {
         guard !style.isHidden else {
             return
         }
-        let foreground = colors(for: style).foreground
         var attributes: [NSAttributedString.Key: Any] = [
             .font: font(for: style),
             .foregroundColor: style.isFaint ? foreground.withAlphaComponent(0.5) : foreground,
@@ -239,11 +253,13 @@ final class TerminalContentView: NSView {
     }
 
     var cursorRect: CGRect {
-        let terminal = session.terminal
-        return rect(
-            row: terminal.scrollback.count + terminal.cursor.row,
-            columns: terminal.cursor.column ..< terminal.cursor.column + 1
-        )
+        rect(row: session.terminal.scrollback.count + session.terminal.cursor.row, columns: cursorColumns)
+    }
+
+    private var cursorColumns: Range<Int> {
+        let cursor = session.terminal.cursor
+        let width = max(Int(session.terminal.screen[cursor.row][cursor.column].width), 1)
+        return cursor.column ..< cursor.column + width
     }
 
     func fit(to size: CGSize) {
