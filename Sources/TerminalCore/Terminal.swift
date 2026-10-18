@@ -31,6 +31,7 @@ package struct Terminal: Sendable {
     package private(set) var usesApplicationCursorKeys = false
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
+    private var usesAutowrap = true
 
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
@@ -212,8 +213,12 @@ package struct Terminal: Sendable {
         lastCharacter = scalar
         let width = columns > 1 ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
-            carriageReturn()
-            lineFeed()
+            if usesAutowrap {
+                carriageReturn()
+                lineFeed()
+            } else {
+                cursor.column = columns - width
+            }
         }
         let character = scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar)
         for column in cursor.column ..< cursor.column + width {
@@ -225,7 +230,7 @@ package struct Terminal: Sendable {
         }
         if cursor.column + width == columns {
             cursor.column = columns - 1
-            isWrapPending = true
+            isWrapPending = usesAutowrap
         } else {
             cursor.column += width
         }
@@ -383,6 +388,8 @@ package struct Terminal: Sendable {
         switch (mode, isEnabled) {
         case (1, _):
             usesApplicationCursorKeys = isEnabled
+        case (7, _):
+            usesAutowrap = isEnabled
         case (25, _):
             isCursorVisible = isEnabled
         case (2004, _):

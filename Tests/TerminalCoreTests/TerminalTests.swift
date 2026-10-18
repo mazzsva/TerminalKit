@@ -187,6 +187,18 @@ struct TerminalTests {
         #expect(lines(terminal) == ["b ", "c "])
     }
 
+    @Test func overwritesTheLastColumnWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[?7labcdef\u{1B}[?7hgh")
+        #expect(lines(terminal) == ["abcg", "h   "])
+    }
+
+    @Test func keepsAWideCharacterOnTheLineWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[?7labc中")
+        #expect(lines(terminal) == ["ab中 ", "    "])
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")
