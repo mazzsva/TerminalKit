@@ -8,7 +8,6 @@ public struct TerminalPalette: Equatable, Sendable {
     public var ansiColors: [Color]
 
     public init(foreground: Color, background: Color, cursor: Color, selection: Color, ansiColors: [Color]) {
-        precondition(ansiColors.count == 16)
         self.foreground = foreground
         self.background = background
         self.cursor = cursor

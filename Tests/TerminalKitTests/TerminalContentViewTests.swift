@@ -244,6 +244,30 @@ struct TerminalContentViewTests {
         #expect(isClose(color(in: representation, at: CGPoint(x: 190, y: 90)), to: [0.2, 0.3, 0.4]))
     }
 
+    @Test func makesAPaletteWithFewerANSIColors() {
+        let palette = TerminalPalette(
+            foreground: .white, background: .black, cursor: .gray, selection: .blue, ansiColors: [.red])
+        #expect(palette.ansiColors == [.red])
+    }
+
+    @Test(arguments: [2, 20])
+    func fillsTheANSIColorsFromTheStandardPalette(count: Int) async throws {
+        let view = try await drawnView(running: "printf '\\033[41m  \\033[47m  \\033[107m  \\033[m'")
+        var palette = TerminalPalette.standard
+        palette.ansiColors =
+            [.black, Color(.sRGB, red: 0.4, green: 0.6, blue: 0.2)]
+            + Array(repeating: Color(.sRGB, red: 0.1, green: 0.9, blue: 0.5), count: count - 2)
+        view.palette = palette
+        let representation = try representation(of: view)
+        let points = [0, 2, 4]
+            .map { CGPoint(x: 4 + view.cellSize.width * (CGFloat($0) + 0.5), y: 4 + view.cellSize.height / 2) }
+        let fill: [CGFloat] = count > 2 ? [0.1, 0.9, 0.5] : [203.0 / 255, 204.0 / 255, 205.0 / 255]
+        let brightFill: [CGFloat] = count > 2 ? [0.1, 0.9, 0.5] : [233.0 / 255, 235.0 / 255, 235.0 / 255]
+        #expect(isClose(color(in: representation, at: points[0]), to: [0.4, 0.6, 0.2]))
+        #expect(isClose(color(in: representation, at: points[1]), to: fill))
+        #expect(isClose(color(in: representation, at: points[2]), to: brightFill))
+    }
+
     @Test func drawsTheForegroundColor() async throws {
         let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
         let red = try image(of: try await drawnView(running: "printf '\\033[31mX\\r'"))
