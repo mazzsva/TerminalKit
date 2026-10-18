@@ -20,7 +20,7 @@ struct TerminalViewTests {
         #expect(session.terminal.rows == Int((visibleSize.height - 8) / view.cellSize.height))
     }
 
-    @Test func showsANewSessionInTheSameView() throws {
+    @Test func showsANewSessionInANewView() throws {
         let hostingView = NSHostingView(
             rootView: TerminalView(
                 session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh"))))
@@ -32,10 +32,11 @@ struct TerminalViewTests {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
         hostingView.rootView = TerminalView(session: session)
         hostingView.layoutSubtreeIfNeeded()
-        let visibleSize = try #require(view.enclosingScrollView).contentSize
-        #expect(contentView(in: hostingView) === view)
-        #expect(view.session === session)
-        #expect(session.terminal.columns == Int((visibleSize.width - 8) / view.cellSize.width))
+        let newView = try #require(contentView(in: hostingView))
+        let visibleSize = try #require(newView.enclosingScrollView).contentSize
+        #expect(newView !== view)
+        #expect(newView.session === session)
+        #expect(session.terminal.columns == Int((visibleSize.width - 8) / newView.cellSize.width))
     }
 
     @Test func growsWithTheScrollback() async throws {

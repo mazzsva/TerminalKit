@@ -9,6 +9,7 @@ public struct TerminalView: View {
 
     public var body: some View {
         Representable(session: session)
+            .id(ObjectIdentifier(session))
     }
 }
 
@@ -20,9 +21,6 @@ private struct Representable: NSViewRepresentable {
     }
 
     func updateNSView(_ view: TerminalScrollView, context: Context) {
-        if view.terminalView.session !== session {
-            view.terminalView.session = session
-        }
         let font = context.environment.terminalFont ?? TerminalContentView.defaultFont
         if view.terminalView.font != font {
             view.terminalView.font = font

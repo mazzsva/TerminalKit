@@ -5,14 +5,7 @@ final class TerminalContentView: NSView {
     static let padding: CGFloat = 4
     static let defaultFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
 
-    var session: TerminalSession {
-        didSet {
-            inputContext?.discardMarkedText()
-            markedText = ""
-            enclosingScrollView?.needsLayout = true
-            needsDisplay = true
-        }
-    }
+    let session: TerminalSession
 
     var font = defaultFont {
         didSet {
