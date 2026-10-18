@@ -29,6 +29,7 @@ package struct Terminal: Sendable {
     package private(set) var usesApplicationCursorKeys = false
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
+    package private(set) var title = ""
     package private(set) var mouseTracking = MouseTracking.off
     private(set) var usesSGRMouseEncoding = false
 
@@ -125,6 +126,8 @@ package struct Terminal: Sendable {
                 restoreCursor()
             case .controlSequence(let sequence):
                 perform(sequence)
+            case .operatingSystemCommand(let command):
+                perform(command)
             default:
                 break
             }
@@ -371,8 +374,16 @@ package struct Terminal: Sendable {
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
     }
 
+    private mutating func perform(_ command: String) {
+        let parts = command.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
+        if parts.count == 2, parts[0] == "0" || parts[0] == "2" {
+            title = String(parts[1])
+        }
+    }
+
     private mutating func reset() {
         var terminal = Terminal(columns: columns, rows: rows)
+        terminal.title = title
         terminal.scrollback = scrollback
         terminal.removedScrollbackCount = removedScrollbackCount
         terminal.decoder = decoder

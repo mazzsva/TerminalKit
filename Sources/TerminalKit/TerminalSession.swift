@@ -7,11 +7,17 @@ public final class TerminalSession {
     public enum State: Equatable, Sendable {
         case idle
         case running
-        case exited
+        case exited(Termination)
+    }
+
+    public enum Termination: Equatable, Sendable {
+        case exit(Int32)
+        case uncaughtSignal(Int32)
     }
 
     private let configuration: Configuration
     public private(set) var state = State.idle
+    public private(set) var title = ""
 
     private(set) var terminal = Terminal(columns: 80, rows: 24)
 
@@ -41,8 +47,7 @@ public final class TerminalSession {
             for await bytes in output {
                 self?.receive(bytes)
             }
-            self?.state = .exited
-            self?.pseudoTerminal = nil
+            self?.finish()
         }
     }
 
@@ -58,10 +63,30 @@ public final class TerminalSession {
         pseudoTerminal?.write(bytes)
     }
 
+    private func finish() {
+        guard let termination = pseudoTerminal?.termination else {
+            return
+        }
+        state = .exited(Termination(termination))
+        pseudoTerminal = nil
+    }
+
     private func receive(_ bytes: [UInt8]) {
         let replies = terminal.receive(bytes)
+        title = terminal.title
         if !replies.isEmpty {
             pseudoTerminal?.write(replies)
+        }
+    }
+}
+
+extension TerminalSession.Termination {
+    fileprivate init(_ termination: PseudoTerminal.Termination) {
+        switch termination {
+        case .exit(let status):
+            self = .exit(status)
+        case .uncaughtSignal(let signal):
+            self = .uncaughtSignal(signal)
         }
     }
 }

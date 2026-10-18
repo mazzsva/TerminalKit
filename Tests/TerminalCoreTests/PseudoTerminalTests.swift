@@ -8,6 +8,14 @@ struct PseudoTerminalTests {
         #expect(try await output("printf 'hello\\nworld'") == "hello\r\nworld")
     }
 
+    @Test func reportsTheExitStatus() async throws {
+        #expect(try await termination("exit 3") == .exit(3))
+    }
+
+    @Test func reportsAnUncaughtSignal() async throws {
+        #expect(try await termination("kill -TERM $$") == .uncaughtSignal(SIGTERM))
+    }
+
     @Test func endsTheOutputWhenTheProcessExits() async throws {
         let start = ContinuousClock.now
         #expect(try await output("trap '' HUP; /bin/sleep 5 & echo done") == "done\r\n")
@@ -195,4 +203,16 @@ private func output(
         output += bytes
     }
     return String(decoding: output, as: UTF8.self)
+}
+
+private func termination(_ script: String) async throws -> PseudoTerminal.Termination? {
+    let pseudoTerminal = try PseudoTerminal(
+        executableURL: URL(filePath: "/bin/sh"),
+        arguments: ["-c", script],
+        environment: [:],
+        columns: 80,
+        rows: 24
+    )
+    for await _ in pseudoTerminal.output {}
+    return pseudoTerminal.termination
 }
