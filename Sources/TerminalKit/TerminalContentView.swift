@@ -73,7 +73,7 @@ final class TerminalContentView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if let window, window.firstResponder === window {
+        if let window, window.firstResponder === window || window.firstResponder is TerminalContentView {
             window.makeFirstResponder(self)
         }
     }

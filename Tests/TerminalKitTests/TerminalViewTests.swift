@@ -39,6 +39,26 @@ struct TerminalViewTests {
         #expect(session.terminal.columns == Int((visibleSize.width - 8) / newView.cellSize.width))
     }
 
+    @Test func focusesTheNewSession() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [],
+            backing: .buffered,
+            defer: true
+        )
+        let hostingView = NSHostingView(
+            rootView: TerminalView(
+                session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh"))))
+        )
+        window.contentView = hostingView
+        hostingView.layoutSubtreeIfNeeded()
+        hostingView.rootView = TerminalView(
+            session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh"))))
+        hostingView.layoutSubtreeIfNeeded()
+        let view = try #require(contentView(in: hostingView))
+        #expect(window.firstResponder === view)
+    }
+
     @Test func growsWithTheScrollback() async throws {
         let session = TerminalSession(
             configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "seq 1 50"])
