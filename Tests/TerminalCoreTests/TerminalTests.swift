@@ -950,6 +950,38 @@ struct TerminalTests {
         #expect(!terminal.usesBracketedPaste)
     }
 
+    @Test(arguments: [
+        ("0", Terminal.CursorShape.block), ("", .block), ("1", .block), ("2", .block), ("3", .underline),
+        ("4", .underline), ("5", .bar), ("6", .bar),
+    ])
+    func setsTheCursorShape(parameter: String, shape: Terminal.CursorShape) {
+        var terminal = Terminal(columns: 1, rows: 1)
+        terminal.receive("\u{1B}[5 q\u{1B}[3 q\u{1B}[\(parameter) q")
+        #expect(terminal.cursorShape == shape)
+    }
+
+    @Test(arguments: ["\u{1B}[7 q", "\u{1B}[?2 q", "\u{1B}[2q", "\u{1B}[2!q", "\u{1B}[2 p"])
+    func ignoresOtherCursorShapeSequences(sequence: String) {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[5 q" + sequence + "x")
+        #expect(terminal.cursorShape == .bar)
+        #expect(terminal.screen[0][0].character == "x")
+    }
+
+    @Test func keepsTheCursorShapeOnTheAlternateScreen() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        terminal.receive("\u{1B}[5 q\u{1B}[?1049h")
+        #expect(terminal.cursorShape == .bar)
+        terminal.receive("\u{1B}[3 q\u{1B}[?1049l")
+        #expect(terminal.cursorShape == .underline)
+    }
+
+    @Test func resetsTheCursorShape() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        terminal.receive("\u{1B}[5 q\u{1B}c")
+        #expect(terminal.cursorShape == .block)
+    }
+
     @Test func setsTheFocusReportingMode() {
         var terminal = Terminal(columns: 1, rows: 1)
         #expect(!terminal.usesFocusReporting)

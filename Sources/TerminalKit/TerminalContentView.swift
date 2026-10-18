@@ -3,6 +3,7 @@ import TerminalCore
 
 final class TerminalContentView: NSView {
     static let padding: CGFloat = 4
+    static let cursorThickness: CGFloat = 2
     static let defaultFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
 
     let session: TerminalSession
@@ -242,7 +243,20 @@ final class TerminalContentView: NSView {
             return
         }
         colors.cursor.setFill()
-        cursor.fill(using: .sourceOver)
+        switch terminal.cursorShape {
+        case .underline:
+            CGRect(
+                x: cursor.minX, y: cursor.maxY - Self.cursorThickness, width: cursor.width, height: Self.cursorThickness
+            )
+            .fill(using: .sourceOver)
+            return
+        case .bar:
+            CGRect(x: cursor.minX, y: cursor.minY, width: Self.cursorThickness, height: cursor.height)
+                .fill(using: .sourceOver)
+            return
+        case .block:
+            cursor.fill(using: .sourceOver)
+        }
         let line = terminal.screen[terminal.cursor.row]
         let style = line[terminal.cursor.column].style
         drawText(
