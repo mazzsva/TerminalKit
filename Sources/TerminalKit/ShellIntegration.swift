@@ -148,11 +148,21 @@ enum ShellIntegration {
             }
 
             __terminalkit_precmd() {
-                builtin local code=$?
+                builtin local code=$? entry text
+                entry=$(HISTTIMEFORMAT= builtin history 1)
                 if [[ $__terminalkit_command == 1 ]]; then
                     __terminalkit_command=0
                     builtin printf '\e]133;D;%s\a' "$code"
+                elif [[ -n ${__terminalkit_entry+X} && -n $entry && $entry != "$__terminalkit_entry" ]]; then
+                    text=${entry#"${entry%%[! ]*}"}
+                    text=${text#"${text%%[!0-9]*}"}
+                    text=${text#\*}
+                    if [[ -n ${text//[[:space:]]/} ]]; then
+                        __terminalkit_encode "${text#  }"
+                        builtin printf '\e]133;C;cmdline_url=%s\a\e]133;D;%s\a' "$__terminalkit_reply" "$code"
+                    fi
                 fi
+                __terminalkit_entry=$entry
                 __terminalkit_encode "$PWD"
                 builtin printf '\e]7;file://%s%s\a' "$HOSTNAME" "$__terminalkit_reply"
                 builtin return $code
