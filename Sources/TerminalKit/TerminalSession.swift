@@ -18,10 +18,6 @@ public final class TerminalSession {
     public let configuration: Configuration
     public private(set) var state = State.idle
 
-    public var title: String {
-        terminal.title
-    }
-
     private(set) var terminal = Terminal(columns: 80, rows: 24)
 
     @ObservationIgnored private var pseudoTerminal: PseudoTerminal?

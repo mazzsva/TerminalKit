@@ -248,18 +248,10 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
     }
 
-    @Test(arguments: ["0", "2"])
-    func setsTheTitle(command: String) {
+    @Test func ignoresTheTitle() {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("\u{1B}]\(command);~/Developer — zsh\u{7}")
-        #expect(terminal.title == "~/Developer — zsh")
+        terminal.receive("\u{1B}]0;~/Developer — zsh\u{7}")
         #expect(lines(terminal) == ["    ", "    "])
-    }
-
-    @Test func ignoresOtherOperatingSystemCommands() {
-        var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("\u{1B}]1;Icon\u{7}\u{1B}]2\u{7}")
-        #expect(terminal.title.isEmpty)
     }
 
     @Test func growsTheScreen() {

@@ -66,30 +66,16 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}[1\r0H") == [.execute("\r"), controlSequence(parameters: [10], final: "H")])
     }
 
-    @Test func dispatchesOperatingSystemCommands() {
-        #expect(parse("\u{1B}]0;Café\u{7}") == [.operatingSystemCommand("0;Café")])
+    @Test func ignoresOperatingSystemCommands() {
+        #expect(parse("\u{1B}]0;Café\nA\u{7}B") == [.print("B")])
     }
 
     @Test func endsOperatingSystemCommandsWithTheStringTerminator() {
-        #expect(
-            parse("\u{1B}]2;Title\u{1B}\\") == [
-                .operatingSystemCommand("2;Title"),
-                .escape(intermediates: "", final: "\\"),
-            ]
-        )
-    }
-
-    @Test func ignoresControlCharactersInsideOperatingSystemCommands() {
-        #expect(parse("\u{1B}]0;A\nB\u{7}") == [.operatingSystemCommand("0;AB")])
+        #expect(parse("\u{1B}]2;Title\u{1B}\\A") == [.escape(intermediates: "", final: "\\"), .print("A")])
     }
 
     @Test func cancelsOperatingSystemCommands() {
-        #expect(parse("\u{1B}]0;Title\u{18}") == [.execute("\u{18}")])
-    }
-
-    @Test func limitsOperatingSystemCommands() {
-        let title = String(repeating: "A", count: 5_000)
-        #expect(parse("\u{1B}]\(title)\u{7}") == [.operatingSystemCommand(String(title.prefix(4_096)))])
+        #expect(parse("\u{1B}]0;Title\u{18}A") == [.execute("\u{18}"), .print("A")])
     }
 
     @Test(arguments: ["P", "X", "^", "_"])
