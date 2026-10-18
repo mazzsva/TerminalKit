@@ -4,16 +4,14 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct PseudoTerminalTests {
-    @Test func reportsTheExitStatus() async throws {
-        #expect(try await termination("exit 3") == .exit(3))
-    }
-
-    @Test func reportsAnUncaughtSignal() async throws {
-        #expect(try await termination("kill -TERM $$") == .uncaughtSignal(SIGTERM))
-    }
-
     @Test func readsTheOutput() async throws {
         #expect(try await output("printf 'hello\\nworld'") == "hello\r\nworld")
+    }
+
+    @Test func endsTheOutputWhenTheProcessExits() async throws {
+        let start = ContinuousClock.now
+        #expect(try await output("trap '' HUP; /bin/sleep 5 & echo done") == "done\r\n")
+        #expect(ContinuousClock.now - start < .seconds(4))
     }
 
     @Test func readsAllOutputBeforeTheExit() async throws {
@@ -32,7 +30,7 @@ struct PseudoTerminalTests {
         )
         try await Task.sleep(for: .seconds(1))
         #expect(!FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
-        for await _ in pseudoTerminal.events {}
+        for await _ in pseudoTerminal.output {}
         #expect(FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
     }
 
@@ -105,10 +103,7 @@ struct PseudoTerminalTests {
             rows: 24
         )
         var output = ""
-        for await event in pseudoTerminal.events {
-            guard case .output(let bytes) = event else {
-                continue
-            }
+        for await bytes in pseudoTerminal.output {
             output += String(decoding: bytes, as: UTF8.self)
             if output.hasSuffix("ready\r\n") {
                 pseudoTerminal.resize(columns: 100, rows: 30)
@@ -175,26 +170,8 @@ private func output(
     )
     input(pseudoTerminal)
     var output: [UInt8] = []
-    for await event in pseudoTerminal.events {
-        if case .output(let bytes) = event {
-            output += bytes
-        }
+    for await bytes in pseudoTerminal.output {
+        output += bytes
     }
     return String(decoding: output, as: UTF8.self)
-}
-
-private func termination(_ script: String) async throws -> PseudoTerminal.Termination? {
-    let pseudoTerminal = try PseudoTerminal(
-        executableURL: URL(filePath: "/bin/sh"),
-        arguments: ["-c", script],
-        environment: [:],
-        columns: 80,
-        rows: 24
-    )
-    for await event in pseudoTerminal.events {
-        if case .exit(let termination) = event {
-            return termination
-        }
-    }
-    return nil
 }

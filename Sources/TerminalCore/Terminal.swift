@@ -28,7 +28,6 @@ package struct Terminal: Sendable {
     package private(set) var scrollback: [[Cell]] = []
     package private(set) var removedScrollbackCount = 0
     package private(set) var cursor = Position(row: 0, column: 0)
-    package private(set) var title = ""
     package private(set) var usesApplicationCursorKeys = false
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
@@ -115,8 +114,6 @@ package struct Terminal: Sendable {
                 restoreCursor()
             case .controlSequence(let sequence):
                 perform(sequence)
-            case .operatingSystemCommand(let command):
-                perform(command)
             default:
                 break
             }
@@ -189,13 +186,6 @@ package struct Terminal: Sendable {
             restoreCursor()
         default:
             break
-        }
-    }
-
-    private mutating func perform(_ command: String) {
-        let parts = command.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
-        if parts.count == 2, parts[0] == "0" || parts[0] == "2" {
-            title = String(parts[1])
         }
     }
 

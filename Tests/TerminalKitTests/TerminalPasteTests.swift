@@ -10,7 +10,7 @@ struct TerminalPasteTests {
         let (view, session) = try startedView(running: "read a; read b; echo \"$a+$b\"")
         let pasteboard = pasteboard(containing: "hello\nworld\n")
         defer { pasteboard.releaseGlobally() }
-        #expect(view.readSelection(from: pasteboard))
+        view.paste(from: pasteboard)
         #expect(await lines(afterExitOf: session).contains("hello+world"))
     }
 
@@ -21,7 +21,7 @@ struct TerminalPasteTests {
         await waitForText("ready", in: session)
         let pasteboard = pasteboard(containing: "a\nb\r\nc")
         defer { pasteboard.releaseGlobally() }
-        #expect(view.readSelection(from: pasteboard))
+        view.paste(from: pasteboard)
         #expect(await lines(afterExitOf: session).contains("61  0d  62  0d  63"))
     }
 
@@ -34,22 +34,6 @@ struct TerminalPasteTests {
         let bytes = try await pastedBytes("ab", mode: "\\033[?2004h\\033[?2004l", count: 2)
         #expect(bytes == "61  62")
     }
-
-    @Test func takesTextFromServices() throws {
-        let (view, _) = try startedView(running: "exit")
-        #expect(view.validRequestor(forSendType: nil, returnType: .string) as? NSView === view)
-        #expect(view.validRequestor(forSendType: .string, returnType: .string) as? NSView !== view)
-        view.selection = .init(anchor: .init(line: 0, column: 0), head: .init(line: 1, column: 0))
-        #expect(view.validRequestor(forSendType: .string, returnType: .string) as? NSView === view)
-        #expect(view.validRequestor(forSendType: nil, returnType: .fileURL) as? NSView !== view)
-    }
-
-    @Test func pastesNothingWithoutText() throws {
-        let (view, _) = try startedView(running: "exit")
-        let pasteboard = pasteboard(containing: nil)
-        defer { pasteboard.releaseGlobally() }
-        #expect(!view.readSelection(from: pasteboard))
-    }
 }
 
 @MainActor
@@ -60,7 +44,7 @@ private func pastedBytes(_ text: String, mode: String, count: Int) async throws 
     await waitForText("ready", in: session)
     let pasteboard = pasteboard(containing: text)
     defer { pasteboard.releaseGlobally() }
-    #expect(view.readSelection(from: pasteboard))
+    view.paste(from: pasteboard)
     return await lines(afterExitOf: session).first { !$0.isEmpty && $0 != "ready" }
 }
 
@@ -76,12 +60,10 @@ func startedView(running script: String) throws -> (TerminalContentView, Termina
 }
 
 @MainActor
-func pasteboard(containing text: String?) -> NSPasteboard {
+func pasteboard(containing text: String) -> NSPasteboard {
     let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
     pasteboard.clearContents()
-    if let text {
-        pasteboard.setString(text, forType: .string)
-    }
+    pasteboard.setString(text, forType: .string)
     return pasteboard
 }
 

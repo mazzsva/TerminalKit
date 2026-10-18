@@ -1,6 +1,6 @@
 import AppKit
 
-extension TerminalContentView: NSServicesMenuRequestor, NSMenuItemValidation {
+extension TerminalContentView: NSMenuItemValidation {
     var selectedText: String? {
         guard let selection, selection.anchor != selection.head else {
             return nil
@@ -25,43 +25,32 @@ extension TerminalContentView: NSServicesMenuRequestor, NSMenuItemValidation {
     }
 
     @objc func copy(_ sender: Any?) {
-        _ = writeSelection(to: .general, types: [.string])
+        copySelection(to: .general)
     }
 
-    func writeSelection(to pasteboard: NSPasteboard, types: [NSPasteboard.PasteboardType]) -> Bool {
-        guard types.contains(.string), let selectedText else {
-            return false
+    func copySelection(to pasteboard: NSPasteboard) {
+        guard let selectedText else {
+            return
         }
         pasteboard.clearContents()
-        return pasteboard.setString(selectedText, forType: .string)
+        pasteboard.setString(selectedText, forType: .string)
     }
 
     @objc func paste(_ sender: Any?) {
-        _ = readSelection(from: .general)
+        paste(from: .general)
     }
 
-    func readSelection(from pasteboard: NSPasteboard) -> Bool {
+    func paste(from pasteboard: NSPasteboard) {
         guard let text = pasteboard.string(forType: .string) else {
-            return false
+            return
         }
         scrollToBottom()
         let lines = text.replacing("\r\n", with: "\r").replacing("\n", with: "\r")
         guard session.terminal.usesBracketedPaste else {
             session.send(Array(lines.utf8))
-            return true
+            return
         }
         session.send(Array("\u{1B}[200~\(lines.replacing("\u{1B}", with: ""))\u{1B}[201~".utf8))
-        return true
-    }
-
-    override func validRequestor(
-        forSendType sendType: NSPasteboard.PasteboardType?,
-        returnType: NSPasteboard.PasteboardType?
-    ) -> Any? {
-        let canSend = sendType == nil || sendType == .string && selectedText != nil
-        let canReturn = returnType == nil || returnType == .string
-        return canSend && canReturn && (sendType != nil || returnType != nil)
-            ? self : super.validRequestor(forSendType: sendType, returnType: returnType)
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {

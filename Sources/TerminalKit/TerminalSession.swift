@@ -7,20 +7,11 @@ public final class TerminalSession {
     public enum State: Equatable, Sendable {
         case idle
         case running
-        case exited(Termination)
-    }
-
-    public enum Termination: Equatable, Sendable {
-        case exit(Int32)
-        case uncaughtSignal(Int32)
+        case exited
     }
 
     public let configuration: Configuration
     public private(set) var state = State.idle
-
-    public var title: String {
-        terminal.title
-    }
 
     private(set) var terminal = Terminal(columns: 80, rows: 24)
 
@@ -45,11 +36,13 @@ public final class TerminalSession {
         self.pseudoTerminal = pseudoTerminal
         state = .running
 
-        let events = pseudoTerminal.events
+        let output = pseudoTerminal.output
         Task { [weak self] in
-            for await event in events {
-                self?.handle(event)
+            for await bytes in output {
+                self?.receive(bytes)
             }
+            self?.state = .exited
+            self?.pseudoTerminal = nil
         }
     }
 
@@ -65,27 +58,10 @@ public final class TerminalSession {
         pseudoTerminal?.write(bytes)
     }
 
-    private func handle(_ event: PseudoTerminal.Event) {
-        switch event {
-        case .output(let bytes):
-            let replies = terminal.receive(bytes)
-            if !replies.isEmpty {
-                pseudoTerminal?.write(replies)
-            }
-        case .exit(let termination):
-            state = .exited(Termination(termination))
-            pseudoTerminal = nil
-        }
-    }
-}
-
-extension TerminalSession.Termination {
-    fileprivate init(_ termination: PseudoTerminal.Termination) {
-        switch termination {
-        case .exit(let status):
-            self = .exit(status)
-        case .uncaughtSignal(let signal):
-            self = .uncaughtSignal(signal)
+    private func receive(_ bytes: [UInt8]) {
+        let replies = terminal.receive(bytes)
+        if !replies.isEmpty {
+            pseudoTerminal?.write(replies)
         }
     }
 }
