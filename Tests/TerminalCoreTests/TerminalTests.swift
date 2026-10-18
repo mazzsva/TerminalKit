@@ -167,6 +167,18 @@ struct TerminalTests {
         #expect(lines(terminal) == ["ab  ", "  c "])
     }
 
+    @Test func repeatsThePrecedingCharacter() {
+        var terminal = Terminal(columns: 6, rows: 2)
+        terminal.receive("a\u{1B}[3b中\u{1B}[b")
+        #expect(lines(terminal) == ["aaaa中 ", "中     "])
+    }
+
+    @Test func repeatsNothingBeforeACharacter() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[3bx")
+        #expect(lines(terminal) == ["x   "])
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")

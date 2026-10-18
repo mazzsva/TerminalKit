@@ -37,6 +37,7 @@ package struct Terminal: Sendable {
     private var isWrapPending = false
     private var style = Style()
     private var usesLineDrawing = false
+    private var lastCharacter: Unicode.Scalar?
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
     private var replies: [UInt8] = []
@@ -155,6 +156,12 @@ package struct Terminal: Sendable {
             eraseInLine(sequence.parameter(at: 0, default: 0))
         case "@":
             insertCharacters(count)
+        case "b":
+            if let lastCharacter {
+                for _ in 0 ..< count {
+                    print(lastCharacter)
+                }
+            }
         case "P":
             deleteCharacters(count)
         case "X":
@@ -189,6 +196,7 @@ package struct Terminal: Sendable {
             combine(scalar)
             return
         }
+        lastCharacter = scalar
         let width = columns > 1 ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
             carriageReturn()
