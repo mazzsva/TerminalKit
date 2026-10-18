@@ -27,6 +27,9 @@ extension TerminalContentView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if openLink(at: event) {
+            return
+        }
         if reportsMouse(for: event) {
             reportMouse(event, button: 0)
             return

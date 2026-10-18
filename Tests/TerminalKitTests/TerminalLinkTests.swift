@@ -1,0 +1,166 @@
+import AppKit
+import Testing
+
+@testable import TerminalKit
+
+@MainActor
+@Suite(.timeLimit(.minutes(1)))
+struct TerminalLinkTests {
+    @Test(arguments: [
+        ("see https://example.com.", "https://example.com"),
+        ("(https://en.wikipedia.org/wiki/Swift_(language))", "https://en.wikipedia.org/wiki/Swift_(language)"),
+        ("go to https://a.com/x, then", "https://a.com/x"),
+        ("'https://a.com/q?x=1&y=2'", "https://a.com/q?x=1&y=2"),
+        ("<HTTPS://A.COM/>", "HTTPS://A.COM/"),
+        ("mail mailto:me@example.com!", "mailto:me@example.com"),
+        ("open file:///tmp/a b", "file:///tmp/a"),
+        ("ftp://host/file]", "ftp://host/file"),
+    ])
+    func detectsALink(text: String, link: String) {
+        let ranges = TerminalContentView.detectedLinks(in: text)
+        let characters = Array(text)
+        #expect(ranges.map { String(characters[$0]) } == [link])
+    }
+
+    @Test(arguments: ["no link here", "https:/broken", "javascript:alert(1)", "ssh://host"])
+    func detectsNoLink(text: String) {
+        #expect(TerminalContentView.detectedLinks(in: text).isEmpty)
+    }
+
+    @Test func choosesASafeAction() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(
+            at: folder.appending(path: "Tool.app"), withIntermediateDirectories: true)
+        try Data("text".utf8).write(to: folder.appending(path: "notes.txt"))
+        try Data("open -a Calculator".utf8).write(to: folder.appending(path: "run.command"))
+        try Data("#!/bin/sh".utf8).write(to: folder.appending(path: "script"))
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: folder.appending(path: "script").path(percentEncoded: false))
+        let action = { (path: String) in TerminalContentView.action(for: folder.appending(path: path)) }
+        #expect(action("notes.txt") == .open(folder.appending(path: "notes.txt")))
+        #expect(action("") == .open(folder.appending(path: "")))
+        #expect(action("Tool.app") == .reveal(folder.appending(path: "Tool.app")))
+        #expect(action("run.command") == .reveal(folder.appending(path: "run.command")))
+        #expect(action("script") == .reveal(folder.appending(path: "script")))
+        #expect(action("missing") == nil)
+        let url = try #require(URL(string: "https://example.com"))
+        #expect(TerminalContentView.action(for: url) == .open(url))
+        for text in ["zoommtg://join", "javascript:alert(1)", "ssh://host", "x-apple.systempreferences:"] {
+            #expect(TerminalContentView.action(for: try #require(URL(string: text))) == nil)
+        }
+    }
+
+    @Test func findsAHyperlink() async throws {
+        let view = try await linkView(
+            running: "printf 'x \\033]8;;https://example.com/a\\033\\\\ab\\033]8;;\\033\\\\ c'")
+        let link = try #require(view.link(atRow: 0, column: 3))
+        #expect(link.url == URL(string: "https://example.com/a"))
+        #expect(link.spans == [.init(row: 0, columns: 2 ..< 4)])
+        #expect(view.link(atRow: 0, column: 4) == nil)
+        #expect(view.link(atRow: 0, column: 0) == nil)
+    }
+
+    @Test func findsAWrappedLinkAfterWideCharacters() async throws {
+        let view = try await linkView(running: "printf '中 https://example.com/abc d'")
+        let link = try #require(view.link(atRow: 1, column: 2))
+        #expect(link.url == URL(string: "https://example.com/abc"))
+        #expect(
+            link.spans == [
+                .init(row: 0, columns: 3 ..< 10), .init(row: 1, columns: 0 ..< 10), .init(row: 2, columns: 0 ..< 6),
+            ])
+        #expect(view.link(atRow: 0, column: 0) == nil)
+        #expect(view.link(atRow: 2, column: 7) == nil)
+        #expect(view.link(atRow: 9, column: 0) == nil)
+    }
+
+    @Test func opensALinkWithCommandClick() async throws {
+        let view = try await linkView(running: "printf 'https://example.com'")
+        var actions: [TerminalContentView.LinkAction] = []
+        view.performLinkAction = { actions.append($0) }
+        let window = NSWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 2, in: view))
+        #expect(actions.isEmpty)
+        #expect(view.selection != nil)
+        view.selection = nil
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 2, in: view, modifierFlags: .command))
+        #expect(actions == [.open(try #require(URL(string: "https://example.com")))])
+        #expect(view.selection == nil)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 2, in: view, modifierFlags: .command))
+        #expect(actions.count == 1)
+        #expect(view.selection != nil)
+        #expect(window.contentView === view)
+    }
+
+    @Test func opensNoUnsafeLink() async throws {
+        let view = try await linkView(running: "printf '\\033]8;;zoommtg://join\\033\\\\join\\033]8;;\\033\\\\'")
+        var actions: [TerminalContentView.LinkAction] = []
+        view.performLinkAction = { actions.append($0) }
+        let window = NSWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .command))
+        #expect(actions.isEmpty)
+        #expect(window.contentView === view)
+    }
+
+    @Test func opensALinkWhileTheProgramTracksTheMouse() async throws {
+        let session = TerminalSession(
+            running:
+                "stty raw -echo; printf '\\033[?1000hhttps://a.com\\r\\n'; dd bs=1 count=12 2>/dev/null | od -An -tx1"
+        )
+        let view = TerminalContentView(session: session)
+        var actions: [TerminalContentView.LinkAction] = []
+        view.performLinkAction = { actions.append($0) }
+        let window = NSWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        try session.start()
+        await session.waitForText("https://a.com")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .command))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 0, column: 1, in: view, modifierFlags: .command))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 0, in: view))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 0, in: view))
+        #expect(await session.linesAfterExit().contains("1b  5b  4d  20  21  22  1b  5b  4d  23  21  22"))
+        #expect(actions.count == 1)
+        #expect(window.contentView === view)
+    }
+
+    @Test func underlinesTheHoveredLink() async throws {
+        let view = try await linkView(running: "printf 'https://example.com'")
+        let window = NSWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        let location = view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil)
+        let plain = try image(of: view)
+        view.updateHoveredLink(at: location, modifierFlags: [])
+        #expect(view.hoveredLink == nil)
+        view.updateHoveredLink(at: location, modifierFlags: .command)
+        #expect(view.hoveredLink?.url == URL(string: "https://example.com"))
+        #expect(try image(of: view) != plain)
+        view.mouseExited(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view))
+        #expect(view.hoveredLink == nil)
+        #expect(try image(of: view) == plain)
+        #expect(window.contentView === view)
+    }
+}
+
+extension CGRect {
+    fileprivate var center: CGPoint {
+        CGPoint(x: midX, y: midY)
+    }
+}
+
+@MainActor
+private func linkView(running script: String) async throws -> TerminalContentView {
+    let session = TerminalSession(running: script)
+    session.resize(columns: 10, rows: 4)
+    let view = TerminalContentView(session: session)
+    try session.start()
+    await session.waitForExit()
+    return view
+}
+
+@MainActor
+private func image(of view: NSView) throws -> Data {
+    let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+    view.cacheDisplay(in: view.bounds, to: representation)
+    return try #require(representation.tiffRepresentation)
+}
