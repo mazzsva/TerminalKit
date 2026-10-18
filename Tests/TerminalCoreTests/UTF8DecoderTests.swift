@@ -19,6 +19,14 @@ struct UTF8DecoderTests {
         #expect(Array(decoder.decode([0x98, 0x80])) == ["😀"])
     }
 
+    @Test func decodesNoBytes() {
+        var decoder = UTF8Decoder()
+        #expect(decoder.decode([]).isEmpty)
+        #expect(decoder.decode([0xC3]).isEmpty)
+        #expect(decoder.decode([]).isEmpty)
+        #expect(Array(decoder.decode([0xA9])) == ["é"])
+    }
+
     @Test func replacesInvalidBytes() {
         var decoder = UTF8Decoder()
         #expect(Array(decoder.decode([0x41, 0x80, 0xC0, 0xFF])) == ["A", "\u{FFFD}", "\u{FFFD}", "\u{FFFD}"])

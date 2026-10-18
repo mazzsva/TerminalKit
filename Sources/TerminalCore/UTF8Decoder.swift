@@ -9,7 +9,7 @@ struct UTF8Decoder {
     }
 
     private static func endOfCompleteSequences(in bytes: [UInt8]) -> Int {
-        for count in 1 ... min(3, bytes.count) where bytes[bytes.count - count] & 0xC0 != 0x80 {
+        for count in (1 ... 3).prefix(bytes.count) where bytes[bytes.count - count] & 0xC0 != 0x80 {
             let length =
                 switch bytes[bytes.count - count] {
                 case 0xC2 ... 0xDF: 2

@@ -17,6 +17,7 @@ package struct Terminal: Sendable {
     }
 
     private static let tabWidth = 8
+    private static let maximumScalarsPerCell = 16
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
 
@@ -311,7 +312,7 @@ package struct Terminal: Sendable {
             insertCharacters(count)
         case "b":
             if let lastCharacter {
-                for _ in 0 ..< count {
+                for _ in 0 ..< repeatCount(count, of: lastCharacter) {
                     print(lastCharacter)
                 }
             }
@@ -403,6 +404,12 @@ package struct Terminal: Sendable {
         }
     }
 
+    private func repeatCount(_ count: Int, of scalar: Unicode.Scalar) -> Int {
+        let rowCount = max(columns / scalar.width, 1)
+        let screenCount = (rows + 1) * rowCount
+        return count <= screenCount ? count : screenCount + (count - screenCount) % rowCount
+    }
+
     private mutating func combine(_ scalar: Unicode.Scalar) {
         var column = isWrapPending ? cursor.column : cursor.column - 1
         if column > 0, screen[cursor.row][column].width == 0 {
@@ -412,6 +419,9 @@ package struct Terminal: Sendable {
             return
         }
         var text = String(screen[cursor.row][column].character)
+        guard text.unicodeScalars.count < Self.maximumScalarsPerCell else {
+            return
+        }
         text.unicodeScalars.append(scalar)
         if let character = text.first, text.count == 1 {
             screen[cursor.row][column].character = character
