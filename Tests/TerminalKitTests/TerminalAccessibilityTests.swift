@@ -156,6 +156,21 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityFrame(for: NSRange(location: 99, length: 1)) == .zero)
     }
 
+    @Test func framesAnEmptyScrollbackLine() async throws {
+        let view = try await accessibleView(running: "printf 'a\\n\\nb\\nc\\nd\\ne\\n'")
+        let window = NSWindow(contentView: view)
+        let range = view.accessibilityRange(forLine: 1)
+        #expect(range == NSRange(location: 2, length: 1))
+        let expected = view.rect(row: 1, columns: 0 ..< 1)
+        #expect(view.accessibilityFrame(for: range) == window.convertToScreen(view.convert(expected, to: nil)))
+        #expect(view.accessibilityFrame(for: NSRange(location: 1, length: 1)) != .zero)
+    }
+
+    @Test func givesTheVisibleRangeOutsideAWindow() async throws {
+        let view = try await accessibleView(running: "printf 'ab'")
+        #expect(view.accessibilityVisibleCharacterRange().location == 0)
+    }
+
     @Test func framesTheEndOfAFullRow() async throws {
         let view = try await accessibleView(running: "printf '0123456789\\r\\nx'")
         let window = NSWindow(contentView: view)

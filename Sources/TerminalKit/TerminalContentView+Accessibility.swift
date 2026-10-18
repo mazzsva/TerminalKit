@@ -175,6 +175,7 @@ extension TerminalContentView {
 
     override func accessibilityVisibleCharacterRange() -> NSRange {
         let text = accessibilityText
+        let visibleRect = enclosingScrollView?.documentVisibleRect ?? bounds
         let firstRow = row(at: visibleRect.minY + Self.padding, in: text)
         let lastRow = row(at: visibleRect.maxY - Self.padding - 1, in: text)
         return NSRange(
@@ -268,7 +269,8 @@ extension TerminalContentView {
         }
         let start = position(of: range.location, in: text)
         let end = range.length > 0 ? position(of: range.upperBound - 1, in: text) : start
-        let endColumn = end.column + max(Int(line(at: end.row)[end.column].width), 1)
+        let endLine = line(at: end.row)
+        let endColumn = end.column + (endLine.indices.contains(end.column) ? max(Int(endLine[end.column].width), 1) : 1)
         let frame =
             start.row == end.row
             ? rect(row: start.row, columns: start.column ..< endColumn)
@@ -309,7 +311,7 @@ extension TerminalContentView {
                 return (row, column)
             }
         }
-        return (row, line.count - 1)
+        return (row, max(line.count - 1, 0))
     }
 
     private func clamped(_ range: NSRange, in text: AccessibilityText) -> NSRange? {
