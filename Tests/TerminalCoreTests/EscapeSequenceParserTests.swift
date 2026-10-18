@@ -28,6 +28,17 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}(\u{18}B") == [.execute("\u{18}"), .print("B")])
     }
 
+    @Test(arguments: ["\u{1B}", "\u{1B}(", "\u{1B}( "])
+    func printsANonASCIICharacterAfterAnEscape(escape: String) {
+        #expect(parse(escape + "éAB") == [.print("é"), .print("A"), .print("B")])
+        #expect(parse(escape + "中") == [.print("中")])
+    }
+
+    @Test func ignoresDeleteAndC1ControlCharactersInAnEscape() {
+        #expect(parse("\u{1B}\u{7F}\u{85}7") == [.escape(intermediates: "", final: "7")])
+        #expect(parse("\u{1B}(\u{7F}\u{85}B") == [.escape(intermediates: "(", final: "B")])
+    }
+
     @Test func dispatchesControlSequences() {
         #expect(parse("\u{1B}[H") == [controlSequence(final: "H")])
         #expect(parse("\u{1B}[12;40H") == [controlSequence(parameters: [12, 40], final: "H")])

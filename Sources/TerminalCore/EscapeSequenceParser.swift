@@ -103,6 +103,9 @@ struct EscapeSequenceParser: Sendable {
         case "0" ... "~":
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)
+        case "\u{A0}"...:
+            state = .ground
+            return .print(scalar)
         default:
             break
         }
@@ -116,6 +119,9 @@ struct EscapeSequenceParser: Sendable {
         case "0" ... "~":
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)
+        case "\u{A0}"...:
+            state = .ground
+            return .print(scalar)
         default:
             break
         }
