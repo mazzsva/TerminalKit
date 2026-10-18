@@ -26,6 +26,82 @@ struct TerminalPromptTests {
         await session.waitForExit()
     }
 
+    @Test func revealsACommand() async throws {
+        let (scrollView, session) = try await scrollView(
+            running: commands + "; printf '\\033]133;A\\007$ ready'; read line")
+        #expect(session.commands.count == 3)
+        session.reveal(session.commands[0])
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(topLine(of: scrollView) == "$ command 1")
+        scrollView.terminalView.scrollToBottom()
+        scrollView.needsLayout = true
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
+        session.reveal(session.commands[1])
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(topLine(of: scrollView) == "$ command 2")
+        scrollView.terminalView.scrollToBottom()
+        session.reveal(session.commands[1])
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(topLine(of: scrollView) == "$ command 2")
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+    }
+
+    @Test func revealsTheOutputOfACommandWithoutAPrompt() async throws {
+        let (scrollView, session) = try await scrollView(
+            running: "printf '\\033]133;C\\007only output\\r\\n'; seq 1 40; echo ready; read line"
+        )
+        session.reveal(try #require(session.commands.first))
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(topLine(of: scrollView) == "only output")
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+    }
+
+    @Test func revealsACommandAfterOldCommandsAreTrimmed() async throws {
+        let (scrollView, session) = try await scrollView(
+            running: """
+                i=0
+                while [ $i -lt 11001 ]; do
+                    printf '\\033]133;A\\007$ %d\\r\\n\\033]133;C\\007' $i
+                    i=$((i + 1))
+                done
+                echo ready; read line
+                """
+        )
+        #expect(session.commands.first?.id == 1_001)
+        session.reveal(try #require(session.commands.first { $0.id == 10_500 }))
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(topLine(of: scrollView) == "$ 10500")
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+    }
+
+    @Test func revealsNothingForAnUnknownCommand() async throws {
+        let (scrollView, session) = try await scrollView(
+            running: commands + "; printf '\\033]133;A\\007$ ready'; read line")
+        let top = scrollView.contentView.bounds.minY
+        var command = session.commands[0]
+        command = TerminalSession.Command(
+            id: 99, text: command.text, directory: nil, exitStatus: nil, startDate: command.startDate, endDate: nil)
+        session.reveal(command)
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.minY == top)
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+    }
+
+    @Test func revealsNothingOnTheAlternateScreen() async throws {
+        let (scrollView, session) = try await scrollView(running: commands + "; printf '\\033[?1049hready'; read line")
+        let top = scrollView.contentView.bounds.minY
+        session.reveal(session.commands[0])
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.minY == top)
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+    }
+
     @Test func scrollsThroughShortCommands() async throws {
         let short =
             "for n in 1 2 3 4 5 6 7 8 9; do printf '\\033]133;A\\007$ short %s\\r\\n\\033]133;C\\007x\\r\\n' $n; done"

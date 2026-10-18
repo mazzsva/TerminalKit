@@ -22,6 +22,8 @@ public final class TerminalSession {
     public private(set) var bellCount = 0
     public private(set) var commands: [Command] = []
     public private(set) var currentDirectory: URL?
+    private(set) var revealedCommandID: Int?
+    private(set) var revealCount = 0
 
     private(set) var liveTerminal = Terminal(columns: 80, rows: 24) {
         didSet {
@@ -76,6 +78,11 @@ public final class TerminalSession {
             }
             self?.finish()
         }
+    }
+
+    public func reveal(_ command: Command) {
+        revealedCommandID = command.id
+        revealCount += 1
     }
 
     func resize(columns: Int, rows: Int) {

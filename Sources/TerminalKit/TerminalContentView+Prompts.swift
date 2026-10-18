@@ -14,4 +14,16 @@ extension TerminalContentView {
             scrollToBottom()
         }
     }
+
+    func scrollToCommand(_ id: Int) {
+        let terminal = session.liveTerminal
+        let index = id - terminal.removedCommandCount
+        guard !terminal.isAlternateScreenActive, terminal.commands.indices.contains(index),
+            let row = (terminal.commands[index].prompt ?? terminal.commands[index].output)?.row,
+            row >= terminal.removedScrollbackCount
+        else {
+            return
+        }
+        scroll(CGPoint(x: 0, y: CGFloat(row - terminal.removedScrollbackCount) * cellSize.height))
+    }
 }
