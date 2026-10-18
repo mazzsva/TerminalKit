@@ -43,6 +43,21 @@ extension NSWindow {
     }
 }
 
+final class KeyWindow: NSWindow {
+    var isKey = true {
+        didSet {
+            NotificationCenter.default.post(
+                name: isKey ? NSWindow.didBecomeKeyNotification : NSWindow.didResignKeyNotification,
+                object: self
+            )
+        }
+    }
+
+    override var isKeyWindow: Bool {
+        isKey
+    }
+}
+
 @MainActor
 func mouseEvent(
     _ type: NSEvent.EventType,

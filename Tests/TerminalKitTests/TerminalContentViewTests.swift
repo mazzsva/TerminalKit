@@ -45,22 +45,96 @@ struct TerminalContentViewTests {
     @Test func drawsTheCursor() throws {
         let session = TerminalSession(running: "exit")
         let view = TerminalContentView(session: session)
+        let window = KeyWindow(contentView: view)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
         let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: representation)
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
         let corner = CGPoint(x: 190, y: 90)
         #expect(color(in: representation, at: center) != color(in: representation, at: corner))
+        #expect(window.firstResponder === view)
+    }
+
+    @Test func drawsAHollowCursorWithoutTheFocus() async throws {
+        let (view, window) = try await focusedView(running: "exit")
+        let edge = CGPoint(x: view.cursorRect.minX + 0.5, y: view.cursorRect.midY)
+        let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
+        let corner = CGPoint(x: 190, y: 90)
+        let focused = try representation(of: view)
+        let cursor = color(in: focused, at: center)
+        #expect(!isClose(cursor, to: color(in: focused, at: corner)))
+
+        window.isKey = false
+        let unfocused = try representation(of: view)
+        #expect(isClose(color(in: unfocused, at: edge), to: cursor))
+        #expect(isClose(color(in: unfocused, at: center), to: color(in: unfocused, at: corner)))
+
+        window.isKey = true
+        #expect(isClose(color(in: try representation(of: view), at: center), to: cursor))
+    }
+
+    @Test func drawsAHollowCursorWhenAnotherViewHasTheFocus() async throws {
+        let (view, window) = try await focusedView(running: "exit")
+        let textView = NSTextView()
+        view.addSubview(textView)
+        window.makeFirstResponder(textView)
+        let representation = try representation(of: view)
+        let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
+        let corner = CGPoint(x: 190, y: 90)
+        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: corner)))
+        #expect(!view.isFocused)
+
+        window.makeFirstResponder(view)
+        #expect(view.isFocused)
+    }
+
+    @Test func losesTheFocusWhenItLeavesTheWindow() async throws {
+        let (view, window) = try await focusedView(running: "exit")
+        let container = NSView()
+        window.contentView = container
+        #expect(!view.isFocused)
+
+        container.addSubview(view)
+        #expect(view.isFocused)
+    }
+
+    @Test func reportsTheFocusWhenTheProcessAsks() async throws {
+        let session = TerminalSession(
+            running: "stty raw -echo; printf '\\033[?1004h'; dd bs=1 count=6 2>/dev/null | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        let window = KeyWindow(contentView: view)
+        window.isKey = false
+        try session.start()
+        for await isEnabled in Observations({ session.terminal.usesFocusReporting }) where isEnabled {
+            break
+        }
+        window.isKey = true
+        window.isKey = true
+        window.isKey = false
+        #expect(await session.linesAfterExit().contains("1b  5b  49  1b  5b  4f"))
+    }
+
+    @Test func reportsNoFocusWhenTheProcessDoesNotAsk() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; dd bs=1 count=1 2>/dev/null | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        let window = KeyWindow(contentView: view)
+        try session.start()
+        await session.waitForText("ready")
+        window.isKey = false
+        window.isKey = true
+        view.keyDown(with: try keyDown("a"))
+        #expect(await session.linesAfterExit().contains("61"))
     }
 
     @Test func drawsTheCharacterUnderTheCursor() async throws {
         var palette = TerminalPalette.standard
         palette.cursor = .red
-        let character = try await drawnView(running: "printf 'X\\b'")
-        let space = try await drawnView(running: "printf ' \\b'")
+        let (character, characterWindow) = try await focusedView(running: "printf 'X\\b'")
+        let (space, spaceWindow) = try await focusedView(running: "printf ' \\b'")
         character.palette = palette
         space.palette = palette
         #expect(try pixels(in: character.cursorRect, of: character) != pixels(in: space.cursorRect, of: space))
+        #expect(characterWindow.firstResponder === character && spaceWindow.firstResponder === space)
     }
 
     @Test func coversAWideCharacterWithTheCursor() async throws {
@@ -287,6 +361,17 @@ private func drawnView(running script: String) async throws -> TerminalContentVi
 }
 
 @MainActor
+private func focusedView(running script: String) async throws -> (view: TerminalContentView, window: KeyWindow) {
+    let session = TerminalSession(running: script)
+    let view = TerminalContentView(session: session)
+    let window = KeyWindow(contentView: view)
+    view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+    try session.start()
+    await session.waitForExit()
+    return (view, window)
+}
+
+@MainActor
 private func image(of view: NSView) throws -> Data {
     try #require(try representation(of: view).tiffRepresentation)
 }
@@ -313,6 +398,13 @@ private func pixels(in rect: CGRect, of view: NSView) throws -> [NSColor?] {
             stride(from: Int(rect.minX * scale), to: Int(rect.maxX * scale), by: 1)
                 .map { x in representation.colorAt(x: x, y: y) }
         }
+}
+
+private func isClose(_ color: NSColor?, to other: NSColor?) -> Bool {
+    guard let other = other?.usingColorSpace(.sRGB) else {
+        return false
+    }
+    return isClose(color, to: [other.redComponent, other.greenComponent, other.blueComponent])
 }
 
 private func isClose(_ color: NSColor?, to components: [CGFloat]) -> Bool {

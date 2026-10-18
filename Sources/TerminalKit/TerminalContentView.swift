@@ -34,6 +34,17 @@ final class TerminalContentView: NSView {
         }
     }
 
+    private(set) var isFocused = false {
+        didSet {
+            guard isFocused != oldValue else {
+                return
+            }
+            needsDisplay = true
+            if session.terminal.usesFocusReporting {
+                session.send(Array((isFocused ? "\u{1B}[I" : "\u{1B}[O").utf8))
+            }
+        }
+    }
     var lastMousePosition: Terminal.Position?
     var scrollWheelLines: CGFloat = 0
 
@@ -103,11 +114,48 @@ final class TerminalContentView: NSView {
         true
     }
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: window)
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: window)
+        if let newWindow {
+            for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+                NotificationCenter.default.addObserver(
+                    self,
+                    selector: #selector(windowKeyStateDidChange),
+                    name: name,
+                    object: newWindow
+                )
+            }
+        }
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let window, window.firstResponder === window || window.firstResponder is TerminalContentView {
             window.makeFirstResponder(self)
         }
+        windowKeyStateDidChange()
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else {
+            return false
+        }
+        isFocused = window?.isKeyWindow == true
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        guard super.resignFirstResponder() else {
+            return false
+        }
+        isFocused = false
+        return true
+    }
+
+    @objc private func windowKeyStateDidChange() {
+        isFocused = window?.isKeyWindow == true && window?.firstResponder === self
     }
 
     override func keyDown(with event: NSEvent) {
@@ -188,6 +236,11 @@ final class TerminalContentView: NSView {
         guard terminal.isCursorVisible else {
             return
         }
+        guard isFocused else {
+            colors.cursor.setStroke()
+            NSBezierPath(rect: cursor.insetBy(dx: 0.5, dy: 0.5)).stroke()
+            return
+        }
         colors.cursor.setFill()
         cursor.fill(using: .sourceOver)
         let line = terminal.screen[terminal.cursor.row]
@@ -215,7 +268,7 @@ final class TerminalContentView: NSView {
     }
 
     private var selectionColor: NSColor {
-        window?.firstResponder === self ? colors.selection : .unemphasizedSelectedTextBackgroundColor
+        isFocused ? colors.selection : .unemphasizedSelectedTextBackgroundColor
     }
 
     private static func runs(in line: Terminal.Line) -> [(columns: Range<Int>, style: Terminal.Style)] {

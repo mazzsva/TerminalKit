@@ -29,6 +29,7 @@ package struct Terminal: Sendable {
     package private(set) var usesApplicationCursorKeys = false
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
+    package private(set) var usesFocusReporting = false
     package private(set) var title = ""
     package private(set) var mouseTracking = MouseTracking.off
     private(set) var usesSGRMouseEncoding = false
@@ -609,6 +610,8 @@ package struct Terminal: Sendable {
             mouseTracking = .drags
         case (1000, false), (1002, false), (1003, false):
             mouseTracking = .off
+        case (1004, _):
+            usesFocusReporting = isEnabled
         case (1006, _):
             usesSGRMouseEncoding = isEnabled
         case (2004, _):
