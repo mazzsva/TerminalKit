@@ -3,7 +3,11 @@ import TerminalCore
 
 extension TerminalContentView {
     override func mouseUp(with event: NSEvent) {
-        if reportsMouse(for: event), !event.modifierFlags.contains(.command) || link(at: event) == nil {
+        guard !isOpeningLink else {
+            isOpeningLink = false
+            return
+        }
+        if reportsMouse(for: event) {
             reportMouse(event, button: 0, isRelease: true)
         }
     }

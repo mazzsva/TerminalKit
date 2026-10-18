@@ -20,7 +20,7 @@ extension TerminalContentView {
     private static let schemes: Set<String> = ["http", "https", "mailto", "ftp", "file"]
     private static let launchingExtensions: Set<String> = [
         "app", "command", "tool", "terminal", "workflow", "action", "pkg", "mpkg", "scpt", "scptd", "applescript",
-        "jar",
+        "jar", "webloc", "fileloc", "inetloc", "mobileconfig", "prefpane", "saver",
     ]
     private static let pattern = #/(?:https?|ftp|file)://[^\s<>"'`]+|mailto:[^\s<>"'`]+/#.ignoresCase()
 
@@ -31,13 +31,15 @@ extension TerminalContentView {
         guard url.isFileURL else {
             return .open(url)
         }
-        let path = url.path(percentEncoded: false)
+        let resolved = url.resolvingSymlinksInPath()
+        let path = resolved.path(percentEncoded: false)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
             return nil
         }
         let launches =
-            launchingExtensions.contains(url.pathExtension.lowercased())
+            launchingExtensions.contains(resolved.pathExtension.lowercased())
+            || (try? resolved.resourceValues(forKeys: [.isApplicationKey]).isApplication) == true
             || !isDirectory.boolValue && FileManager.default.isExecutableFile(atPath: path)
         return launches ? .reveal(url) : .open(url)
     }
@@ -82,13 +84,27 @@ extension TerminalContentView {
             range = lowerBound ..< upperBound
             url = terminal.links.uri(of: link).flatMap(URL.init(string:))
         } else {
-            let characters = cells.map { terminal.character(of: $0.cell) }
-            let text = String(characters)
-            guard let match = Self.detectedLinks(in: text).first(where: { $0.contains(index) }) else {
+            var text = String.UnicodeScalarView()
+            var starts: [Int] = []
+            var count = 0
+            for cell in cells {
+                let scalars = terminal.character(of: cell.cell).unicodeScalars
+                starts.append(count)
+                count += scalars.count
+                text.append(contentsOf: scalars)
+            }
+            let matches = Self.detectedLinks(in: String(text))
+                .compactMap { match in
+                    starts.firstIndex(of: match.lowerBound)
+                        .map {
+                            $0 ..< (starts.firstIndex { $0 >= match.upperBound } ?? cells.count)
+                        }
+                }
+            guard let match = matches.first(where: { $0.contains(index) }) else {
                 return nil
             }
             range = match
-            url = URL(string: String(characters[match]))
+            url = URL(string: String(cells[match].map { terminal.character(of: $0.cell) }))
         }
         guard let url else {
             return nil
@@ -104,10 +120,11 @@ extension TerminalContentView {
     }
 
     static func detectedLinks(in text: String) -> [Range<Int>] {
-        text.matches(of: pattern)
+        let scalars = text.unicodeScalars
+        return text.matches(of: pattern.matchingSemantics(.unicodeScalar))
             .map { match in
-                let lowerBound = text.distance(from: text.startIndex, to: match.range.lowerBound)
-                var characters = Array(text[match.range])
+                let lowerBound = scalars.distance(from: scalars.startIndex, to: match.range.lowerBound)
+                var characters = scalars[match.range].map(Character.init)
                 while let last = characters.last, shouldTrim(last, from: characters) {
                     characters.removeLast()
                 }
