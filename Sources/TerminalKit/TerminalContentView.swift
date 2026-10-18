@@ -33,6 +33,9 @@ final class TerminalContentView: NSView {
         }
     }
 
+    var lastMousePosition: Terminal.Position?
+    var scrollWheelLines: CGFloat = 0
+
     private var colors = Colors(.standard)
     private var keyDownEvent: NSEvent?
 

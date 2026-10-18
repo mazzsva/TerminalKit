@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Testing
 
 @testable import TerminalKit
 
@@ -40,4 +41,31 @@ extension NSWindow {
         )
         self.contentView = contentView
     }
+}
+
+@MainActor
+func mouseEvent(
+    _ type: NSEvent.EventType,
+    row: Int,
+    column: Int,
+    in view: TerminalContentView,
+    modifierFlags: NSEvent.ModifierFlags = []
+) throws -> NSEvent {
+    let point = CGPoint(
+        x: TerminalContentView.padding + CGFloat(column) * view.cellSize.width,
+        y: TerminalContentView.padding + (CGFloat(row) + 0.5) * view.cellSize.height
+    )
+    return try #require(
+        NSEvent.mouseEvent(
+            with: type,
+            location: view.convert(point, to: nil),
+            modifierFlags: modifierFlags,
+            timestamp: 0,
+            windowNumber: view.window?.windowNumber ?? 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1
+        )
+    )
 }

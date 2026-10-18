@@ -27,11 +27,21 @@ extension TerminalContentView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if reportsMouse(for: event) {
+            reportMouse(event, button: 0)
+            return
+        }
         let point = selectionPoint(at: convert(event.locationInWindow, from: nil))
         selection = Selection(anchor: point, head: point)
     }
 
     override func mouseDragged(with event: NSEvent) {
+        if reportsMouse(for: event) {
+            if session.terminal.mouseTracking == .drags, mousePosition(of: event) != lastMousePosition {
+                reportMouse(event, button: 32)
+            }
+            return
+        }
         autoscroll(with: event)
         selection?.head = selectionPoint(at: convert(event.locationInWindow, from: nil))
     }
