@@ -1,7 +1,7 @@
 import Foundation
 
 extension Terminal {
-    package struct Command: Equatable, Sendable {
+    package struct Command: Codable, Equatable, Sendable {
         package var text: String?
         package var directory: URL?
         package var prompt: Position?
@@ -11,7 +11,7 @@ extension Terminal {
         package var isFinished = false
     }
 
-    private static let maximumCommands = 10_000
+    static let maximumCommands = 10_000
     private static let commandTrimCount = 1_000
 
     mutating func performShellIntegration(_ mark: Substring) {
