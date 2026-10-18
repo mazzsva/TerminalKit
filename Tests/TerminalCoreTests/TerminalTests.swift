@@ -321,7 +321,6 @@ struct TerminalTests {
     @Test func switchesToABlankAlternateScreen() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("ab\u{1B}[?1049h")
-        #expect(terminal.isAlternateScreenActive)
         #expect(lines(terminal) == ["    ", "    "])
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
@@ -329,7 +328,6 @@ struct TerminalTests {
     @Test func restoresTheNormalScreenAndCursor() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("ab\u{1B}[?1049h\u{1B}[2;3Hxy\u{1B}[?1049lc")
-        #expect(!terminal.isAlternateScreenActive)
         #expect(lines(terminal) == ["abc ", "    "])
     }
 

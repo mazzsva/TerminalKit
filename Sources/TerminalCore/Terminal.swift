@@ -32,10 +32,6 @@ package struct Terminal: Sendable {
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
 
-    package var isAlternateScreenActive: Bool {
-        normalScreen != nil
-    }
-
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
     private var isWrapPending = false
