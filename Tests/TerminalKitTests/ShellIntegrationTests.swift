@@ -116,6 +116,24 @@ struct ShellIntegrationTests {
         #expect(prompts.allSatisfy { lines[$0.row - terminal.removedScrollbackCount].hasPrefix("top line") })
     }
 
+    @Test func reflowsTheTopLinesOfABashPrompt() async throws {
+        try write("PS1='top line of a long prompt here\\nbash$ '", to: ".bash_profile")
+        let session = try startedSession("/bin/bash")
+        await session.waitForText("bash$")
+        session.resize(columns: 10, rows: 24)
+        #expect(session.lines.contains("f a long p"))
+        #expect(session.lines.contains("rompt here"))
+    }
+
+    @Test func keepsTheTopLinesOfAZshPromptForTheShell() async throws {
+        try write("PS1=$'top line of a long prompt here\\nzsh%% '", to: ".zshrc")
+        let session = try startedSession("/bin/zsh")
+        await session.waitForText("zsh%")
+        session.resize(columns: 10, rows: 24)
+        #expect(!session.lines.contains("f a long p"))
+        #expect(session.lines.contains("top line o"))
+    }
+
     @Test func keepsTheZDOTDIROfTheEnvironment() async throws {
         try FileManager.default.createDirectory(at: home.appending(path: "config"), withIntermediateDirectories: true)
         try write("export FROM=zshrc", to: "config/.zshrc")

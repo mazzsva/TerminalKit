@@ -18,9 +18,12 @@ extension Terminal {
         let parameters = mark.split(separator: ";", omittingEmptySubsequences: false)
         switch parameters[0] {
         case "A":
-            finishCommand(exitStatus: nil)
-            prompt = markPosition
-            input = nil
+            if !parameters.contains("k=s") {
+                finishCommand(exitStatus: nil)
+                prompt = markPosition
+                input = nil
+            }
+            redrawnPrompt = markPosition
         case "B":
             input = markPosition
         case "C":
@@ -36,6 +39,7 @@ extension Terminal {
             )
             prompt = nil
             input = nil
+            redrawnPrompt = nil
             if commands.count > Self.maximumCommands + Self.commandTrimCount {
                 removedCommandCount += commands.count - Self.maximumCommands
                 commands.removeFirst(commands.count - Self.maximumCommands)
@@ -57,6 +61,7 @@ extension Terminal {
     mutating func updateMarks(_ update: (inout Position?) -> Void) {
         update(&prompt)
         update(&input)
+        update(&redrawnPrompt)
         for index in commands.indices {
             update(&commands[index].prompt)
             update(&commands[index].output)
