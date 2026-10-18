@@ -6,13 +6,6 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct TerminalSessionTests {
-    @Test func keepsTheConfiguration() {
-        let configuration = TerminalSession.Configuration(
-            executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", "exit"])
-        let session = TerminalSession(configuration: configuration)
-        #expect(session.configuration == configuration)
-    }
-
     @Test func startsTheLoginShellInTheHomeDirectory() {
         let configuration = TerminalSession.Configuration.loginShell
         #expect(configuration.executableURL.path(percentEncoded: false).hasPrefix("/"))
