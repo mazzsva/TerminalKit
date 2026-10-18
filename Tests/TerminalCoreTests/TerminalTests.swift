@@ -306,13 +306,14 @@ struct TerminalTests {
 
     @Test func resetsTheTerminal() {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("a\r\nb\r\nc\u{1B}[?1h\u{1B}[?2004h\u{1B}[?25l\u{1B}[?1049h\u{1B}[1mx\u{1B}c")
+        terminal.receive("a\r\nb\r\nc\u{1B}[?1h\u{1B}[?2004h\u{1B}[?25l\u{1B}[?1004h\u{1B}[?1049h\u{1B}[1mx\u{1B}c")
         #expect(lines(terminal) == ["    ", "    "])
         #expect(scrollback(terminal) == ["a"])
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
         #expect(!terminal.usesApplicationCursorKeys)
         #expect(!terminal.usesBracketedPaste)
         #expect(terminal.isCursorVisible)
+        #expect(!terminal.usesFocusReporting)
         terminal.receive("y")
         #expect(terminal.screen[0][0].style == Terminal.Style())
     }
@@ -947,6 +948,17 @@ struct TerminalTests {
         #expect(terminal.usesBracketedPaste)
         terminal.receive("\u{1B}[?2004l")
         #expect(!terminal.usesBracketedPaste)
+    }
+
+    @Test func setsTheFocusReportingMode() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(!terminal.usesFocusReporting)
+        terminal.receive("\u{1B}[?1004h")
+        #expect(terminal.usesFocusReporting)
+        terminal.receive("\u{1B}[?1049h\u{1B}[?1049l")
+        #expect(terminal.usesFocusReporting)
+        terminal.receive("\u{1B}[?1004l")
+        #expect(!terminal.usesFocusReporting)
     }
 
     @Test func setsTheApplicationCursorKeysMode() {
