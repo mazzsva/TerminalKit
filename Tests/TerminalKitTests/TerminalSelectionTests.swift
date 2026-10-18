@@ -63,6 +63,19 @@ struct TerminalSelectionTests {
         #expect(representation.colorAt(x: 40, y: 40) != before)
     }
 
+    @Test func drawsTheSelectionToTheEndOfAScrollbackLine() async throws {
+        let view = try await view(running: "seq 1 50")
+        let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        let scale = CGFloat(representation.pixelsWide) / representation.size.width
+        let x = Int(view.bounds.midX * scale)
+        let y = Int((4 + 1.5 * view.cellSize.height) * scale)
+        view.cacheDisplay(in: view.bounds, to: representation)
+        let before = representation.colorAt(x: x, y: y)
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 3, column: 0))
+        view.cacheDisplay(in: view.bounds, to: representation)
+        #expect(representation.colorAt(x: x, y: y) != before)
+    }
+
     @Test func copiesTheSelectedText() async throws {
         let view = try await view(running: "printf 'hello world   \\r\\nsecond line'")
         view.selection = Selection(anchor: .init(line: 0, column: 6), head: .init(line: 1, column: 6))

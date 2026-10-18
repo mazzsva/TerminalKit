@@ -131,7 +131,12 @@ final class TerminalContentView: NSView {
                     rect(row: row, columns: columns).fill()
                 }
             }
-            if let columns = selection?.columns(inLine: terminal.removedScrollbackCount + row, count: line.count) {
+            if let columns = selection?
+                .columns(
+                    inLine: terminal.removedScrollbackCount + row,
+                    count: max(line.count, terminal.columns)
+                )
+            {
                 selectionColor.setFill()
                 rect(row: row, columns: columns).fill()
             }
