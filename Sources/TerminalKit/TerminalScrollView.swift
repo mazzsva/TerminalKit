@@ -4,6 +4,7 @@ final class TerminalScrollView: NSScrollView {
     let terminalView: TerminalContentView
 
     private var removedScrollbackCount = 0
+    private var revealCount = 0
 
     init(session: TerminalSession) {
         terminalView = TerminalContentView(session: session)
@@ -34,6 +35,11 @@ final class TerminalScrollView: NSScrollView {
         } else if removedLines > 0 {
             let offset = CGFloat(removedLines) * terminalView.cellSize.height
             terminalView.scroll(CGPoint(x: 0, y: max(contentView.bounds.minY - offset, 0)))
+        }
+        let session = terminalView.session
+        if session.revealCount != revealCount {
+            revealCount = session.revealCount
+            session.revealedCommandID.map(terminalView.scrollToCommand)
         }
     }
 }
