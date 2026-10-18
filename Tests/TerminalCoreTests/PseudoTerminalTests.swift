@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import TerminalCore
 import Testing
@@ -69,6 +70,33 @@ struct PseudoTerminalTests {
         #expect(!FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
         for await _ in pseudoTerminal.output {}
         #expect(FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
+    }
+
+    @Test func sendsALargeInputQuicklyAndInOrder() async throws {
+        let count = 32 << 20
+        var input = (0 ..< 251).map(UInt8.init)
+        while input.count < count {
+            input += input
+        }
+        input.removeLast(input.count - count)
+        let pseudoTerminal = try PseudoTerminal(
+            executableURL: URL(filePath: "/bin/sh"),
+            arguments: ["-c", "stty raw -echo; echo ready; head -c \(count) | shasum -a 256"],
+            environment: ["PATH": "/usr/bin:/bin"],
+            columns: 80,
+            rows: 24
+        )
+        var output = ""
+        var start: ContinuousClock.Instant?
+        for await bytes in pseudoTerminal.output {
+            output += String(decoding: bytes, as: UTF8.self)
+            if start == nil, output.contains("ready") {
+                start = .now
+                pseudoTerminal.write(input)
+            }
+        }
+        #expect(output.contains(SHA256.hash(data: input).map { String(format: "%02x", $0) }.joined()))
+        #expect(try ContinuousClock.now - #require(start) < .seconds(15))
     }
 
     @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
