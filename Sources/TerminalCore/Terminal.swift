@@ -36,6 +36,7 @@ package struct Terminal: Sendable {
     package private(set) var usesFocusReporting = false
     package private(set) var title = ""
     package internal(set) var graphemes = Graphemes()
+    package internal(set) var links = Links()
     package private(set) var bellCount = 0
     package internal(set) var commands: [Command] = []
     package internal(set) var removedCommandCount = 0
@@ -59,6 +60,7 @@ package struct Terminal: Sendable {
         snapshot.scrollback = scrollback
         snapshot.removedScrollbackCount = removedScrollbackCount
         snapshot.graphemes = graphemes
+        snapshot.links = links
         return snapshot
     }
     private var usesAutowrap = true
@@ -498,6 +500,42 @@ package struct Terminal: Sendable {
         graphemes.character(of: cell)
     }
 
+    private mutating func setLink(_ value: Substring) {
+        guard let (key, uri) = Links.key(from: value) else {
+            return
+        }
+        guard !uri.isEmpty else {
+            style.link = 0
+            return
+        }
+        if links.needsCompaction(forKey: key, uri: uri) {
+            compactLinks()
+        }
+        style.link = links.link(forKey: key, uri: uri)
+    }
+
+    private mutating func compactLinks() {
+        endSynchronizedOutput()
+        var used = Array(repeating: false, count: links.count)
+        Links.markLinks(in: scrollback, into: &used)
+        Links.markLinks(in: screen, into: &used)
+        for link in [savedCursor.style.link, normalScreen?.savedCursor.style.link ?? 0] {
+            used[Int(link)] = true
+        }
+        if let normalScreen {
+            Links.markLinks(in: normalScreen.lines, into: &used)
+        }
+        let newIndices = links.compact(keeping: used)
+        Links.remapLinks(in: &scrollback, with: newIndices)
+        Links.remapLinks(in: &screen, with: newIndices)
+        savedCursor.style.link = newIndices[Int(savedCursor.style.link)]
+        if var normalScreen {
+            Links.remapLinks(in: &normalScreen.lines, with: newIndices)
+            normalScreen.savedCursor.style.link = newIndices[Int(normalScreen.savedCursor.style.link)]
+            self.normalScreen = normalScreen
+        }
+    }
+
     private mutating func compactGraphemes() {
         endSynchronizedOutput()
         var used = Array(repeating: false, count: graphemes.count)
@@ -661,6 +699,8 @@ package struct Terminal: Sendable {
         switch parts[0] {
         case "0", "2":
             title = String(parts[1])
+        case "8":
+            setLink(parts[1])
         case "7":
             setCurrentDirectory(parts[1])
         case "133":
@@ -681,6 +721,7 @@ package struct Terminal: Sendable {
         terminal.input = input
         terminal.synchronizedOutputCount = synchronizedOutputCount
         terminal.graphemes = graphemes
+        terminal.links = links
         terminal.scrollback = scrollback
         terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount

@@ -59,6 +59,26 @@ final class TerminalContentView: NSView {
     }
     var ringBell = { NSSound.beep() }
     var currentDate = { Date() }
+    var performLinkAction = { (action: LinkAction) in
+        switch action {
+        case .open(let url):
+            NSWorkspace.shared.open(url)
+        case .reveal(let url):
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+    var hoveredLink: Link? {
+        didSet {
+            guard hoveredLink != oldValue else {
+                return
+            }
+            needsDisplay = true
+            if (hoveredLink == nil) != (oldValue == nil) {
+                (hoveredLink == nil ? NSCursor.arrow : NSCursor.pointingHand).set()
+            }
+        }
+    }
+    var hoveredLinkRevision = 0
     private var fittedColumns: Int?
     var lastMousePosition: Terminal.Position?
     var scrollWheelLines: CGFloat = 0
@@ -118,6 +138,13 @@ final class TerminalContentView: NSView {
         self.session = session
         cellSize = Self.cellSize(of: font)
         super.init(frame: .zero)
+        addTrackingArea(
+            NSTrackingArea(
+                rect: .zero,
+                options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                owner: self
+            )
+        )
         registerForDraggedTypes([.fileURL, .string])
     }
 
@@ -303,6 +330,14 @@ final class TerminalContentView: NSView {
                     foreground: colors(for: style).foreground,
                     graphemes: graphemes
                 )
+            }
+        }
+
+        if let hoveredLink, hoveredLinkRevision == session.revision {
+            colors.foreground.setFill()
+            for span in hoveredLink.spans {
+                let rect = rect(row: span.row, columns: span.columns)
+                CGRect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1).fill()
             }
         }
 

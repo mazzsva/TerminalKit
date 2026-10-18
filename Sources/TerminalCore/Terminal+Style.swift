@@ -8,20 +8,82 @@ extension Terminal {
     package struct Style: Equatable, Sendable {
         package var foreground = Color.default
         package var background = Color.default
-        package var isBold = false
-        package var isFaint = false
-        package var isItalic = false
-        package var isUnderlined = false
-        package var isInverse = false
-        package var isHidden = false
-        package var isStrikethrough = false
+        package var link: UInt16 = 0
+        private var flags: UInt8 = 0
+
+        package init(
+            foreground: Color = .default,
+            background: Color = .default,
+            link: UInt16 = 0,
+            isBold: Bool = false,
+            isFaint: Bool = false,
+            isItalic: Bool = false,
+            isUnderlined: Bool = false,
+            isInverse: Bool = false,
+            isHidden: Bool = false,
+            isStrikethrough: Bool = false
+        ) {
+            self.foreground = foreground
+            self.background = background
+            self.link = link
+            self.isBold = isBold
+            self.isFaint = isFaint
+            self.isItalic = isItalic
+            self.isUnderlined = isUnderlined
+            self.isInverse = isInverse
+            self.isHidden = isHidden
+            self.isStrikethrough = isStrikethrough
+        }
+
+        package var isBold: Bool {
+            get { flag(0) }
+            set { setFlag(0, newValue) }
+        }
+
+        package var isFaint: Bool {
+            get { flag(1) }
+            set { setFlag(1, newValue) }
+        }
+
+        package var isItalic: Bool {
+            get { flag(2) }
+            set { setFlag(2, newValue) }
+        }
+
+        package var isUnderlined: Bool {
+            get { flag(3) }
+            set { setFlag(3, newValue) }
+        }
+
+        package var isInverse: Bool {
+            get { flag(4) }
+            set { setFlag(4, newValue) }
+        }
+
+        package var isHidden: Bool {
+            get { flag(5) }
+            set { setFlag(5, newValue) }
+        }
+
+        package var isStrikethrough: Bool {
+            get { flag(6) }
+            set { setFlag(6, newValue) }
+        }
+
+        private func flag(_ bit: UInt8) -> Bool {
+            flags & 1 << bit != 0
+        }
+
+        private mutating func setFlag(_ bit: UInt8, _ isOn: Bool) {
+            flags = isOn ? flags | 1 << bit : flags & ~(1 << bit)
+        }
 
         mutating func apply(_ parameters: [Int]) {
             var parameters = (parameters.isEmpty ? [0] : parameters).makeIterator()
             while let parameter = parameters.next() {
                 switch parameter {
                 case 0:
-                    self = Style()
+                    self = Style(link: link)
                 case 1:
                     isBold = true
                 case 2:
