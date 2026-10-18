@@ -193,6 +193,32 @@ struct TerminalTests {
         #expect(lines(terminal) == ["a       b       c   "])
     }
 
+    @Test func setsATabStop() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("\u{1B}[3g\u{1B}[5G\u{1B}H\r\tx\ty")
+        #expect(lines(terminal) == ["    x              y"])
+    }
+
+    @Test func clearsATabStop() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("\u{1B}[9G\u{1B}[g\r\tx")
+        #expect(lines(terminal) == ["                x   "])
+    }
+
+    @Test func movesByTabStops() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("\u{1B}[2Ix\u{1B}[2Zy\u{1B}[3Zz")
+        #expect(lines(terminal) == ["z       y       x   "])
+    }
+
+    @Test func addsTabStopsToNewColumns() {
+        var terminal = Terminal(columns: 10, rows: 1)
+        terminal.receive("\u{1B}[3g")
+        terminal.resize(columns: 20, rows: 1)
+        terminal.receive("\tx")
+        #expect(lines(terminal) == ["                x   "])
+    }
+
     @Test func stopsTabsAtTheLastColumn() {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive("\t\ta")

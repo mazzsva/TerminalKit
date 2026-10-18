@@ -40,6 +40,7 @@ package struct Terminal: Sendable {
     private var lastCharacter: Unicode.Scalar?
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
+    private var tabStops: [Bool]
     private var replies: [UInt8] = []
     private var normalScreen: (lines: [[Cell]], savedCursor: SavedCursor)?
 
@@ -49,6 +50,7 @@ package struct Terminal: Sendable {
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
         scrollRegion = 0 ..< rows
+        tabStops = Self.defaultTabStops(0 ..< columns)
     }
 
     package mutating func resize(columns: Int, rows: Int) {
@@ -70,6 +72,9 @@ package struct Terminal: Sendable {
             normalScreen.savedCursor.position.row -= removedNormalRows
             self.normalScreen = normalScreen
         }
+        tabStops =
+            columns > self.columns
+            ? tabStops + Self.defaultTabStops(self.columns ..< columns) : Array(tabStops.prefix(columns))
         self.columns = columns
         self.rows = rows
         scrollRegion = 0 ..< rows
@@ -92,12 +97,14 @@ package struct Terminal: Sendable {
             case .execute("\u{8}"):
                 moveCursor(row: cursor.row, column: cursor.column - 1)
             case .execute("\t"):
-                cursor.column = min((cursor.column / Self.tabWidth + 1) * Self.tabWidth, columns - 1)
+                moveForward(tabStops: 1)
             case .escape(intermediates: "", final: "D"):
                 lineFeed()
             case .escape(intermediates: "", final: "E"):
                 carriageReturn()
                 lineFeed()
+            case .escape(intermediates: "", final: "H"):
+                tabStops[cursor.column] = true
             case .escape(intermediates: "", final: "M"):
                 reverseLineFeed()
             case .escape(intermediates: "(", final: "0"):
@@ -146,6 +153,12 @@ package struct Terminal: Sendable {
             moveCursor(row: cursor.row - count, column: 0)
         case "G":
             moveCursor(row: cursor.row, column: count - 1)
+        case "I":
+            moveForward(tabStops: count)
+        case "Z":
+            moveBackward(tabStops: count)
+        case "g":
+            clearTabStops(sequence.parameter(at: 0, default: 0))
         case "H", "f":
             moveCursor(row: count - 1, column: sequence.parameter(at: 1, default: 1) - 1)
         case "d":
@@ -335,6 +348,35 @@ package struct Terminal: Sendable {
     private mutating func moveCursor(row: Int, column: Int) {
         isWrapPending = false
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
+    }
+
+    private mutating func moveForward(tabStops count: Int) {
+        for _ in 0 ..< min(count, columns) {
+            cursor.column = tabStops[(cursor.column + 1)...].firstIndex(of: true) ?? columns - 1
+        }
+    }
+
+    private mutating func moveBackward(tabStops count: Int) {
+        var column = cursor.column
+        for _ in 0 ..< min(count, columns) {
+            column = tabStops[..<column].lastIndex(of: true) ?? 0
+        }
+        moveCursor(row: cursor.row, column: column)
+    }
+
+    private mutating func clearTabStops(_ mode: Int) {
+        switch mode {
+        case 0:
+            tabStops[cursor.column] = false
+        case 3:
+            tabStops = Array(repeating: false, count: columns)
+        default:
+            break
+        }
+    }
+
+    private static func defaultTabStops(_ columns: Range<Int>) -> [Bool] {
+        columns.map { $0 % tabWidth == 0 }
     }
 
     private mutating func setPrivateMode(_ mode: Int, isEnabled: Bool) {
