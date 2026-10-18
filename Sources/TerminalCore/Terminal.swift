@@ -31,6 +31,12 @@ package struct Terminal: Sendable {
     package private(set) var usesApplicationCursorKeys = false
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
+    package private(set) var mouseTracking = MouseTracking.off
+    private(set) var usesSGRMouseEncoding = false
+
+    package var isAlternateScreenActive: Bool {
+        normalScreen != nil
+    }
     private var usesAutowrap = true
     private var usesInsertMode = false
 
@@ -411,6 +417,14 @@ package struct Terminal: Sendable {
             usesAutowrap = isEnabled
         case (25, _):
             isCursorVisible = isEnabled
+        case (1000, true):
+            mouseTracking = .clicks
+        case (1002, true), (1003, true):
+            mouseTracking = .drags
+        case (1000, false), (1002, false), (1003, false):
+            mouseTracking = .off
+        case (1006, _):
+            usesSGRMouseEncoding = isEnabled
         case (2004, _):
             usesBracketedPaste = isEnabled
         case (47, true), (1047, true):
