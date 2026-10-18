@@ -180,6 +180,41 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains(bytes))
     }
 
+    @Test func sendsControlKeysThatTheInputSystemDrops() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        for key in ["/", "2", "6", "?"] {
+            view.keyDown(with: try keyDown(key, modifierFlags: .control))
+        }
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("1f  00  1e  7f  78"))
+    }
+
+    @Test func leavesControlKeysToTheMarkedText() async throws {
+        let session = TerminalSession(
+            running: """
+                stty raw -echo; echo ready
+                while byte=$(dd bs=1 count=1 2>/dev/null | od -An -tx1 | tr -d ' '); [ "$byte" != 78 ]; do
+                    echo "got $byte"
+                done
+                """
+        )
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.setMarkedText(
+            "´",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.keyDown(with: try keyDown("2", modifierFlags: .control))
+        view.unmarkText()
+        view.keyDown(with: try keyDown("x"))
+        #expect(await !session.linesAfterExit().contains { $0.contains("got 00") })
+    }
+
     @Test func sendsAKeyWithTwoCommandsOnce() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 7 | od -An -tx1")
         let view = TerminalContentView(session: session)
