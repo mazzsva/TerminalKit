@@ -20,6 +20,20 @@ struct TerminalInputTests {
         #expect(try keyDown("\u{7F}").terminalInput() == [0x7F])
     }
 
+    @Test func sendsMetaForTheOptionKey() throws {
+        let optionA = try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option)
+        #expect(optionA.metaInput(applicationCursorKeys: false) == [0x1B, 0x61])
+        let optionShiftA = try keyDown("Å", charactersIgnoringModifiers: "A", modifierFlags: [.option, .shift])
+        #expect(optionShiftA.metaInput(applicationCursorKeys: false) == [0x1B, 0x41])
+    }
+
+    @Test func movesByWordsWithOptionAndTheArrowKeys() throws {
+        #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: .option).wordMovementInput == [0x1B, 0x62])
+        #expect(try keyDown(NSRightArrowFunctionKey, modifierFlags: .option).wordMovementInput == [0x1B, 0x66])
+        #expect(try keyDown(NSLeftArrowFunctionKey).wordMovementInput == nil)
+        #expect(try keyDown("a", modifierFlags: .option).wordMovementInput == nil)
+    }
+
     @Test func ignoresKeyEquivalents() throws {
         #expect(try keyDown("c", modifierFlags: .command).terminalInput() == nil)
     }

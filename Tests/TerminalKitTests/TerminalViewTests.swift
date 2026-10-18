@@ -173,6 +173,18 @@ struct TerminalViewTests {
         #expect(try #require(contentView(in: hostingView)).palette == palette)
     }
 
+    @Test func usesOptionAsTheMetaKey() throws {
+        let hostingView = NSHostingView(
+            rootView: TerminalView(
+                session: TerminalSession(configuration: .init(executableURL: URL(filePath: "/bin/sh")))
+            )
+            .optionAsMetaKey()
+        )
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+        #expect(try #require(contentView(in: hostingView)).usesOptionAsMetaKey)
+    }
+
     @Test func focusesTheTerminalWhenItAppears() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),

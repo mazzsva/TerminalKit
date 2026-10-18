@@ -161,6 +161,25 @@ struct TerminalContentViewTests {
         #expect(await lines(afterExitOf: session).contains("1b  4f  41"))
     }
 
+    @Test(arguments: [(true, "1b  61"), (false, "c3  a5")])
+    func sendsTheOptionKeyAsMetaWhenItIsOn(isOn: Bool, bytes: String) async throws {
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/bin/sh"),
+                arguments: ["-c", "stty raw -echo; echo ready; head -c 2 | od -An -tx1"]
+            )
+        )
+        let view = TerminalContentView(session: session)
+        view.usesOptionAsMetaKey = isOn
+        try session.start()
+        for await lines in Observations({ session.terminal.screen.map { String($0.map(\.character)) } })
+        where lines.contains(where: { $0.hasPrefix("ready") }) {
+            break
+        }
+        view.keyDown(with: try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option))
+        #expect(await lines(afterExitOf: session).contains(bytes))
+    }
+
     @Test func sendsTextFromTheInputSystem() async throws {
         let session = readingSession()
         let view = TerminalContentView(session: session)
