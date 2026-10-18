@@ -49,7 +49,7 @@ struct TerminalSessionTests {
     @Test func reportsTheExitOfTheProcess() async throws {
         let session = TerminalSession(configuration: shell("exit 3"))
         try session.start()
-        #expect(await waitForExit(of: session) == .exited(.exit(3)))
+        #expect(await waitForExit(of: session) == .exited)
     }
 
     @Test func sendsInputToTheProcess() async throws {

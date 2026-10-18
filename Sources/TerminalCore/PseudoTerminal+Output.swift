@@ -2,8 +2,8 @@ import Dispatch
 import Synchronization
 
 extension PseudoTerminal {
-    package struct Events: AsyncSequence, Sendable {
-        let stream: AsyncStream<Event>
+    package struct Output: AsyncSequence, Sendable {
+        let stream: AsyncStream<[UInt8]>
         let flowControl: FlowControl
 
         package func makeAsyncIterator() -> AsyncIterator {
@@ -11,18 +11,18 @@ extension PseudoTerminal {
         }
 
         package struct AsyncIterator: AsyncIteratorProtocol {
-            var iterator: AsyncStream<Event>.Iterator
+            var iterator: AsyncStream<[UInt8]>.Iterator
             let flowControl: FlowControl
 
-            package mutating func next(isolation actor: isolated (any Actor)? = #isolation) async -> Event? {
-                let event = await iterator.next(isolation: actor)
-                if event != nil {
+            package mutating func next(isolation actor: isolated (any Actor)? = #isolation) async -> [UInt8]? {
+                let bytes = await iterator.next(isolation: actor)
+                if bytes != nil {
                     flowControl.didRead()
                 }
-                return event
+                return bytes
             }
 
-            package mutating func next() async -> Event? {
+            package mutating func next() async -> [UInt8]? {
                 await next(isolation: nil)
             }
         }

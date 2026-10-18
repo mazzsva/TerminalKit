@@ -4,23 +4,13 @@ import Foundation
 import Synchronization
 
 package final class PseudoTerminal: Sendable {
-    package enum Event: Equatable, Sendable {
-        case output([UInt8])
-        case exit(Termination)
-    }
-
-    package enum Termination: Equatable, Sendable {
-        case exit(Int32)
-        case uncaughtSignal(Int32)
-    }
-
     private static let readSize = 65_536
 
     package let processIdentifier: pid_t
-    package let events: Events
+    package let output: Output
 
     private let fileDescriptor: Int32
-    private let continuation: AsyncStream<Event>.Continuation
+    private let continuation: AsyncStream<[UInt8]>.Continuation
     private let queue = DispatchQueue(label: "PseudoTerminal")
     private let readSource: any DispatchSourceRead
     private let flowControl: FlowControl
@@ -54,11 +44,11 @@ package final class PseudoTerminal: Sendable {
             throw error
         }
         fileDescriptor = primary
-        let stream: AsyncStream<Event>
-        (stream, continuation) = AsyncStream.makeStream(of: Event.self)
+        let stream: AsyncStream<[UInt8]>
+        (stream, continuation) = AsyncStream.makeStream(of: [UInt8].self)
         readSource = DispatchSource.makeReadSource(fileDescriptor: primary, queue: queue)
         flowControl = FlowControl(source: readSource)
-        events = Events(stream: stream, flowControl: flowControl)
+        output = Output(stream: stream, flowControl: flowControl)
         readSource.setEventHandler { [weak self] in
             self?.readOutput()
         }
@@ -127,15 +117,13 @@ package final class PseudoTerminal: Sendable {
     private func monitorExit(secondary: Int32) {
         let processIdentifier = processIdentifier
         Thread { [weak self] in
-            var status: Int32 = 0
-            while waitpid(processIdentifier, &status, 0) == -1 && errno == EINTR {}
+            while waitpid(processIdentifier, nil, 0) == -1 && errno == EINTR {}
             close(secondary)
-            let termination = Termination(status: status)
             guard let self else {
                 return
             }
             queue.async {
-                self.finish(termination)
+                self.finish()
             }
         }
         .start()
@@ -154,7 +142,7 @@ package final class PseudoTerminal: Sendable {
             count = max(result, 0)
         }
         if result > 0 {
-            continuation.yield(.output(bytes))
+            continuation.yield(bytes)
             flowControl.didYield()
             return true
         }
@@ -175,10 +163,9 @@ package final class PseudoTerminal: Sendable {
         flowControl.cancel()
     }
 
-    private func finish(_ termination: Termination) {
+    private func finish() {
         while readOutput() {}
         cancelSources()
-        continuation.yield(.exit(termination))
         continuation.finish()
     }
 
@@ -258,13 +245,6 @@ package final class PseudoTerminal: Sendable {
             throw POSIXError(result)
         }
         return processIdentifier
-    }
-}
-
-extension PseudoTerminal.Termination {
-    fileprivate init(status: Int32) {
-        let signal = status & 0x7F
-        self = signal == 0 ? .exit(status >> 8 & 0xFF) : .uncaughtSignal(signal)
     }
 }
 
