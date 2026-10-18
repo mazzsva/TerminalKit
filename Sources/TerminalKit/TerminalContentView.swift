@@ -76,7 +76,9 @@ final class TerminalContentView: NSView {
             background = NSColor(palette.background)
             cursor = NSColor(palette.cursor)
             selection = NSColor(palette.selection)
-            ansiColors = palette.ansiColors.map(NSColor.init)
+            ansiColors =
+                (palette.ansiColors.prefix(16) + TerminalPalette.standard.ansiColors.dropFirst(palette.ansiColors.count))
+                .map(NSColor.init)
         }
     }
 
