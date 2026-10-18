@@ -111,6 +111,7 @@ final class TerminalContentView: NSView {
         self.session = session
         cellSize = Self.cellSize(of: font)
         super.init(frame: .zero)
+        registerForDraggedTypes([.fileURL, .string])
     }
 
     @available(*, unavailable)
