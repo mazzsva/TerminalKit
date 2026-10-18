@@ -49,12 +49,16 @@ final class TerminalContentView: NSView {
                 return
             }
             needsDisplay = true
+            if isFocused, session.sizingView !== self {
+                session.sizingView = self
+            }
             if session.liveTerminal.usesFocusReporting {
                 session.send(Array((isFocused ? "\u{1B}[I" : "\u{1B}[O").utf8))
             }
         }
     }
     var ringBell = { NSSound.beep() }
+    private var fittedColumns: Int?
     var lastMousePosition: Terminal.Position?
     var scrollWheelLines: CGFloat = 0
 
@@ -133,7 +137,14 @@ final class TerminalContentView: NSView {
         super.viewWillMove(toWindow: newWindow)
         NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: window)
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: window)
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: window)
         if let newWindow {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(releaseSize),
+                name: NSWindow.willCloseNotification,
+                object: newWindow
+            )
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
                 NotificationCenter.default.addObserver(
                     self,
@@ -147,6 +158,9 @@ final class TerminalContentView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if window == nil {
+            releaseSize()
+        }
         if let window, window.firstResponder === window || window.firstResponder is TerminalContentView {
             window.makeFirstResponder(self)
         }
@@ -189,6 +203,12 @@ final class TerminalContentView: NSView {
         }
         isFocused = false
         return true
+    }
+
+    @objc private func releaseSize() {
+        if session.sizingView === self {
+            session.sizingView = nil
+        }
     }
 
     @objc private func windowKeyStateDidChange() {
@@ -419,11 +439,20 @@ final class TerminalContentView: NSView {
     }
 
     func fit(to size: CGSize) {
-        let columns = max(Int((size.width - 2 * Self.padding) / cellSize.width), 1)
-        if columns != session.terminal.columns {
-            selection = nil
+        _ = session.sizingViewChangeCount
+        if session.sizingView == nil || session.sizingView?.window == nil && window != nil {
+            session.sizingView = self
         }
-        session.resize(columns: columns, rows: max(Int((size.height - 2 * Self.padding) / cellSize.height), 1))
+        if session.sizingView === self {
+            session.resize(
+                columns: max(Int((size.width - 2 * Self.padding) / cellSize.width), 1),
+                rows: max(Int((size.height - 2 * Self.padding) / cellSize.height), 1)
+            )
+        }
+        if session.terminal.columns != fittedColumns {
+            selection = nil
+            fittedColumns = session.terminal.columns
+        }
         let lineCount = session.terminal.scrollback.count + session.terminal.rows
         setFrameSize(
             CGSize(width: size.width, height: max(size.height, CGFloat(lineCount) * cellSize.height + 2 * Self.padding))

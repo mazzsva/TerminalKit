@@ -31,6 +31,12 @@ public final class TerminalSession {
     @ObservationIgnored var synchronizedOutputTimeout = Duration.seconds(1)
     @ObservationIgnored private(set) var revision = 0
     @ObservationIgnored private(set) var widthChangeCount = 0
+    @ObservationIgnored weak var sizingView: TerminalContentView? {
+        didSet {
+            sizingViewChangeCount += 1
+        }
+    }
+    private(set) var sizingViewChangeCount = 0
 
     @ObservationIgnored private var pseudoTerminal: PseudoTerminal?
     @ObservationIgnored private var synchronizedOutputTimer: Task<Void, Never>?
