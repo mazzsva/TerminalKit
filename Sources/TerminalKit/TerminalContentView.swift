@@ -79,6 +79,7 @@ final class TerminalContentView: NSView {
         }
     }
     var hoveredLinkRevision = 0
+    var isOpeningLink = false
     private var fittedColumns: Int?
     var lastMousePosition: Terminal.Position?
     var scrollWheelLines: CGFloat = 0

@@ -27,7 +27,8 @@ extension TerminalContentView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        if openLink(at: event) {
+        isOpeningLink = openLink(at: event)
+        guard !isOpeningLink else {
             return
         }
         if reportsMouse(for: event) {
@@ -39,6 +40,9 @@ extension TerminalContentView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        guard !isOpeningLink else {
+            return
+        }
         if reportsMouse(for: event) {
             if session.liveTerminal.mouseTracking == .drags, mousePosition(of: event) != lastMousePosition {
                 reportMouse(event, button: 32)
