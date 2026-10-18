@@ -1,10 +1,4 @@
 package struct Terminal: Sendable {
-    package struct Cell: Equatable, Sendable {
-        package var character: Character = " "
-        package var style = Style()
-        package var width: UInt8 = 1
-    }
-
     package struct Position: Equatable, Sendable {
         package var row: Int
         package var column: Int
@@ -23,7 +17,6 @@ package struct Terminal: Sendable {
     }
 
     private static let tabWidth = 8
-    private static let asciiCharacters = (0 ..< 128).map { Character(Unicode.Scalar(UInt8($0))) }
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
 
@@ -241,11 +234,10 @@ package struct Terminal: Sendable {
         if usesInsertMode {
             insertCharacters(width)
         }
-        let character = scalar.isASCII ? Self.asciiCharacters[Int(scalar.value)] : Character(scalar)
         for column in cursor.column ..< cursor.column + width {
             clearWideCharacter(at: column)
         }
-        screen[cursor.row][cursor.column] = Cell(character: character, style: style, width: UInt8(width))
+        screen[cursor.row][cursor.column] = Cell(scalar: scalar, style: style, width: UInt8(width))
         if width == 2 {
             screen[cursor.row][cursor.column + 1] = Cell(style: style, width: 0)
         }
