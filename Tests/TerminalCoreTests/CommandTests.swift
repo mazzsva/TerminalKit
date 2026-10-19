@@ -41,6 +41,12 @@ struct CommandTests {
         #expect(terminal.commands.last?.text == "ls  -la")
     }
 
+    @Test func limitsTheCommandFromTheScreen() {
+        var terminal = Terminal(columns: 80, rows: 5)
+        terminal.receive(prompt + String(repeating: "x", count: 20_000) + "\r\n\u{1B}]133;C\u{7}")
+        #expect(terminal.commands.last?.text == String(repeating: "x", count: 4_096))
+    }
+
     @Test func readsAWrappedCommandFromTheScreen() {
         var terminal = Terminal(columns: 6, rows: 5)
         terminal.receive(prompt + "echo hello world\r\n\u{1B}]133;C\u{7}")

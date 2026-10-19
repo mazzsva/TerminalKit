@@ -12,6 +12,7 @@ extension Terminal {
     }
 
     static let maximumCommands = 10_000
+    private static let maximumTextLength = 4_096
     private static let commandTrimCount = 1_000
 
     mutating func performShellIntegration(_ mark: Substring) {
@@ -135,9 +136,12 @@ extension Terminal {
             if !isWrapped, row < end.row {
                 text += "\n"
             }
+            if text.count > Self.maximumTextLength {
+                break
+            }
         }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maximumTextLength)
+        return trimmed.isEmpty ? nil : String(trimmed)
     }
 
     private func line(atMark row: Int) -> Line? {
