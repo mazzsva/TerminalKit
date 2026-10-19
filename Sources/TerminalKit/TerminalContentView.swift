@@ -211,7 +211,9 @@ final class TerminalContentView: NSView {
 
     private func bellDidRing() {
         let date = currentDate()
-        guard Self.ringsBell(at: date, lastBellDate: lastBellDate) else {
+        guard session.sizingView == nil || session.sizingView === self,
+            Self.ringsBell(at: date, lastBellDate: lastBellDate)
+        else {
             return
         }
         lastBellDate = date
