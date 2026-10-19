@@ -288,7 +288,10 @@ struct TerminalTests {
         #expect(lines(terminal) == ["aaaa中 ", "中     "])
     }
 
-    @Test(arguments: [(4, 3, "a"), (5, 2, "中"), (1, 3, "中"), (7, 1, "x"), (3, 4, "é")])
+    @Test(arguments: [
+        (4, 3, "a"), (5, 2, "中"), (1, 3, "中"), (7, 1, "x"), (3, 4, "é"), (2, 2, "b"), (6, 3, "\u{1B}(0q"),
+        (1, 3, "a"),
+    ])
     func repeatsLikePrintingTheCharacter(columns: Int, rows: Int, character: String) {
         for start in ["", "\u{1B}[2;3H", "\u{1B}[2;3r\u{1B}[1;2H", "\u{1B}[?7l", "\u{1B}[4h\u{1B}[1;2H"] {
             for count in [1, 9, 10, 11, 23, 64, 1_000] {
@@ -301,10 +304,44 @@ struct TerminalTests {
                 #expect(lines(repeated) == lines(printed))
                 #expect(repeated.screen.map(\.isWrapped) == printed.screen.map(\.isWrapped))
                 #expect(repeated.cursor == printed.cursor)
+                let width = columns > 1 ? character.unicodeScalars.last!.width : 1
+                if count <= (rows + 1) * max(columns / width, 1) {
+                    #expect(repeated.scrollback == printed.scrollback)
+                    #expect(repeated.screen == printed.screen)
+                }
                 repeated.receive("w")
                 printed.receive("w")
                 #expect(lines(repeated) == lines(printed))
             }
+        }
+    }
+
+    @Test(arguments: 0 ..< 20)
+    func repeatsLikePrintingAfterRandomOutput(seed: UInt64) {
+        var state = seed &+ 1
+        func random(_ range: ClosedRange<Int>) -> Int {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return range.lowerBound + Int((state >> 33) % UInt64(range.count))
+        }
+        let pieces = [
+            "a", "中", "\r\n", "\u{1B}[41m", "\u{1B}[0m", "\u{1B}[2;4r", "\u{1B}[r", "\u{1B}[3;2H", "\u{1B}[K",
+            "\u{1B}[4h", "\u{1B}[4l", "\u{1B}[?7l", "\u{1B}[?7h",
+        ]
+        for _ in 0 ..< 50 {
+            let columns = random(1 ... 9)
+            let rows = random(1 ... 5)
+            let prefix = (0 ..< random(0 ... 12)).map { _ in pieces[random(0 ... pieces.count - 1)] }.joined()
+            let count = random(0 ... (rows + 1) * columns)
+            var repeated = Terminal(columns: columns, rows: rows)
+            var printed = repeated
+            repeated.receive(prefix + "x\u{1B}[\(count)b")
+            printed.receive(prefix + String(repeating: "x", count: max(count, 1) + 1))
+            #expect(repeated.scrollback == printed.scrollback)
+            #expect(repeated.screen == printed.screen)
+            #expect(repeated.cursor == printed.cursor)
+            repeated.receive("w")
+            printed.receive("w")
+            #expect(repeated.screen == printed.screen)
         }
     }
 
