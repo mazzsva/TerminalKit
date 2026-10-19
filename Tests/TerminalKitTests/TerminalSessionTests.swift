@@ -21,6 +21,17 @@ struct TerminalSessionTests {
             environment == ["TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8", "PATH": "/bin"])
     }
 
+    @Test func describesTheTerminalToAnyProcess() {
+        let environment = TerminalSession.Configuration(executableURL: URL(filePath: "/bin/sh")).environment
+        let inherited = ProcessInfo.processInfo.environment
+        #expect(environment["TERM"] == "xterm-256color")
+        #expect(environment["COLORTERM"] == "truecolor")
+        #expect(environment["LANG"] == inherited["LANG"] ?? "en_US.UTF-8")
+        #expect(environment["PATH"] == inherited["PATH"])
+        #expect(environment["TERM_PROGRAM"] == nil)
+        #expect(environment["TERM_SESSION_ID"] == nil)
+    }
+
     @Test func keepsTheLanguageOfTheUser() {
         let environment = TerminalSession.Configuration.loginShell(inheriting: ["LANG": "pt_BR.UTF-8"]).environment
         #expect(environment["LANG"] == "pt_BR.UTF-8")
