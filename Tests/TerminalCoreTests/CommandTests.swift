@@ -23,6 +23,18 @@ struct CommandTests {
         #expect(command?.end == Terminal.Position(row: 2, column: 0))
     }
 
+    @Test func ignoresMarksWithoutTheNonce() {
+        var terminal = Terminal(columns: 20, rows: 5)
+        terminal.shellIntegrationNonce = "n"
+        terminal.receive(prompt + "ls\r\n\u{1B}]133;C;cmdline_url=ls\u{7}\u{1B}]133;C;nonce=m;cmdline_url=x\u{7}")
+        #expect(terminal.commands.isEmpty)
+        terminal.receive("\u{1B}c\u{1B}]133;A;nonce=n\u{7}$ \u{1B}]133;C;cmdline_url=ls;nonce=n\u{7}")
+        terminal.receive("\u{1B}]133;D;3\u{7}\u{1B}]133;D;4;nonce=n\u{7}")
+        #expect(terminal.commands.map(\.text) == ["ls"])
+        #expect(terminal.commands.map(\.exitStatus) == [4])
+        #expect(terminal.commands.first?.prompt == Terminal.Position(row: 0, column: 0))
+    }
+
     @Test func readsTheCommandFromTheScreen() {
         var terminal = Terminal(columns: 20, rows: 5)
         terminal.receive(prompt + "ls  -la  \r\n\u{1B}]133;C\u{7}")

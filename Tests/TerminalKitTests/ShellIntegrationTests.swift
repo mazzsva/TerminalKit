@@ -93,6 +93,18 @@ struct ShellIntegrationTests {
     }
 
     @Test(arguments: ["/bin/zsh", "/bin/bash"])
+    func ignoresTheMarksOfPrograms(shell: String) async throws {
+        let session = try startedSession(shell)
+        let forgery = "printf '\\033]133;C;cmdline_url=forged\\007\\033]133;D;7\\007\\033]133;A\\007'"
+        session.send(Array("\(forgery)\r".utf8))
+        await session.waitForCommands { $0.count == 1 && $0[0].endDate != nil }
+        session.send(Array("true\r".utf8))
+        await session.waitForCommands { $0.count == 2 && $0[1].endDate != nil }
+        #expect(session.commands.map(\.text) == [forgery, "true"])
+        #expect(session.commands.map(\.exitStatus) == [0, 0])
+    }
+
+    @Test(arguments: ["/bin/zsh", "/bin/bash"])
     func recordsNoCommandForAnEmptyLine(shell: String) async throws {
         let session = try startedSession(shell)
         session.send(Array("\r\r   \rtrue\r".utf8))
@@ -294,16 +306,19 @@ struct ShellIntegrationConfigurationTests {
                 arguments: ["-l"],
                 environment: ["ZDOTDIR": "/config"]
             )
-            .integratingShell(scriptsIn: directory)
-        #expect(configuration.arguments == ["-l"])
-        #expect(configuration.environment == ["ZDOTDIR": "/scripts/zsh", "TERMINALKIT_ZSH_ZDOTDIR": "/config"])
+            .integratingShell(scriptsIn: directory, nonce: "n")
+        #expect(configuration?.arguments == ["-l"])
+        #expect(
+            configuration?.environment == [
+                "ZDOTDIR": "/scripts/zsh", "TERMINALKIT_ZSH_ZDOTDIR": "/config", "TERMINALKIT_NONCE": "n",
+            ])
     }
 
     @Test func startsZshWithoutAZDOTDIR() {
         let configuration =
             TerminalSession.Configuration(executableURL: URL(filePath: "/opt/bin/zsh"), environment: [:])
-            .integratingShell(scriptsIn: directory)
-        #expect(configuration.environment == ["ZDOTDIR": "/scripts/zsh"])
+            .integratingShell(scriptsIn: directory, nonce: "n")
+        #expect(configuration?.environment == ["ZDOTDIR": "/scripts/zsh", "TERMINALKIT_NONCE": "n"])
     }
 
     @Test(arguments: [([], "rc"), (["-l"], "login"), (["--login"], "login")])
@@ -314,9 +329,9 @@ struct ShellIntegrationConfigurationTests {
                 arguments: arguments,
                 environment: [:]
             )
-            .integratingShell(scriptsIn: directory)
-        #expect(configuration.arguments == ["--rcfile", "/scripts/bash/terminalkit.bash"])
-        #expect(configuration.environment == ["TERMINALKIT_BASH_INJECT": kind])
+            .integratingShell(scriptsIn: directory, nonce: "n")
+        #expect(configuration?.arguments == ["--rcfile", "/scripts/bash/terminalkit.bash"])
+        #expect(configuration?.environment == ["TERMINALKIT_BASH_INJECT": kind, "TERMINALKIT_NONCE": "n"])
     }
 
     @Test(arguments: [("/bin/bash", ["-c", "true"]), ("/bin/sh", ["-l"]), ("/opt/bin/fish", ["-l"])])
@@ -327,9 +342,8 @@ struct ShellIntegrationConfigurationTests {
                 arguments: arguments,
                 environment: [:]
             )
-            .integratingShell(scriptsIn: directory)
-        #expect(configuration.arguments == arguments)
-        #expect(configuration.environment.isEmpty)
+            .integratingShell(scriptsIn: directory, nonce: "n")
+        #expect(configuration == nil)
     }
 
     @Test func installsTheScriptsOnce() throws {

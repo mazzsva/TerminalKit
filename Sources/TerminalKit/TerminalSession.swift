@@ -91,8 +91,12 @@ public final class TerminalSession {
             return
         }
         var configuration = configuration
-        if configuration.usesShellIntegration, let directory = try? ShellIntegration.install() {
-            configuration = configuration.integratingShell(scriptsIn: directory)
+        let nonce = UUID().uuidString
+        if configuration.usesShellIntegration, let directory = try? ShellIntegration.install(),
+            let integrated = configuration.integratingShell(scriptsIn: directory, nonce: nonce)
+        {
+            configuration = integrated
+            liveTerminal.shellIntegrationNonce = nonce
         }
         let pseudoTerminal = try PseudoTerminal(
             executableURL: configuration.executableURL,

@@ -48,7 +48,7 @@ extension TerminalSession.Configuration {
         )
     }
 
-    func integratingShell(scriptsIn directory: URL) -> Self {
+    func integratingShell(scriptsIn directory: URL, nonce: String) -> Self? {
         var configuration = self
         switch executableURL.lastPathComponent {
         case "zsh":
@@ -60,8 +60,9 @@ extension TerminalSession.Configuration {
             ]
             configuration.environment["TERMINALKIT_BASH_INJECT"] = arguments.isEmpty ? "rc" : "login"
         default:
-            break
+            return nil
         }
+        configuration.environment["TERMINALKIT_NONCE"] = nonce
         return configuration
     }
 
