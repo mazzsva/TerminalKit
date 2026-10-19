@@ -61,11 +61,3 @@ private func viewReading(_ reader: String, modes: String) async throws -> (Termi
     await session.waitForText("ready")
     return (view, session)
 }
-
-@MainActor
-private func scrollWheelEvent(lines: Int32) throws -> NSEvent {
-    let event = try #require(
-        CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: lines, wheel2: 0, wheel3: 0)
-    )
-    return try #require(NSEvent(cgEvent: event))
-}
