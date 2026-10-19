@@ -93,18 +93,15 @@ extension TerminalContentView {
                 count += scalars.count
                 text.append(contentsOf: scalars)
             }
-            let matches = Self.detectedLinks(in: String(text))
-                .compactMap { match in
-                    starts.firstIndex(of: match.lowerBound)
-                        .map {
-                            $0 ..< (starts.firstIndex { $0 >= match.upperBound } ?? cells.count)
-                        }
-                }
-            guard let match = matches.first(where: { $0.contains(index) }) else {
+            let offset = starts[index]
+            guard
+                let match = Self.detectedLinks(in: String(text)).first(where: { $0.contains(offset) }),
+                let lowerBound = starts.firstIndex(of: match.lowerBound)
+            else {
                 return nil
             }
-            range = match
-            url = URL(string: String(cells[match].map { terminal.character(of: $0.cell) }))
+            range = lowerBound ..< (starts[lowerBound...].firstIndex { $0 >= match.upperBound } ?? cells.count)
+            url = URL(string: String(cells[range].map { terminal.character(of: $0.cell) }))
         }
         guard let url else {
             return nil
@@ -121,9 +118,13 @@ extension TerminalContentView {
 
     static func detectedLinks(in text: String) -> [Range<Int>] {
         let scalars = text.unicodeScalars
+        var position = scalars.startIndex
+        var offset = 0
         return text.matches(of: pattern.matchingSemantics(.unicodeScalar))
             .map { match in
-                let lowerBound = scalars.distance(from: scalars.startIndex, to: match.range.lowerBound)
+                offset += scalars.distance(from: position, to: match.range.lowerBound)
+                position = match.range.lowerBound
+                let lowerBound = offset
                 var characters = scalars[match.range].map(Character.init)
                 while let last = characters.last, shouldTrim(last, from: characters) {
                     characters.removeLast()
