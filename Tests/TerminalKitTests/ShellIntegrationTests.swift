@@ -56,6 +56,43 @@ struct ShellIntegrationTests {
     }
 
     @Test(arguments: ["/bin/zsh", "/bin/bash"])
+    func recordsACommandThatRunsInASubshell(shell: String) async throws {
+        let session = try startedSession(shell)
+        session.send(Array("(exit 3)\r".utf8))
+        await session.waitForCommands { $0.count == 1 && $0[0].endDate != nil }
+        session.send(Array("{ true; } &\r".utf8))
+        await session.waitForCommands { $0.count == 2 && $0[1].endDate != nil }
+        session.send(Array("(echo m\recho n)\r".utf8))
+        await session.waitForCommands { $0.count == 3 && $0[2].endDate != nil }
+        let lines = shell == "/bin/bash" ? "(echo m; echo n)" : "(echo m\necho n)"
+        #expect(session.commands.map(\.text) == ["(exit 3)", "{ true; } &", lines])
+        #expect(session.commands.map(\.exitStatus) == [3, 0, 0])
+    }
+
+    @Test(arguments: ["/bin/zsh", "/bin/bash"])
+    func recordsNoCommandForAnInterruptedLine(shell: String) async throws {
+        let session = try startedSession(shell)
+        session.send(Array("true\r".utf8))
+        await session.waitForCommands { $0.count == 1 && $0[0].endDate != nil }
+        session.send(Array("(echo typed)".utf8) + [3])
+        session.send(Array("\rfalse\r".utf8))
+        await session.waitForCommands { $0.count == 2 && $0[1].endDate != nil }
+        #expect(session.commands.map(\.text) == ["true", "false"])
+    }
+
+    @Test(arguments: ["/bin/zsh", "/bin/bash"])
+    func recordsNoCommandForTheSavedHistory(shell: String) async throws {
+        try write("(old)\n", to: "history")
+        let session = try startedSession(
+            shell,
+            environment: ["HISTFILE": home.appending(path: "history").path(percentEncoded: false)]
+        )
+        session.send(Array("true\r".utf8))
+        await session.waitForCommands { $0.count == 1 && $0[0].endDate != nil }
+        #expect(session.commands.map(\.text) == ["true"])
+    }
+
+    @Test(arguments: ["/bin/zsh", "/bin/bash"])
     func recordsNoCommandForAnEmptyLine(shell: String) async throws {
         let session = try startedSession(shell)
         session.send(Array("\r\r   \rtrue\r".utf8))
