@@ -96,6 +96,23 @@ final class TerminalContentView: NSView {
         let cursor: NSColor
         let selection: NSColor
         let ansiColors: [NSColor]
+        private let cache = ColorCache()
+
+        private final class ColorCache {
+            var colors: [Terminal.Color: NSColor] = [:]
+        }
+
+        func color(_ color: Terminal.Color) -> NSColor? {
+            if let cached = cache.colors[color] {
+                return cached
+            }
+            let resolved = NSColor.terminal(color, ansiColors: ansiColors)
+            if cache.colors.count >= 4_096 {
+                cache.colors.removeAll()
+            }
+            cache.colors[color] = resolved
+            return resolved
+        }
 
         init(_ palette: TerminalPalette) {
             foreground = NSColor(palette.foreground)
@@ -113,12 +130,17 @@ final class TerminalContentView: NSView {
         let bold: NSFont
         let italic: NSFont
         let boldItalic: NSFont
+        let glyphs = GlyphCache()
 
         init(_ font: NSFont) {
             regular = font
             bold = Self.font(font, traits: .bold)
             italic = Self.font(font, traits: .italic)
             boldItalic = Self.font(font, traits: [.bold, .italic])
+        }
+
+        func index(for style: Terminal.Style) -> Int {
+            (style.isBold ? 1 : 0) + (style.isItalic ? 2 : 0)
         }
 
         func font(for style: Terminal.Style) -> NSFont {
@@ -420,8 +442,8 @@ final class TerminalContentView: NSView {
     }
 
     private func colors(for style: Terminal.Style) -> (foreground: NSColor, background: NSColor?) {
-        let foreground = NSColor.terminal(style.foreground, ansiColors: colors.ansiColors) ?? colors.foreground
-        let background = NSColor.terminal(style.background, ansiColors: colors.ansiColors)
+        let foreground = colors.color(style.foreground) ?? colors.foreground
+        let background = colors.color(style.background)
         return style.isInverse ? (background ?? colors.background, foreground) : (foreground, background)
     }
 
@@ -433,36 +455,54 @@ final class TerminalContentView: NSView {
         foreground: NSColor,
         graphemes: Terminal.Graphemes
     ) {
-        guard !style.isHidden else {
+        guard !style.isHidden, let context = NSGraphicsContext.current?.cgContext else {
             return
         }
-        var attributes: [NSAttributedString.Key: Any] = [
-            .font: fonts.font(for: style),
-            .foregroundColor: style.isFaint ? foreground.withAlphaComponent(0.5) : foreground,
-        ]
+        let font = fonts.font(for: style)
+        let index = fonts.index(for: style)
+        let color = style.isFaint ? foreground.withAlphaComponent(0.5) : foreground
+        let top = Self.padding + CGFloat(row) * cellSize.height
+        context.setFillColor(color.cgColor)
+        context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
+        defer { context.textMatrix = .identity }
+        var batchFont: CTFont?
+        var glyphs: [CGGlyph] = []
+        var positions: [CGPoint] = []
+        func flush() {
+            if let batchFont, !glyphs.isEmpty {
+                CTFontDrawGlyphs(batchFont, glyphs, positions, glyphs.count, context)
+            }
+            glyphs.removeAll(keepingCapacity: true)
+            positions.removeAll(keepingCapacity: true)
+        }
+        for column in columns where line[column].width > 0 && line[column] != .padding {
+            let character = graphemes.character(of: line[column])
+            guard character != " " else {
+                continue
+            }
+            let entry = fonts.glyphs.entry(for: character, font: font, index: index)
+            let x = Self.padding + CGFloat(column) * cellSize.width
+            let baseline = top + entry.ascent
+            for run in entry.runs {
+                if let current = batchFont, !CFEqual(current, run.font) {
+                    flush()
+                }
+                batchFont = run.font
+                glyphs += run.glyphs
+                positions += run.positions.map { CGPoint(x: x + $0.x, y: $0.y - baseline) }
+            }
+        }
+        flush()
+        let baseline = top + font.ascender
+        let thickness = max(font.underlineThickness, 1)
+        let left = Self.padding + CGFloat(columns.lowerBound) * cellSize.width
+        let width = CGFloat(columns.count) * cellSize.width
         if style.isUnderlined {
-            attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+            context.fill(CGRect(x: left, y: baseline - font.underlinePosition, width: width, height: thickness))
         }
         if style.isStrikethrough {
-            attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
-        }
-        var column = columns.lowerBound
-        while column < columns.upperBound {
-            let end =
-                line[column ..< columns.upperBound].firstIndex { $0.width != 1 || !$0.isASCII }
-                ?? columns.upperBound
-            if end > column {
-                let text = String(line[column ..< end].map(graphemes.character(of:)))
-                NSAttributedString(string: text, attributes: attributes)
-                    .draw(at: rect(row: row, columns: column ..< end).origin)
-                column = end
-            } else {
-                if line[column].width > 0 {
-                    NSAttributedString(string: String(graphemes.character(of: line[column])), attributes: attributes)
-                        .draw(at: rect(row: row, columns: column ..< column + 1).origin)
-                }
-                column += 1
-            }
+            context.fill(
+                CGRect(x: left, y: baseline - font.xHeight / 2 - thickness / 2, width: width, height: thickness))
         }
     }
 

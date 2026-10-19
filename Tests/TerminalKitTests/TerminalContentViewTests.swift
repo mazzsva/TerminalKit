@@ -210,6 +210,53 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: cell, of: wide) == pixels(in: cell, of: narrow))
     }
 
+    @Test func drawsEachCharacterInItsCellWithAProportionalFont() async throws {
+        let narrow = try await drawnView(running: "printf 'iiiiW\\n'")
+        let spaced = try await drawnView(running: "printf '    W\\n'")
+        for view in [narrow, spaced] {
+            view.font = .systemFont(ofSize: 13)
+        }
+        let cell = CGRect(
+            x: 4 + 4 * narrow.cellSize.width,
+            y: 4,
+            width: narrow.cellSize.width,
+            height: narrow.cellSize.height
+        )
+        #expect(try pixels(in: cell, of: narrow) == pixels(in: cell, of: spaced))
+    }
+
+    @Test(arguments: ["e\\314\\201", "\\360\\237\\230\\200", "\\344\\270\\255", "\\320\\226"])
+    func drawsACharacterOutsideASCII(character: String) async throws {
+        let blank = try await drawnView(running: "printf '  \\r'")
+        let drawn = try await drawnView(running: "printf '\(character)\\r'")
+        let cells = CGRect(x: 4, y: 4, width: 2 * drawn.cellSize.width, height: drawn.cellSize.height)
+        #expect(try pixels(in: cells, of: drawn) != pixels(in: cells, of: blank))
+    }
+
+    @Test(arguments: [
+        ("\\344\\270\\255", "\\346\\226\\207"), ("\\360\\237\\230\\200", "\\360\\237\\232\\200"),
+    ])
+    func drawsTheGlyphsOfTheFallbackFont(character: String, other: String) async throws {
+        let first = try await drawnView(running: "printf 'x\(character)\\r'")
+        let second = try await drawnView(running: "printf 'x\(other)\\r'")
+        let spaced = try await drawnView(running: "printf ' \(character)\\r'")
+        let cells = CGRect(
+            x: 4 + first.cellSize.width, y: 4, width: 2 * first.cellSize.width, height: first.cellSize.height)
+        #expect(try pixels(in: cells, of: first) != pixels(in: cells, of: second))
+        #expect(try pixels(in: cells, of: first) == pixels(in: cells, of: spaced))
+    }
+
+    @Test func underlinesARunWithAWideCharacter() async throws {
+        let view = try await drawnView(running: "printf '\\033[4ma\\344\\270\\255b\\033[m\\r'")
+        let font = view.fonts.regular
+        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let representation = try representation(of: view)
+        let background = color(in: representation, at: CGPoint(x: 190, y: 90))
+        let underline = stride(from: 4 + view.cellSize.width / 4, to: 4 + view.cellSize.width * 3.75, by: 1)
+            .map { color(in: representation, at: CGPoint(x: $0, y: y)) }
+        #expect(underline.allSatisfy { $0 != background })
+    }
+
     @Test func drawsTheBackgroundColor() async throws {
         let view = try await drawnView(running: "printf '\\033[41m  \\033[m'")
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
