@@ -26,6 +26,12 @@ extension TerminalSession {
         }
     }
 
+    func waitForCommands(_ isComplete: @escaping ([Command]) -> Bool) async {
+        for await commands in Observations({ self.commands }) where isComplete(commands) {
+            return
+        }
+    }
+
     func linesAfterExit() async -> [String] {
         await waitForExit()
         return lines

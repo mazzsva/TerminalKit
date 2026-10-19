@@ -43,6 +43,8 @@ public final class TerminalSession {
     private(set) var sizingViewChangeCount = 0
 
     @ObservationIgnored private var pseudoTerminal: PseudoTerminal?
+    @ObservationIgnored private var commandEventContinuations: [Int: AsyncStream<CommandEvent>.Continuation] = [:]
+    @ObservationIgnored private var nextCommandEventID = 0
     @ObservationIgnored private var synchronizedOutputTimer: Task<Void, Never>?
     @ObservationIgnored private var timedSynchronizedOutputCount = 0
 
@@ -174,7 +176,12 @@ public final class TerminalSession {
         pseudoTerminal = nil
         if let last = commands.indices.last, commands[last].endDate == nil {
             commands[last].endDate = Date()
+            send(.finished(commands[last]))
         }
+        for continuation in commandEventContinuations.values {
+            continuation.finish()
+        }
+        commandEventContinuations.removeAll()
         if liveTerminal.isSynchronizingOutput {
             liveTerminal.endSynchronizedOutput()
         }
@@ -253,19 +260,55 @@ extension TerminalSession {
                 if command.isFinished {
                     commands[commands.count - 1].exitStatus = command.exitStatus
                     commands[commands.count - 1].endDate = date
+                    send(.finished(commands[commands.count - 1]))
                 }
             } else {
-                commands.append(
-                    Command(
-                        id: id,
-                        text: command.text,
-                        directory: command.directory,
-                        exitStatus: command.exitStatus,
-                        startDate: date,
-                        endDate: command.isFinished ? date : nil
-                    )
+                var started = Command(
+                    id: id,
+                    text: command.text,
+                    directory: command.directory,
+                    exitStatus: nil,
+                    startDate: date,
+                    endDate: nil
                 )
+                send(.started(started))
+                if command.isFinished {
+                    started.exitStatus = command.exitStatus
+                    started.endDate = date
+                    send(.finished(started))
+                }
+                commands.append(started)
             }
+        }
+    }
+}
+
+extension TerminalSession {
+    public enum CommandEvent: Hashable, Sendable {
+        case started(Command)
+        case finished(Command)
+    }
+
+    public func commandEvents() -> AsyncStream<CommandEvent> {
+        let (stream, continuation) = AsyncStream.makeStream(of: CommandEvent.self)
+        if case .exited = state {
+            continuation.finish()
+            return stream
+        }
+        let id = nextCommandEventID
+        nextCommandEventID += 1
+        commandEventContinuations[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { @MainActor in
+                self?.commandEventContinuations[id] = nil
+            }
+        }
+        return stream
+    }
+
+    private func send(_ event: CommandEvent) {
+        for continuation in commandEventContinuations.values {
+            continuation.yield(event)
         }
     }
 }

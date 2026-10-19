@@ -369,11 +369,3 @@ struct ShellIntegrationConfigurationTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false)).count == 1)
     }
 }
-
-extension TerminalSession {
-    fileprivate func waitForCommands(_ isComplete: @escaping ([Command]) -> Bool) async {
-        for await commands in Observations({ self.commands }) where isComplete(commands) {
-            return
-        }
-    }
-}
