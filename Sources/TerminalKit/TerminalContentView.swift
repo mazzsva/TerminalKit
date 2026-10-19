@@ -3,6 +3,10 @@ import TerminalCore
 
 final class TerminalContentView: NSView {
     static let padding: CGFloat = 4
+    static let minimumColumns = 10
+    static let minimumRows = 2
+    static let maximumColumns = 1_000
+    static let maximumRows = 1_000
     static let cursorThickness: CGFloat = 2
     static let defaultFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
 
@@ -478,13 +482,19 @@ final class TerminalContentView: NSView {
 
     func fit(to size: CGSize) {
         _ = session.sizingViewChangeCount
-        if session.sizingView == nil || session.sizingView?.window == nil && window != nil {
+        let columns = (size.width - 2 * Self.padding) / cellSize.width
+        let rows = (size.height - 2 * Self.padding) / cellSize.height
+        let canSize = columns >= CGFloat(Self.minimumColumns) && rows >= CGFloat(Self.minimumRows)
+        if !canSize, session.sizingView === self {
+            session.sizingView = nil
+        }
+        if canSize, session.sizingView == nil || session.sizingView?.window == nil && window != nil {
             session.sizingView = self
         }
         if session.sizingView === self {
             session.resize(
-                columns: max(Int((size.width - 2 * Self.padding) / cellSize.width), 1),
-                rows: max(Int((size.height - 2 * Self.padding) / cellSize.height), 1)
+                columns: Int(min(columns, CGFloat(Self.maximumColumns))),
+                rows: Int(min(rows, CGFloat(Self.maximumRows)))
             )
         }
         if session.terminal.columns != fittedColumns {
