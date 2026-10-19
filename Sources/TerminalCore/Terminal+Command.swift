@@ -118,30 +118,51 @@ extension Terminal {
         return Position(row: removedScrollbackCount + scrollback.count + cursor.row, column: cursor.column)
     }
 
-    private var inputText: String? {
-        guard let input, let end = markPosition, input.row <= end.row else {
+    package func output(ofCommandAt index: Int) -> String? {
+        guard commands.indices.contains(index), let output = commands[index].output else {
             return nil
         }
-        var text = ""
-        for row in input.row ... end.row {
-            guard let line = line(atMark: row) else {
-                return nil
-            }
-            let start = row == input.row ? min(input.column, line.count) : 0
-            let cells = line[start ..< (row == end.row ? max(min(end.column, line.count), start) : line.count)]
-            let isWrapped = line.isWrapped && row < end.row
-            let stop = isWrapped ? cells.endIndex : (cells.lastIndex { !$0.isBlank }).map { $0 + 1 } ?? start
-            text += String(
-                cells[start ..< stop].filter { $0.width > 0 && $0 != .padding }.map(graphemes.character(of:)))
-            if !isWrapped, row < end.row {
-                text += "\n"
-            }
-            if text.count > Self.maximumTextLength {
-                break
-            }
+        let cursor = Position(
+            row: removedScrollbackCount + scrollback.count + normalCursor.row, column: normalCursor.column)
+        return text(from: output, to: commands[index].end ?? cursor)
+    }
+
+    private var inputText: String? {
+        guard let input, let end = markPosition,
+            let text = text(from: input, to: end, limit: Self.maximumTextLength)
+        else {
+            return nil
         }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maximumTextLength)
         return trimmed.isEmpty ? nil : String(trimmed)
+    }
+
+    private func text(from start: Position, to end: Position, limit: Int = .max) -> String? {
+        guard start.row <= end.row else {
+            return nil
+        }
+        var text = ""
+        var length = 0
+        for row in start.row ... end.row {
+            guard let line = line(atMark: row) else {
+                return nil
+            }
+            let first = row == start.row ? min(start.column, line.count) : 0
+            let cells = line[first ..< (row == end.row ? max(min(end.column, line.count), first) : line.count)]
+            let isWrapped = line.isWrapped && row < end.row
+            let stop = isWrapped ? cells.endIndex : (cells.lastIndex { !$0.isBlank }).map { $0 + 1 } ?? first
+            let piece = cells[first ..< stop].filter { $0.width > 0 && $0 != .padding }.map(graphemes.character(of:))
+            text += String(piece)
+            length += piece.count
+            if !isWrapped, row < end.row {
+                text += "\n"
+                length += 1
+            }
+            if length > limit {
+                break
+            }
+        }
+        return text
     }
 
     private func line(atMark row: Int) -> Line? {
@@ -152,7 +173,8 @@ extension Terminal {
         guard index >= scrollback.count else {
             return scrollback[index]
         }
-        return screen.indices.contains(index - scrollback.count) ? screen[index - scrollback.count] : nil
+        let lines = normalLines
+        return lines.indices.contains(index - scrollback.count) ? lines[index - scrollback.count] : nil
     }
 
     private mutating func finishCommand(exitStatus: Int32?) {

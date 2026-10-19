@@ -35,6 +35,31 @@ struct CommandTests {
         #expect(terminal.commands.first?.prompt == Terminal.Position(row: 0, column: 0))
     }
 
+    @Test func readsTheOutputOfACommand() {
+        var terminal = Terminal(columns: 5, rows: 3)
+        terminal.receive(prompt + "ls\r\n\u{1B}]133;C\u{7}a  \r\nbcdefgh\r\n\r\n中x\r\n\u{1B}]133;D;0\u{7}" + prompt)
+        #expect(terminal.output(ofCommandAt: 0) == "a\nbcdefgh\n\n中x\n")
+        terminal.receive("y\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}" + prompt)
+        #expect(terminal.output(ofCommandAt: 1) == "")
+        #expect(terminal.output(ofCommandAt: 2) == nil)
+    }
+
+    @Test func readsTheOutputOfARunningCommand() {
+        var terminal = Terminal(columns: 10, rows: 3)
+        terminal.receive(prompt + "top\r\n\u{1B}]133;C\u{7}line\r\nhalf")
+        #expect(terminal.output(ofCommandAt: 0) == "line\nhalf")
+        terminal.receive("\u{1B}[?1049hfull screen")
+        #expect(terminal.output(ofCommandAt: 0) == "line\nhalf")
+    }
+
+    @Test func readsNoOutputThatLeftTheScrollback() {
+        var terminal = Terminal(columns: 10, rows: 3)
+        terminal.receive(prompt + "seq\r\n\u{1B}]133;C\u{7}" + (0 ..< 12_000).map { "\($0)\r\n" }.joined())
+        terminal.receive("\u{1B}]133;D;0\u{7}" + prompt + "ls\r\n\u{1B}]133;C\u{7}a\r\n\u{1B}]133;D;0\u{7}")
+        #expect(terminal.output(ofCommandAt: 0) == nil)
+        #expect(terminal.output(ofCommandAt: 1) == "a\n")
+    }
+
     @Test func readsTheCommandFromTheScreen() {
         var terminal = Terminal(columns: 20, rows: 5)
         terminal.receive(prompt + "ls  -la  \r\n\u{1B}]133;C\u{7}")

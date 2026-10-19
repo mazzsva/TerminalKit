@@ -35,6 +35,14 @@ struct ShellIntegrationTests {
     }
 
     @Test(arguments: ["/bin/zsh", "/bin/bash"])
+    func readsTheOutputOfACommand(shell: String) async throws {
+        let session = try startedSession(shell)
+        session.send(Array("printf 'a\\n\\tb\\n'\r".utf8))
+        await session.waitForCommands { $0.count == 1 && $0[0].endDate != nil }
+        #expect(session.output(of: session.commands[0]) == "a\n        b\n")
+    }
+
+    @Test(arguments: ["/bin/zsh", "/bin/bash"])
     func reportsTheCurrentDirectory(shell: String) async throws {
         try FileManager.default.createDirectory(at: home.appending(path: "a b/é%20"), withIntermediateDirectories: true)
         let session = try startedSession(shell)
