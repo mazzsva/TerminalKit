@@ -85,3 +85,16 @@ func mouseEvent(
         )
     )
 }
+
+@MainActor
+func scrollWheelEvent(lines: Int32) throws -> NSEvent {
+    let event = try #require(
+        CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: lines, wheel2: 0, wheel3: 0)
+    )
+    for field in [
+        CGEventField.scrollWheelEventIsContinuous, .scrollWheelEventScrollPhase, .scrollWheelEventMomentumPhase,
+    ] {
+        event.setIntegerValueField(field, value: 0)
+    }
+    return try #require(NSEvent(cgEvent: event))
+}

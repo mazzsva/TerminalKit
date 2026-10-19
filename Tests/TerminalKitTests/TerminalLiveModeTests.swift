@@ -82,11 +82,7 @@ struct TerminalLiveModeTests {
         for await isActive in Observations({ session.liveTerminal.isAlternateScreenActive }) where isActive {
             break
         }
-        let event = try #require(
-            CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: 1, wheel2: 0, wheel3: 0)
-                .flatMap(NSEvent.init(cgEvent:))
-        )
-        view.scrollWheel(with: event)
+        view.scrollWheel(with: try scrollWheelEvent(lines: 1))
         #expect(await session.linesAfterExit().contains("1b  5b  41"))
     }
 }
