@@ -11,7 +11,8 @@ extension TerminalSession {
         public init(
             executableURL: URL,
             arguments: [String] = [],
-            environment: [String: String] = ProcessInfo.processInfo.environment,
+            environment: [String: String] = TerminalSession.Configuration.terminalEnvironment(
+                inheriting: ProcessInfo.processInfo.environment),
             currentDirectoryURL: URL? = nil,
             usesShellIntegration: Bool = false
         ) {
@@ -29,7 +30,8 @@ extension TerminalSession.Configuration {
         loginShell(inheriting: ProcessInfo.processInfo.environment)
     }
 
-    static func loginShell(inheriting environment: [String: String]) -> Self {
+    @usableFromInline
+    static func terminalEnvironment(inheriting environment: [String: String]) -> [String: String] {
         var environment = environment
         for name in ["TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID"] {
             environment[name] = nil
@@ -39,10 +41,14 @@ extension TerminalSession.Configuration {
         if environment["LANG"] == nil {
             environment["LANG"] = "en_US.UTF-8"
         }
-        return Self(
+        return environment
+    }
+
+    static func loginShell(inheriting environment: [String: String]) -> Self {
+        Self(
             executableURL: shellURL,
             arguments: ["-l"],
-            environment: environment,
+            environment: terminalEnvironment(inheriting: environment),
             currentDirectoryURL: .homeDirectory,
             usesShellIntegration: true
         )
