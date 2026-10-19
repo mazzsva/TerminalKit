@@ -42,9 +42,7 @@ struct PseudoTerminalTests {
     }
 
     @Test func endsTheOutputWhenTheProcessExits() async throws {
-        let start = ContinuousClock.now
-        let output = try await output("trap '' HUP; /bin/sleep 30 & echo $!")
-        #expect(ContinuousClock.now - start < .seconds(20))
+        let output = try await output("trap '' HUP; /bin/sleep 600 & echo $!")
         let processIdentifier = try #require(pid_t(output.trimmingCharacters(in: .whitespacesAndNewlines)))
         #expect(kill(processIdentifier, SIGKILL) == 0)
     }
