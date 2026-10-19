@@ -21,6 +21,25 @@ struct TerminalViewTests {
         #expect(session.terminal.rows == Int((visibleSize.height - 8) / view.cellSize.height))
     }
 
+    @Test func opensLinksWithTheOpenURLActionOfTheEnvironment() throws {
+        var opened: [URL] = []
+        let hostingView = NSHostingView(
+            rootView: TerminalView(session: TerminalSession(running: "exit"))
+                .environment(
+                    \.openURL,
+                    OpenURLAction { url in
+                        opened.append(url)
+                        return .handled
+                    })
+        )
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+        let view = try #require(contentView(in: hostingView))
+        let url = try #require(URL(string: "https://example.com/a"))
+        view.performLinkAction(.open(url))
+        #expect(opened == [url])
+    }
+
     @Test func showsANewSessionInANewView() throws {
         let hostingView = NSHostingView(rootView: TerminalView(session: TerminalSession(running: "exit")))
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)

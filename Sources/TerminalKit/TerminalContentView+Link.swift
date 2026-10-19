@@ -24,6 +24,15 @@ extension TerminalContentView {
     ]
     private static let pattern = #/(?:https?|ftp|file)://[^\s<>"'`]+|mailto:[^\s<>"'`]+/#.ignoresCase()
 
+    static func performWithWorkspace(_ action: LinkAction) {
+        switch action {
+        case .open(let url):
+            NSWorkspace.shared.open(url)
+        case .reveal(let url):
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+
     static func action(for url: URL) -> LinkAction? {
         guard let scheme = url.scheme?.lowercased(), schemes.contains(scheme) else {
             return nil

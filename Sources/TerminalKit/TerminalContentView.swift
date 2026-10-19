@@ -63,14 +63,7 @@ final class TerminalContentView: NSView {
     }
     var ringBell = { NSSound.beep() }
     var currentDate = { Date() }
-    var performLinkAction = { (action: LinkAction) in
-        switch action {
-        case .open(let url):
-            NSWorkspace.shared.open(url)
-        case .reveal(let url):
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-        }
-    }
+    var performLinkAction = performWithWorkspace
     var hoveredLink: Link? {
         didSet {
             guard hoveredLink != oldValue else {
