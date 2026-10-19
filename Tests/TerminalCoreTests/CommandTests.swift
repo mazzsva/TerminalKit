@@ -255,6 +255,19 @@ struct CommandTests {
         #expect(terminal.commands[0].text == "ls")
     }
 
+    @Test func forgetsTheMarksOfEveryCommandOnAClearedScreen() {
+        var terminal = Terminal(columns: 20, rows: 4)
+        terminal.receive(prompt + "a\r\n\u{1B}]133;C\u{7}1\r\n2\r\n3\r\n4\r\n\u{1B}]133;D;0\u{7}")
+        terminal.receive(prompt + "b\r\n\u{1B}]133;C\u{7}5\r\n6\r\n\u{1B}]133;D;0\u{7}")
+        terminal.receive(prompt + "c\r\n\u{1B}]133;C\u{7}\u{1B}]133;D;0\u{7}" + prompt + "d\r\n\u{1B}]133;C\u{7}")
+        #expect(terminal.scrollback.count == 7)
+        terminal.receive("\u{1B}[2J")
+        let marks = terminal.commands.map { [$0.prompt?.row, $0.output?.row, $0.end?.row] }
+        #expect(marks == [[0, 1, 5], [5, 6, nil], [nil, nil, nil], [nil, nil, nil]])
+        terminal.receive("\u{1B}]133;D;0\u{7}" + prompt + "\u{1B}[2J\u{1B}]133;C\u{7}")
+        #expect(terminal.commands.last?.prompt == nil)
+    }
+
     @Test func forgetsTheMarksBelowAnEraseFromTheCursor() {
         var terminal = Terminal(columns: 20, rows: 5)
         terminal.receive(prompt + "ls\r\n\u{1B}]133;C\u{7}x\r\n\u{1B}]133;D;0\u{7}\u{1B}[2;3H\u{1B}[J")

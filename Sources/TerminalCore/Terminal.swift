@@ -718,6 +718,7 @@ package struct Terminal: Sendable {
         terminal.title = title
         terminal.bellCount = bellCount
         terminal.commands = commands
+        commands = []
         terminal.removedCommandCount = removedCommandCount
         terminal.currentDirectory = currentDirectory
         terminal.shellIntegrationNonce = shellIntegrationNonce
@@ -727,6 +728,7 @@ package struct Terminal: Sendable {
         terminal.graphemes = graphemes
         terminal.links = links
         terminal.scrollback = scrollback
+        scrollback = []
         terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount
         terminal.forgetMarks(after: -1)
