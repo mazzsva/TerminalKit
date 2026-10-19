@@ -378,9 +378,7 @@ package struct Terminal: Sendable {
             insertCharacters(count)
         case "b":
             if let lastCharacter {
-                for _ in 0 ..< repeatCount(count, of: lastCharacter) {
-                    print(lastCharacter)
-                }
+                repeatCharacter(lastCharacter, count: repeatCount(count, of: lastCharacter))
             }
         case "P":
             deleteCharacters(count)
@@ -467,6 +465,28 @@ package struct Terminal: Sendable {
             screen[cursor.row][column + 1] = blank
         default:
             break
+        }
+    }
+
+    private mutating func repeatCharacter(_ scalar: Unicode.Scalar, count: Int) {
+        var remaining = count
+        if scalar.width == 1 {
+            while remaining > 0, !isWrapPending {
+                print(scalar)
+                remaining -= 1
+            }
+            var line = Line(repeatElement(Cell(scalar: scalar, style: style), count: columns))
+            while remaining >= columns {
+                print(scalar)
+                line.isWrapped = screen[cursor.row].isWrapped
+                screen[cursor.row] = line
+                cursor.column = columns - 1
+                isWrapPending = true
+                remaining -= columns
+            }
+        }
+        for _ in 0 ..< remaining {
+            print(scalar)
         }
     }
 
