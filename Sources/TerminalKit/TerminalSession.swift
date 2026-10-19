@@ -24,6 +24,7 @@ public final class TerminalSession {
     public private(set) var currentDirectory: URL?
     private(set) var revealedCommandID: Int?
     private(set) var revealCount = 0
+    @ObservationIgnored var handledRevealCount = 0
 
     private(set) var liveTerminal = Terminal(columns: 80, rows: 24) {
         didSet {
