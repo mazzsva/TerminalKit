@@ -26,6 +26,30 @@ struct TerminalBellTests {
         #expect(window.contentView === view)
     }
 
+    @Test func ringsTheBellInOneViewOfTheSession() async throws {
+        let session = TerminalSession(running: "read line; printf '\\a'; read line")
+        let views = [TerminalContentView(session: session), TerminalContentView(session: session)]
+        let bells = views.map(Bell.init)
+        let windows = views.map { view in
+            view.currentDate = { Date(timeIntervalSince1970: 0) }
+            let window = NSWindow(contentView: view)
+            window.setContentSize(CGSize(width: 400, height: 300))
+            view.fit(to: window.contentLayoutRect.size)
+            return window
+        }
+        try session.start()
+        try await Task.sleep(for: .milliseconds(100))
+        session.send(Array("\r".utf8))
+        while bells.map(\.rings).reduce(0, +) == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(bells.map(\.rings) == [1, 0])
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+        #expect(windows.count == 2)
+    }
+
     @Test func ringsTheBellAtMostTwiceASecond() async throws {
         let session = TerminalSession(
             running: "read a; printf '\\a'; read b; printf '\\a'; read c; printf '\\a'; read d")
