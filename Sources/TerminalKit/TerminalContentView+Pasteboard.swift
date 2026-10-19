@@ -1,4 +1,5 @@
 import AppKit
+import TerminalCore
 
 extension TerminalContentView: NSMenuItemValidation {
     var selectedText: String? {
@@ -7,12 +8,10 @@ extension TerminalContentView: NSMenuItemValidation {
         }
         let terminal = session.terminal
         let graphemes = terminal.graphemes
-        let firstRow = max(min(selection.anchor, selection.head).line - terminal.removedScrollbackCount, 0)
-        let lastRow = min(
-            max(selection.anchor, selection.head).line - terminal.removedScrollbackCount,
-            terminal.scrollback.count + terminal.rows - 1
-        )
-        let pieces = (firstRow ..< max(lastRow + 1, firstRow))
+        let rows = selectedRows(of: selection, in: terminal)
+        let lastRow = rows.upperBound - 1
+        let pieces =
+            rows
             .compactMap { row -> (text: String, continues: Bool)? in
                 let line = line(at: row, in: terminal)
                 guard let columns = selection.columns(inLine: terminal.removedScrollbackCount + row, count: line.count)
@@ -33,6 +32,28 @@ extension TerminalContentView: NSMenuItemValidation {
         return pieces.enumerated()
             .map { index, piece in piece.continues || index == pieces.count - 1 ? piece.text : piece.text + "\n" }
             .joined()
+    }
+
+    var hasSelectedText: Bool {
+        guard let selection, selection.anchor != selection.head else {
+            return false
+        }
+        let terminal = session.terminal
+        return selectedRows(of: selection, in: terminal)
+            .contains { row in
+                selection.columns(
+                    inLine: terminal.removedScrollbackCount + row, count: line(at: row, in: terminal).count)
+                    != nil
+            }
+    }
+
+    private func selectedRows(of selection: Selection, in terminal: Terminal) -> Range<Int> {
+        let firstRow = max(min(selection.anchor, selection.head).line - terminal.removedScrollbackCount, 0)
+        let lastRow = min(
+            max(selection.anchor, selection.head).line - terminal.removedScrollbackCount,
+            terminal.scrollback.count + terminal.rows - 1
+        )
+        return firstRow ..< max(lastRow + 1, firstRow)
     }
 
     @objc func copy(_ sender: Any?) {
@@ -85,7 +106,7 @@ extension TerminalContentView: NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(copy(_:)):
-            selectedText != nil
+            hasSelectedText
         case #selector(paste(_:)):
             NSPasteboard.general.availableType(from: [.string]) != nil
         case #selector(performTextFinderAction(_:)):

@@ -141,6 +141,26 @@ struct TerminalSelectionTests {
         #expect(view.selectedText == nil)
     }
 
+    @Test func turnsOnCopyOnlyWhenThereIsSelectedText() async throws {
+        let view = try await view(running: "seq 1 12000")
+        let item = NSMenuItem(title: "Copy", action: #selector(TerminalContentView.copy(_:)), keyEquivalent: "c")
+        let removed = view.session.terminal.removedScrollbackCount
+        let lineCount = view.session.terminal.scrollback.count + view.session.terminal.rows
+        for (anchor, head) in [
+            (0, 5), (removed - 5, removed - 1), (removed - 5, removed + 2), (removed + 10, removed + 10),
+            (removed + lineCount - 1, removed + lineCount + 5), (removed + lineCount, removed + lineCount + 5),
+        ] {
+            view.selection = Selection(anchor: .init(line: anchor, column: 1), head: .init(line: head, column: 0))
+            #expect(view.validateMenuItem(item) == (view.selectedText != nil), "\(anchor) \(head)")
+        }
+        view.selection = Selection(
+            anchor: .init(line: removed - 5, column: 0), head: .init(line: removed - 1, column: 3))
+        #expect(!view.validateMenuItem(item))
+        view.selection = Selection(
+            anchor: .init(line: removed + 3, column: 1), head: .init(line: removed + 3, column: 1))
+        #expect(!view.validateMenuItem(item))
+    }
+
     @Test func turnsOnCopyOnlyWithASelection() {
         let view = viewInWindow()
         let item = NSMenuItem(title: "Copy", action: #selector(TerminalContentView.copy(_:)), keyEquivalent: "c")
