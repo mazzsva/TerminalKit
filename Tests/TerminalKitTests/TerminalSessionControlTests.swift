@@ -23,6 +23,15 @@ struct TerminalSessionControlTests {
         }
     }
 
+    @Test func killsAProcessThatIgnoresTheHangUp() async throws {
+        let session = TerminalSession(running: "trap '' HUP; echo ready; exec /bin/sleep 33")
+        try session.start()
+        await session.waitForText("ready")
+        session.terminate()
+        await session.waitForExit()
+        #expect(session.state == .exited(.uncaughtSignal(SIGKILL)))
+    }
+
     @Test func terminatesAnInteractiveShell() async throws {
         let session = TerminalSession(
             configuration: .init(

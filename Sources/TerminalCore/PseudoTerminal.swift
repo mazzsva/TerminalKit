@@ -12,6 +12,7 @@ package final class PseudoTerminal: Sendable {
     private static let readSize = 65_536
     private static let maximumOpenRetries = 10
     private static let redriveOpenError: Int32 = -6
+    private static let killDelay = DispatchTimeInterval.seconds(2)
 
     package let processIdentifier: pid_t
     package let output: Output
@@ -23,6 +24,11 @@ package final class PseudoTerminal: Sendable {
     private let buffer: OutputBuffer
     private let input = Mutex(Input())
     private let finalTermination = Mutex<Termination?>(nil)
+    private let child = Child()
+
+    private final class Child: Sendable {
+        let isReaped = Mutex(false)
+    }
 
     package var termination: Termination? {
         finalTermination.withLock { $0 }
@@ -91,6 +97,14 @@ package final class PseudoTerminal: Sendable {
         queue.async { [weak self] in
             self?.cancelSources()
         }
+        let processIdentifier = processIdentifier
+        queue.asyncAfter(deadline: .now() + Self.killDelay) { [child] in
+            child.isReaped.withLock { isReaped in
+                if !isReaped {
+                    kill(-processIdentifier, SIGKILL)
+                }
+            }
+        }
     }
 
     package func write(_ bytes: [UInt8]) {
@@ -152,9 +166,14 @@ package final class PseudoTerminal: Sendable {
 
     private func monitorExit(secondary: Int32) {
         let processIdentifier = processIdentifier
-        Thread { [weak self] in
+        Thread { [weak self, child] in
+            var information = siginfo_t()
+            while waitid(P_PID, id_t(processIdentifier), &information, WEXITED | WNOWAIT) == -1 && errno == EINTR {}
             var status: Int32 = 0
-            while waitpid(processIdentifier, &status, 0) == -1 && errno == EINTR {}
+            child.isReaped.withLock { isReaped in
+                while waitpid(processIdentifier, &status, 0) == -1 && errno == EINTR {}
+                isReaped = true
+            }
             let termination = Termination(status: status)
             close(secondary)
             guard let self else {
