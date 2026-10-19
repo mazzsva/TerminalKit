@@ -20,6 +20,30 @@ struct TerminalLinkSafetyTests {
         #expect(link?.spans.first?.columns.lowerBound == column)
     }
 
+    @Test func findsTheURLUnderThePointerAmongMany() async throws {
+        let items = (0 ..< 30).map { "e\u{301} https://e.co/\($0)," }.joined(separator: " ")
+        let session = TerminalSession(running: "printf '\(items)'")
+        session.resize(columns: 40, rows: 20)
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForExit()
+        let terminal = session.terminal
+        var cells: [(row: Int, column: Int)] = []
+        var text = ""
+        for row in terminal.screen.indices {
+            for column in terminal.screen[row].indices where terminal.screen[row][column].width > 0 {
+                cells.append((row, column))
+                text.append(terminal.character(of: terminal.screen[row][column]))
+            }
+        }
+        for number in [0, 7, 17, 29] {
+            let range = try #require(text.range(of: "https://e.co/\(number),"))
+            let cell = cells[text.distance(from: text.startIndex, to: range.lowerBound) + 5]
+            let link = view.link(atRow: cell.row, column: cell.column)
+            #expect(link?.url == URL(string: "https://e.co/\(number)"))
+        }
+    }
+
     @Test func keepsTheSelectionWhenACommandClickOpensALink() async throws {
         let (view, window) = try await clickView(running: "printf 'some text\\r\\nhttps://example.com/x'")
         var opened: [TerminalContentView.LinkAction] = []
