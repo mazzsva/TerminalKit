@@ -218,6 +218,22 @@ extension TerminalSession {
         public internal(set) var exitStatus: Int32?
         public let startDate: Date
         public internal(set) var endDate: Date?
+
+        public init(
+            id: Int,
+            text: String?,
+            directory: URL? = nil,
+            exitStatus: Int32? = nil,
+            startDate: Date,
+            endDate: Date? = nil
+        ) {
+            self.id = id
+            self.text = text
+            self.directory = directory
+            self.exitStatus = exitStatus
+            self.startDate = startDate
+            self.endDate = endDate
+        }
     }
 
     private func updateCommands() {
