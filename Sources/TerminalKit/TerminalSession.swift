@@ -134,6 +134,10 @@ public final class TerminalSession {
         pseudoTerminal?.resize(columns: columns, rows: rows)
     }
 
+    public func output(of command: Command) -> String? {
+        liveTerminal.output(ofCommandAt: command.id - liveTerminal.removedCommandCount)
+    }
+
     public var hasForegroundProcess: Bool {
         guard let pseudoTerminal, let group = pseudoTerminal.foregroundProcessGroup else {
             return false
