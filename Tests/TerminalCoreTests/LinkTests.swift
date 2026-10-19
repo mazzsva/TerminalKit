@@ -64,6 +64,25 @@ struct LinkTests {
         #expect(uris(terminal.screen[0].dropFirst().prefix(1), in: terminal) == ["last"])
     }
 
+    @Test func waitsLongerAfterACompactionThatFreesNothing() {
+        var links = Terminal.Links(capacity: 80)
+        var compactions = 0
+        for index in 0 ..< 2_000 {
+            if links.needsCompaction(forKey: "\(index)", uri: "\(index)") {
+                _ = links.compact(keeping: Array(repeating: true, count: links.count))
+                compactions += 1
+            }
+            _ = links.link(forKey: "\(index)", uri: "\(index)")
+        }
+        #expect(links.count == 80)
+        #expect((5 ... 25).contains(compactions))
+        links.resetCompactionInterval()
+        for index in 0 ..< 64 {
+            _ = links.link(forKey: "new \(index)", uri: "new")
+        }
+        #expect(links.needsCompaction(forKey: "next", uri: "next"))
+    }
+
     @Test func keepsTheLinkOfTheSavedCursorThroughACompaction() {
         var terminal = Terminal(columns: 20, rows: 3)
         terminal.links = Terminal.Links(capacity: 80)

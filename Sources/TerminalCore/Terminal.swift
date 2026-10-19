@@ -627,6 +627,8 @@ package struct Terminal: Sendable {
         if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
             removedScrollbackCount += scrollback.count - Self.maximumScrollback
             scrollback.removeFirst(scrollback.count - Self.maximumScrollback)
+            graphemes.resetCompactionInterval()
+            links.resetCompactionInterval()
         }
     }
 
@@ -938,6 +940,8 @@ package struct Terminal: Sendable {
         case 3:
             removedScrollbackCount += scrollback.count
             scrollback.removeAll()
+            graphemes.resetCompactionInterval()
+            links.resetCompactionInterval()
         default:
             break
         }
