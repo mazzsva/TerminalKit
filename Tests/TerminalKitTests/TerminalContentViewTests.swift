@@ -16,11 +16,58 @@ struct TerminalContentViewTests {
         #expect(session.terminal.rows == 30)
     }
 
-    @Test func keepsAtLeastOneCell() {
+    @Test func keepsTheSizeInAViewThatIsTooSmall() {
         let session = TerminalSession(running: "exit")
-        TerminalContentView(session: session).fit(to: .zero)
-        #expect(session.terminal.columns == 1)
-        #expect(session.terminal.rows == 1)
+        let view = TerminalContentView(session: session)
+        for size in [CGSize.zero, cells(9.9, 30, in: view), cells(100.5, 1.9, in: view)] {
+            view.fit(to: size)
+            #expect(session.terminal.columns == 80)
+            #expect(session.terminal.rows == 24)
+            #expect(session.sizingView == nil)
+        }
+        view.fit(to: cells(10.5, 2.5, in: view))
+        #expect(session.terminal.columns == 10)
+        #expect(session.terminal.rows == 2)
+    }
+
+    @Test func limitsTheSize() {
+        let session = TerminalSession(running: "exit")
+        let view = TerminalContentView(session: session)
+        view.fit(to: cells(5_000, 3_000, in: view))
+        #expect(session.terminal.columns == 1_000)
+        #expect(session.terminal.rows == 1_000)
+        view.font = .monospacedSystemFont(ofSize: .infinity, weight: .regular)
+        view.fit(to: CGSize(width: 400, height: 300))
+        #expect(session.terminal.columns == 1_000)
+    }
+
+    @Test func givesTheSizeToAnotherViewWhenTheSizingViewIsTooSmall() {
+        let session = TerminalSession(running: "exit")
+        let first = TerminalContentView(session: session)
+        let second = TerminalContentView(session: session)
+        first.fit(to: cells(100.5, 30.5, in: first))
+        second.fit(to: cells(60.5, 20.5, in: second))
+        #expect(session.terminal.columns == 100)
+        first.fit(to: .zero)
+        second.fit(to: cells(60.5, 20.5, in: second))
+        #expect(session.sizingView === second)
+        #expect(session.terminal.columns == 60)
+    }
+
+    @Test func keepsTheScrollbackWhenTheViewCollapses() async throws {
+        let session = TerminalSession(running: "seq -f 'line %g abcdefghijklmnopqrstuvwxyz' 1 2000")
+        let view = TerminalContentView(session: session)
+        view.fit(to: cells(100.5, 30.5, in: view))
+        try session.start()
+        await session.waitForExit()
+        view.fit(to: .zero)
+        view.fit(to: cells(100.5, 30.5, in: view))
+        #expect(session.terminal.removedScrollbackCount == 0)
+        #expect(session.terminal.scrollback.count == 2000 - 29)
+    }
+
+    private func cells(_ columns: CGFloat, _ rows: CGFloat, in view: TerminalContentView) -> CGSize {
+        CGSize(width: 8 + view.cellSize.width * columns, height: 8 + view.cellSize.height * rows)
     }
 
     @Test func makesTheStyledFontsFromTheFont() {
