@@ -1,5 +1,5 @@
 extension Terminal {
-    package enum Color: Equatable, Sendable {
+    package enum Color: Hashable, Sendable {
         case `default`
         case indexed(UInt8)
         case rgb(red: UInt8, green: UInt8, blue: UInt8)
