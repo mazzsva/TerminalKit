@@ -27,6 +27,10 @@ enum ShellIntegration {
         else
             'builtin' 'unset' 'ZDOTDIR'
         fi
+        if [[ -n "${TERMINALKIT_NONCE+X}" ]]; then
+            'builtin' 'typeset' -g _terminalkit_nonce="$TERMINALKIT_NONCE"
+            'builtin' 'unset' 'TERMINALKIT_NONCE'
+        fi
         {
             'builtin' 'typeset' _terminalkit_file="${ZDOTDIR-$HOME}/.zshenv"
             [[ ! -r "$_terminalkit_file" ]] || 'builtin' 'source' '--' "$_terminalkit_file"
@@ -54,7 +58,7 @@ enum ShellIntegration {
             'builtin' 'emulate' -L 'zsh'
             if (( _terminalkit_command )); then
                 _terminalkit_command=0
-                'builtin' 'print' -n "\e]133;D;$code\a"
+                'builtin' 'print' -n "\e]133;D;$code;nonce=$_terminalkit_nonce\a"
             fi
             'builtin' 'local' REPLY
             _terminalkit_encode "$PWD"
@@ -78,7 +82,7 @@ enum ShellIntegration {
             _terminalkit_plain_ps1=$PS1
             'builtin' 'local' ps1=$PS1
             [[ $ps1 == *[^%]% || $ps1 == % ]] && ps1=${ps1%?}
-            PS1=$'%{\e]133;A\a%}'$ps1$'%{\e]133;B\a%}'
+            PS1=$'%{\e]133;A;nonce='$_terminalkit_nonce$'\a%}'$ps1$'%{\e]133;B;nonce='$_terminalkit_nonce$'\a%}'
             _terminalkit_ps1=$PS1
         }
 
@@ -94,7 +98,7 @@ enum ShellIntegration {
             [[ $PS1 != "$_terminalkit_ps1" ]] || PS1=$_terminalkit_plain_ps1
             'builtin' 'local' REPLY=''
             (( ${#1} > 1024 )) || _terminalkit_encode "$1"
-            'builtin' 'print' -n "\e]133;C${REPLY:+;cmdline_url=$REPLY}\a"
+            'builtin' 'print' -n "\e]133;C;nonce=$_terminalkit_nonce${REPLY:+;cmdline_url=$REPLY}\a"
         }
 
         'builtin' 'typeset' -ag precmd_functions preexec_functions
@@ -103,6 +107,11 @@ enum ShellIntegration {
         """#
 
     private static let bash = #"""
+        if [[ -n ${TERMINALKIT_NONCE+X} ]]; then
+            __terminalkit_nonce=$TERMINALKIT_NONCE
+            builtin unset TERMINALKIT_NONCE
+        fi
+
         if [[ -n ${TERMINALKIT_BASH_INJECT-} ]]; then
             if [[ $TERMINALKIT_BASH_INJECT == login ]]; then
                 builtin unset TERMINALKIT_BASH_INJECT
@@ -152,14 +161,15 @@ enum ShellIntegration {
                 entry=$(HISTTIMEFORMAT= builtin history 1)
                 if [[ $__terminalkit_command == 1 ]]; then
                     __terminalkit_command=0
-                    builtin printf '\e]133;D;%s\a' "$code"
+                    builtin printf '\e]133;D;%s;nonce=%s\a' "$code" "${__terminalkit_nonce-}"
                 elif [[ -n ${__terminalkit_entry+X} && -n $entry && $entry != "$__terminalkit_entry" ]]; then
                     text=${entry#"${entry%%[! ]*}"}
                     text=${text#"${text%%[!0-9]*}"}
                     text=${text#\*}
                     if [[ -n ${text//[[:space:]]/} ]]; then
                         __terminalkit_encode "${text#  }"
-                        builtin printf '\e]133;C;cmdline_url=%s\a\e]133;D;%s\a' "$__terminalkit_reply" "$code"
+                        builtin printf '\e]133;C;nonce=%s;cmdline_url=%s\a\e]133;D;%s;nonce=%s\a' \
+                            "${__terminalkit_nonce-}" "$__terminalkit_reply" "$code" "${__terminalkit_nonce-}"
                     fi
                 fi
                 __terminalkit_entry=$entry
@@ -172,10 +182,10 @@ enum ShellIntegration {
                 builtin local code=$?
                 if [[ $PS1 != "$__terminalkit_ps1" ]]; then
                     __terminalkit_plain_ps1=$PS1
-                    builtin local ps1="$PS1" newline='\n' line='\n\[\e]133;A;k=s\a\]'
+                    builtin local ps1="$PS1" newline='\n' line='\n\[\e]133;A;k=s;nonce=${__terminalkit_nonce-}\a\]'
                     ps1=${ps1//"$newline"/$line}
-                    ps1=${ps1//$'\n'/$'\n''\[\e]133;A;k=s\a\]'}
-                    PS1='\[\e]133;A\a\]'$ps1'\[\e]133;B\a\]'
+                    ps1=${ps1//$'\n'/$'\n''\[\e]133;A;k=s;nonce=${__terminalkit_nonce-}\a\]'}
+                    PS1='\[\e]133;A;nonce=${__terminalkit_nonce-}\a\]'$ps1'\[\e]133;B;nonce=${__terminalkit_nonce-}\a\]'
                     __terminalkit_ps1=$PS1
                 fi
                 __terminalkit_prompting=1
@@ -188,7 +198,7 @@ enum ShellIntegration {
                 [[ $BASH_COMMAND == __terminalkit_precmd ]] && builtin return 0
                 __terminalkit_command=1
                 [[ $PS1 != "$__terminalkit_ps1" ]] || PS1=$__terminalkit_plain_ps1
-                builtin printf '\e]133;C\a'
+                builtin printf '\e]133;C;nonce=%s\a' "${__terminalkit_nonce-}"
                 builtin return 0
             }
 
