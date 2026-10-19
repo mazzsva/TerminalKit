@@ -43,7 +43,7 @@ extension Terminal {
         return Restoration(
             columns: columns,
             rows: rows,
-            content: Data(content(of: lines).utf8),
+            content: Data(content(of: lines)),
             commands: commands,
             removedCommandCount: removedCommandCount,
             currentDirectory: currentDirectory
@@ -118,7 +118,7 @@ extension Terminal {
         return cells
     }
 
-    private func content(of lines: [Line]) -> String {
+    private func content(of lines: [Line]) -> [UInt8] {
         let rows = lines.map(emittedCells)
         var count = rows.count
         while count > 0, rows[count - 1].allSatisfy(\.isBlank) {
@@ -138,57 +138,71 @@ extension Terminal {
                 counts[index] = (rows[index].lastIndex { !$0.isBlank } ?? -1) + 1
             }
         }
-        var content = ""
+        var content: [UInt8] = []
         var style = Style()
         for index in 0 ..< count {
             for cell in rows[index].prefix(counts[index]) {
                 if cell.style != style {
-                    content += controls(from: style, to: cell.style)
+                    appendControls(to: &content, from: style, to: cell.style)
                     style = cell.style
                 }
-                content.append(cell.character)
+                content.append(contentsOf: cell.character.utf8)
             }
-            content += controls(from: style, to: Style())
+            appendControls(to: &content, from: style, to: Style())
             style = Style()
             if continues[index] {
                 if counts[index + 1] == 0 {
-                    content += " "
+                    content.append(UInt8(ascii: " "))
                 } else if lines[index].last == .padding {
-                    content += "\u{1B}[K"
+                    content.append(contentsOf: "\u{1B}[K".utf8)
                 }
                 continue
             }
             if index > 0, continues[index - 1], rows[index].prefix(counts[index]).reduce(0, { $0 + $1.width }) < columns
             {
-                content += "\u{1B}[K"
+                content.append(contentsOf: "\u{1B}[K".utf8)
             }
-            content += "\r\n"
+            content.append(contentsOf: "\r\n".utf8)
         }
         return content
     }
 
-    private func controls(from old: Style, to new: Style) -> String {
-        var content = ""
+    private func appendControls(to content: inout [UInt8], from old: Style, to new: Style) {
         var oldAppearance = old
         var newAppearance = new
         oldAppearance.link = 0
         newAppearance.link = 0
         if oldAppearance != newAppearance {
-            var parameters = [0]
+            content.append(contentsOf: "\u{1B}[0".utf8)
             for (isOn, parameter) in [
                 (new.isBold, 1), (new.isFaint, 2), (new.isItalic, 3), (new.isUnderlined, 4),
                 (new.isInverse, 7), (new.isHidden, 8), (new.isStrikethrough, 9),
             ] where isOn {
-                parameters.append(parameter)
+                Self.append(parameter, to: &content)
             }
-            parameters += Self.parameters(of: new.foreground, base: 38)
-            parameters += Self.parameters(of: new.background, base: 48)
-            content += "\u{1B}[\(parameters.map(String.init).joined(separator: ";"))m"
+            for parameter in Self.parameters(of: new.foreground, base: 38)
+                + Self.parameters(of: new.background, base: 48)
+            {
+                Self.append(parameter, to: &content)
+            }
+            content.append(UInt8(ascii: "m"))
         }
         if old.link != new.link {
-            content += "\u{1B}]8;;\(links.uri(of: new.link) ?? "")\u{1B}\\"
+            content.append(contentsOf: "\u{1B}]8;;".utf8)
+            content.append(contentsOf: (links.uri(of: new.link) ?? "").utf8)
+            content.append(contentsOf: "\u{1B}\\".utf8)
         }
-        return content
+    }
+
+    private static func append(_ parameter: Int, to content: inout [UInt8]) {
+        content.append(UInt8(ascii: ";"))
+        if parameter >= 100 {
+            content.append(UInt8(ascii: "0") + UInt8(parameter / 100))
+        }
+        if parameter >= 10 {
+            content.append(UInt8(ascii: "0") + UInt8(parameter / 10 % 10))
+        }
+        content.append(UInt8(ascii: "0") + UInt8(parameter % 10))
     }
 
     private static func parameters(of color: Color, base: Int) -> [Int] {

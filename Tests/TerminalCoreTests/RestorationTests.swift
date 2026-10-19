@@ -49,6 +49,15 @@ struct RestorationTests {
         #expect(rows(of: restored)[2].first?.link == "https://example.com")
     }
 
+    @Test func restoresEveryColor() {
+        var terminal = Terminal(columns: 32, rows: 40)
+        for value in 0 ..< 256 {
+            terminal.receive("\u{1B}[38;5;\(value);48;2;\(value);\(255 - value);\(value / 2)mx")
+        }
+        let restored = restored(terminal)
+        #expect(rows(of: restored).prefix(8) == rows(of: terminal).prefix(8))
+    }
+
     @Test func restoresWrappedLines() {
         var terminal = Terminal(columns: 5, rows: 4)
         terminal.receive("abcdefgh\r\nabcd中x\r\n12345\r\n")
