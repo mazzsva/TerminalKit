@@ -35,9 +35,11 @@ extension Terminal {
         private var characters: [Character] = []
         private var indices: [Character: UInt32] = [:]
         private var additionsSinceCompaction = 0
+        private var compactionInterval: Int
 
         init(capacity: Int = 65_536) {
             self.capacity = capacity
+            compactionInterval = max(capacity / 64, 1)
         }
 
         var count: Int {
@@ -51,8 +53,12 @@ extension Terminal {
             return characters[index]
         }
 
+        mutating func resetCompactionInterval() {
+            compactionInterval = max(capacity / 64, 1)
+        }
+
         func needsCompaction(for character: Character) -> Bool {
-            characters.count >= capacity && additionsSinceCompaction >= capacity / 64
+            characters.count >= capacity && additionsSinceCompaction >= compactionInterval
                 && character.unicodeScalars.count > 1 && indices[character] == nil
         }
 
@@ -84,6 +90,8 @@ extension Terminal {
                 newIndices[index] = UInt32(kept.count)
                 kept.append(character)
             }
+            compactionInterval =
+                kept.count > characters.count * 3 / 4 ? min(compactionInterval * 2, capacity) : max(capacity / 64, 1)
             characters = kept
             indices = Dictionary(uniqueKeysWithValues: kept.enumerated().map { ($1, UInt32($0)) })
             additionsSinceCompaction = 0

@@ -7,6 +7,7 @@ extension Terminal {
         private var indices: [String: UInt16] = [:]
         private var byteCount = 0
         private var additionsSinceCompaction = 0
+        private var compactionInterval = 64
 
         init(capacity: Int = Int(UInt16.max), byteCapacity: Int = 4 << 20) {
             self.capacity = capacity
@@ -21,8 +22,12 @@ extension Terminal {
             link > 0 && Int(link) < uris.count ? uris[Int(link)] : nil
         }
 
+        mutating func resetCompactionInterval() {
+            compactionInterval = 64
+        }
+
         func needsCompaction(forKey key: String, uri: String) -> Bool {
-            isFull(adding: uri) && additionsSinceCompaction >= 64 && indices[key] == nil
+            isFull(adding: uri) && additionsSinceCompaction >= compactionInterval && indices[key] == nil
         }
 
         mutating func link(forKey key: String, uri: String) -> UInt16 {
@@ -58,6 +63,8 @@ extension Terminal {
                 keptKeys.append(keys[index])
                 keptURIs.append(uris[index])
             }
+            compactionInterval =
+                keptURIs.count > uris.count * 3 / 4 ? min(compactionInterval * 2, max(uris.count, 64)) : 64
             keys = keptKeys
             uris = keptURIs
             indices = Dictionary(uniqueKeysWithValues: keptKeys.enumerated().dropFirst().map { ($1, UInt16($0)) })

@@ -57,16 +57,35 @@ struct GraphemeTests {
         #expect(terminal.graphemes.count <= 64)
     }
 
-    @Test func waitsForNewCharactersBeforeTheNextCompaction() {
+    @Test func waitsLongerAfterACompactionThatFreesNothing() {
+        var graphemes = Terminal.Graphemes(capacity: 64)
+        let characters = Array(clusters(count: 1_000))
+        var compactions = 0
+        for character in characters {
+            if graphemes.needsCompaction(for: character) {
+                _ = graphemes.compact(keeping: Array(repeating: true, count: graphemes.count))
+                compactions += 1
+            }
+            _ = graphemes.cell(Terminal.Cell(), with: character)
+        }
+        #expect(graphemes.count == 64)
+        #expect((5 ... 20).contains(compactions))
+        graphemes.resetCompactionInterval()
+        #expect(graphemes.needsCompaction(for: "z\u{20D0}"))
+        _ = graphemes.compact(keeping: Array(repeating: false, count: graphemes.count))
+        for character in characters.prefix(64) {
+            _ = graphemes.cell(Terminal.Cell(), with: character)
+        }
+        _ = graphemes.cell(Terminal.Cell(), with: "y\u{20D0}")
+        #expect(graphemes.needsCompaction(for: "z\u{20D0}"))
+    }
+
+    @Test func keepsANewCharacterAfterTheScrollbackIsCleared() {
         var terminal = Terminal(columns: 10, rows: 2)
         terminal.graphemes = Terminal.Graphemes(capacity: 128)
-        terminal.receive(clusters(count: 128))
-        let first = terminal.graphemes
+        terminal.receive(clusters(count: 1_000))
         terminal.receive("\u{1B}[3J\u{1B}[2J\u{1B}[H" + "z\u{20D0}")
-        #expect(terminal.character(of: terminal.screen[0][0]) == "z")
-        terminal.receive("y\u{20D0}")
-        #expect(terminal.character(of: terminal.screen[0][1]) == "y\u{20D0}")
-        #expect(first.count == 128)
+        #expect(terminal.character(of: terminal.screen[0][0]) == "z\u{20D0}")
     }
 
     @Test func keepsTheTableAfterAReset() {
