@@ -48,6 +48,23 @@ struct TerminalPromptTests {
         await session.waitForExit()
     }
 
+    @Test func revealsACommandInALaterView() async throws {
+        let (first, session) = try await scrollView(
+            running: commands + "; printf '\\033]133;A\\007$ ready'; read line")
+        first.removeFromSuperview()
+        session.reveal(session.commands[1])
+        let second = TerminalScrollView(session: session)
+        second.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        second.layoutSubtreeIfNeeded()
+        #expect(topLine(of: second) == "$ command 2")
+        let third = TerminalScrollView(session: session)
+        third.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        third.layoutSubtreeIfNeeded()
+        #expect(third.contentView.bounds.maxY == third.terminalView.frame.height)
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+    }
+
     @Test func revealsTheOutputOfACommandWithoutAPrompt() async throws {
         let (scrollView, session) = try await scrollView(
             running: "printf '\\033]133;C\\007only output\\r\\n'; seq 1 40; echo ready; read line"

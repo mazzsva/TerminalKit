@@ -5,10 +5,11 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
     var textFinder = NSTextFinder()
 
     private var removedScrollbackCount = 0
-    private var revealCount = 0
+    private var revealCount: Int
 
     init(session: TerminalSession) {
         terminalView = TerminalContentView(session: session)
+        revealCount = session.handledRevealCount
         super.init(frame: .zero)
         documentView = terminalView
         hasVerticalScroller = true
@@ -91,6 +92,7 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
         let session = terminalView.session
         if session.revealCount != revealCount {
             revealCount = session.revealCount
+            session.handledRevealCount = revealCount
             session.revealedCommandID.map(terminalView.scrollToCommand)
         }
     }
