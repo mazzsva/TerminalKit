@@ -71,9 +71,22 @@ extension Terminal {
 
     mutating func forgetMarks(after row: Int) {
         let firstRow = removedScrollbackCount + scrollback.count + row + 1
-        updateMarks { position in
+        func forget(_ position: inout Position?) {
             if let row = position?.row, row >= firstRow {
                 position = nil
+            }
+        }
+        forget(&prompt)
+        forget(&input)
+        forget(&redrawnPrompt)
+        for index in commands.indices.reversed() {
+            let isBefore = [commands[index].prompt, commands[index].output, commands[index].end]
+                .contains { $0.map { $0.row < firstRow } == true }
+            forget(&commands[index].prompt)
+            forget(&commands[index].output)
+            forget(&commands[index].end)
+            if isBefore {
+                break
             }
         }
     }
