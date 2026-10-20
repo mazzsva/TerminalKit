@@ -17,6 +17,15 @@ extension NSColor {
         }
     }
 
+    var terminalRGB: Terminal.RGB? {
+        guard let color = usingColorSpace(.sRGB) else {
+            return nil
+        }
+        let components = [color.redComponent, color.greenComponent, color.blueComponent]
+            .map { UInt16((min(1, max(0, $0)) * 65_535).rounded()) }
+        return Terminal.RGB(red: components[0], green: components[1], blue: components[2])
+    }
+
     private static func cubeColor(_ index: Int) -> (red: UInt8, green: UInt8, blue: UInt8) {
         let levels: [UInt8] = [0, 95, 135, 175, 215, 255]
         return (levels[index / 36], levels[index / 6 % 6], levels[index % 6])

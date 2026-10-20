@@ -38,6 +38,11 @@ struct TerminalColorTests {
     @Test func usesTrueColors() {
         #expect(components(.rgb(red: 1, green: 128, blue: 255)) == [1, 128, 255])
     }
+
+    @Test func roundsAndClampsTheComponents() {
+        let color = NSColor(srgbRed: 1.5, green: .nan, blue: 0.5, alpha: 1)
+        #expect(color.terminalRGB == Terminal.RGB(red: 0xFFFF, green: 0, blue: 0x8000))
+    }
 }
 
 private func components(_ color: Terminal.Color) -> [Int]? {

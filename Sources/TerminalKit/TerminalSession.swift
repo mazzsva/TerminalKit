@@ -155,6 +155,9 @@ public final class TerminalSession {
     }
 
     private func receive(_ bytes: [UInt8]) {
+        if let colors = sizingView?.reportedColors, colors != liveTerminal.reportedColors {
+            liveTerminal.reportedColors = colors
+        }
         let replies = liveTerminal.receive(bytes)
         title = liveTerminal.title
         if bellCount != liveTerminal.bellCount {

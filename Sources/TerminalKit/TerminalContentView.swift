@@ -24,9 +24,11 @@ final class TerminalContentView: NSView {
     var palette = TerminalPalette.standard {
         didSet {
             colors = Colors(palette)
+            updateReportedColors()
             needsDisplay = true
         }
     }
+    private(set) var reportedColors: [Terminal.RGB] = []
     var usesOptionAsMetaKey = false
     var markedText = "" {
         didSet {
@@ -166,6 +168,7 @@ final class TerminalContentView: NSView {
             )
         )
         registerForDraggedTypes([.fileURL, .string])
+        updateReportedColors()
     }
 
     @available(*, unavailable)
@@ -179,6 +182,18 @@ final class TerminalContentView: NSView {
 
     override var acceptsFirstResponder: Bool {
         true
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateReportedColors()
+    }
+
+    private func updateReportedColors() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let reported = [colors.foreground, colors.background].compactMap(\.terminalRGB)
+            reportedColors = reported.count == 2 ? reported : []
+        }
     }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
