@@ -37,6 +37,9 @@ public final class TerminalSession {
         }
     }
     private(set) var sizingViewChangeCount = 0
+    @ObservationIgnored var isShown = false
+    @ObservationIgnored private var isSized = false
+    @ObservationIgnored private var waitingInput: [UInt8]?
 
     @ObservationIgnored private var pseudoTerminal: PseudoTerminal?
     @ObservationIgnored private var synchronizedOutputTimer: Task<Void, Never>?
@@ -54,6 +57,10 @@ public final class TerminalSession {
         guard state == .idle else {
             return
         }
+        guard isSized || !isShown else {
+            waitingInput = waitingInput ?? []
+            return
+        }
         let pseudoTerminal = try PseudoTerminal(
             executableURL: configuration.executableURL,
             arguments: configuration.arguments,
@@ -63,6 +70,10 @@ public final class TerminalSession {
             rows: liveTerminal.rows
         )
         self.pseudoTerminal = pseudoTerminal
+        if let waitingInput {
+            pseudoTerminal.write(waitingInput)
+            self.waitingInput = nil
+        }
         state = .running
 
         let output = pseudoTerminal.output
@@ -75,6 +86,8 @@ public final class TerminalSession {
     }
 
     func resize(columns: Int, rows: Int) {
+        isSized = true
+        defer { startIfWaiting() }
         guard columns != liveTerminal.columns || rows != liveTerminal.rows else {
             return
         }
@@ -93,6 +106,10 @@ public final class TerminalSession {
     }
 
     public func terminate() {
+        if waitingInput != nil {
+            waitingInput = nil
+            state = .exited(.uncaughtSignal(SIGHUP))
+        }
         pseudoTerminal?.hangUp()
     }
 
@@ -110,7 +127,20 @@ public final class TerminalSession {
     }
 
     func send(_ bytes: [UInt8]) {
+        waitingInput? += bytes
         pseudoTerminal?.write(bytes)
+    }
+
+    private func startIfWaiting() {
+        guard waitingInput != nil else {
+            return
+        }
+        do {
+            try start()
+        } catch {
+            waitingInput = nil
+            state = .exited(.exit(127))
+        }
     }
 
     private func finish() {
