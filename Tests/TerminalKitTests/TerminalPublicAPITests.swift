@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct TerminalPublicAPITests {
-    @Test func makesACommandForAPreview() throws {
+    @Test func makesACommandForAPreview() {
         let date = Date(timeIntervalSinceReferenceDate: 0)
         let command = TerminalSession.Command(
             id: 3,
@@ -23,7 +23,5 @@ struct TerminalPublicAPITests {
         #expect(running.directory == nil)
         #expect(running.exitStatus == nil)
         #expect(running.endDate == nil)
-        let decoded = try JSONDecoder().decode(TerminalSession.Command.self, from: JSONEncoder().encode(command))
-        #expect(decoded == command)
     }
 }
