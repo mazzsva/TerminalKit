@@ -57,14 +57,6 @@ public final class TerminalSession {
         guard state == .idle else {
             return
         }
-        var configuration = configuration
-        let nonce = UUID().uuidString
-        if configuration.usesShellIntegration, let directory = try? ShellIntegration.install(),
-            let integrated = configuration.integratingShell(scriptsIn: directory, nonce: nonce)
-        {
-            configuration = integrated
-            liveTerminal.shellIntegrationNonce = nonce
-        }
         let pseudoTerminal = try PseudoTerminal(
             executableURL: configuration.executableURL,
             arguments: configuration.arguments,

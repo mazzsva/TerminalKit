@@ -6,21 +6,18 @@ extension TerminalSession {
         public var arguments: [String]
         public var environment: [String: String]
         public var currentDirectoryURL: URL?
-        public var usesShellIntegration: Bool
 
         public init(
             executableURL: URL,
             arguments: [String] = [],
             environment: [String: String] = TerminalSession.Configuration.terminalEnvironment(
                 inheriting: ProcessInfo.processInfo.environment),
-            currentDirectoryURL: URL? = nil,
-            usesShellIntegration: Bool = false
+            currentDirectoryURL: URL? = nil
         ) {
             self.executableURL = executableURL
             self.arguments = arguments
             self.environment = environment
             self.currentDirectoryURL = currentDirectoryURL
-            self.usesShellIntegration = usesShellIntegration
         }
     }
 }
@@ -49,27 +46,8 @@ extension TerminalSession.Configuration {
             executableURL: shellURL,
             arguments: ["-l"],
             environment: terminalEnvironment(inheriting: environment),
-            currentDirectoryURL: .homeDirectory,
-            usesShellIntegration: true
+            currentDirectoryURL: .homeDirectory
         )
-    }
-
-    func integratingShell(scriptsIn directory: URL, nonce: String) -> Self? {
-        var configuration = self
-        switch executableURL.lastPathComponent {
-        case "zsh":
-            configuration.environment["TERMINALKIT_ZSH_ZDOTDIR"] = environment["ZDOTDIR"]
-            configuration.environment["ZDOTDIR"] = directory.appending(path: "zsh").path(percentEncoded: false)
-        case "bash" where [[], ["-l"], ["--login"]].contains(arguments):
-            configuration.arguments = [
-                "--rcfile", directory.appending(path: "bash/terminalkit.bash").path(percentEncoded: false),
-            ]
-            configuration.environment["TERMINALKIT_BASH_INJECT"] = arguments.isEmpty ? "rc" : "login"
-        default:
-            return nil
-        }
-        configuration.environment["TERMINALKIT_NONCE"] = nonce
-        return configuration
     }
 
     private static var shellURL: URL {
