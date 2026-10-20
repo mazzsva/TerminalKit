@@ -481,6 +481,17 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains("1b  5b  31  3b  33  41  78"))
     }
 
+    @Test func doesNotSendCommandKeys() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; dd bs=1 count=1 2>/dev/null | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown(NSUpArrowFunctionKey, modifierFlags: [.command, .shift]))
+        view.keyDown(with: try keyDown(NSUpArrowFunctionKey, modifierFlags: [.command]))
+        view.keyDown(with: try keyDown("a"))
+        #expect(await session.linesAfterExit().contains("61"))
+    }
+
     @Test func sendsTextFromTheInputSystem() async throws {
         let session = readingSession()
         let view = TerminalContentView(session: session)
