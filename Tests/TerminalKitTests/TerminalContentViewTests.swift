@@ -486,10 +486,23 @@ struct TerminalContentViewTests {
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
+        view.copy(nil)
         view.keyDown(with: try keyDown(NSUpArrowFunctionKey, modifierFlags: [.command, .shift]))
         view.keyDown(with: try keyDown(NSUpArrowFunctionKey, modifierFlags: [.command]))
+        view.keyDown(with: try keyDown("c", modifierFlags: .command))
+        view.keyDown(with: try keyDown("C", modifierFlags: [.command, .shift], keyCode: 8))
+        view.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
+        view.keyDown(with: try keyDown("\r", modifierFlags: .command))
         view.keyDown(with: try keyDown("a"))
         #expect(await session.linesAfterExit().contains("61"))
+    }
+
+    @Test func passesCommandKeysToTheNextResponder() throws {
+        let view = TerminalContentView(session: readingSession())
+        let responder = KeyRecorder()
+        view.nextResponder = responder
+        view.keyDown(with: try keyDown("c", modifierFlags: .command))
+        #expect(responder.keys == ["c"])
     }
 
     @Test func sendsTextFromTheInputSystem() async throws {
@@ -626,4 +639,12 @@ private func isClose(_ color: NSColor?, to components: [CGFloat]) -> Bool {
     }
     return zip([color.redComponent, color.greenComponent, color.blueComponent], components)
         .allSatisfy { abs($0 - $1) < 0.02 }
+}
+
+private final class KeyRecorder: NSResponder {
+    var keys: [String?] = []
+
+    override func keyDown(with event: NSEvent) {
+        keys.append(event.charactersIgnoringModifiers)
+    }
 }

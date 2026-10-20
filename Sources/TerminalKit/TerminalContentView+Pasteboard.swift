@@ -62,6 +62,10 @@ extension TerminalContentView: NSMenuItemValidation {
 
     func copySelection(to pasteboard: NSPasteboard) {
         guard let selectedText else {
+            if markedText.isEmpty, session.liveTerminal.usesDisambiguatedKeys {
+                scrollToBottom()
+                session.send("\u{1B}[99;9u")
+            }
             return
         }
         pasteboard.clearContents()
@@ -106,7 +110,7 @@ extension TerminalContentView: NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(copy(_:)):
-            hasSelectedText
+            hasSelectedText || markedText.isEmpty && session.liveTerminal.usesDisambiguatedKeys
         case #selector(paste(_:)):
             NSPasteboard.general.availableType(from: [.string]) != nil
         case #selector(performTextFinderAction(_:)):
