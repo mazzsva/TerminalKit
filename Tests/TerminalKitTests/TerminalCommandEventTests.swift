@@ -66,4 +66,44 @@ struct TerminalCommandEventTests {
         await session.waitForExit()
         #expect(await value(of: events(of: session.commandEvents())).isEmpty)
     }
+
+    @Test func showsTheCommandsOfTheMarks() async throws {
+        let session = TerminalSession(
+            running: """
+                printf '\\033]133;C;cmdline_url=a\\007\\033]133;D;2\\007\\033]133;C;cmdline_url=b\\007'
+                read line
+                printf '\\033]133;D;0\\007'
+                """
+        )
+        try session.start()
+        await session.waitForCommands { $0.count == 2 }
+        #expect(session.commands.map(\.text) == ["a", "b"])
+        #expect(session.commands.map(\.exitStatus) == [2, nil])
+        #expect(session.commands[0].endDate != nil)
+        #expect(session.commands[1].endDate == nil)
+
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+        #expect(session.commands.map(\.exitStatus) == [2, 0])
+        #expect(session.commands[1].endDate != nil)
+    }
+
+    @Test func dropsTheOldestCommands() async throws {
+        let session = TerminalSession(
+            running: """
+                i=0
+                while [ $i -lt 11001 ]; do
+                    printf '\\033]133;C;cmdline_url=%d\\007\\033]133;D;0\\007' $i
+                    i=$((i + 1))
+                done
+                """
+        )
+        try session.start()
+        await session.waitForExit()
+        #expect(session.commands.count == 10_000)
+        #expect(session.commands.first?.id == 1_001)
+        #expect(session.commands.first?.text == "1001")
+        #expect(session.commands.last?.id == 11_000)
+        #expect(session.commands.last?.text == "11000")
+    }
 }

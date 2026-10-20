@@ -41,7 +41,6 @@ package struct Terminal: Sendable {
     package internal(set) var commands: [Command] = []
     package internal(set) var removedCommandCount = 0
     package internal(set) var currentDirectory: URL?
-    package var shellIntegrationNonce: String?
     package private(set) var mouseTracking = MouseTracking.off
     package private(set) var synchronizedOutputCount = 0
     private(set) var usesSGRMouseEncoding = false
@@ -741,7 +740,6 @@ package struct Terminal: Sendable {
         commands = []
         terminal.removedCommandCount = removedCommandCount
         terminal.currentDirectory = currentDirectory
-        terminal.shellIntegrationNonce = shellIntegrationNonce
         terminal.prompt = prompt
         terminal.input = input
         terminal.synchronizedOutputCount = synchronizedOutputCount

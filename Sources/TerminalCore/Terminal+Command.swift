@@ -17,9 +17,6 @@ extension Terminal {
 
     mutating func performShellIntegration(_ mark: Substring) {
         let parameters = mark.split(separator: ";", omittingEmptySubsequences: false)
-        if let nonce = shellIntegrationNonce, !parameters.contains(where: { $0 == "nonce=\(nonce)" }) {
-            return
-        }
         switch parameters[0] {
         case "A":
             if !parameters.contains("k=s") {

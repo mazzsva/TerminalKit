@@ -87,6 +87,13 @@ struct TerminalSessionTests {
         #expect(session.title == "Title")
     }
 
+    @Test func showsTheCurrentDirectoryOfTheProcess() async throws {
+        let session = TerminalSession(running: "printf '\\033]7;file:///tmp/a%%20b\\007'")
+        try session.start()
+        await session.waitForExit()
+        #expect(session.currentDirectory == URL(filePath: "/tmp/a b"))
+    }
+
     @Test func keepsTheTitleForOtherOutput() async throws {
         let session = TerminalSession(running: "printf '\\033]0;Title\\007'; read line; echo more")
         try session.start()
