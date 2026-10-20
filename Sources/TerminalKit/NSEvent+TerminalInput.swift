@@ -14,6 +14,11 @@ extension NSEvent {
         }
     }
 
+    var lineDeletionInput: [UInt8]? {
+        modifierFlags.intersection([.control, .option, .command]) == .command && charactersIgnoringModifiers == "\u{7F}"
+            ? [0x15] : nil
+    }
+
     var controlInput: [UInt8]? {
         guard modifierFlags.intersection([.control, .option, .command]) == .control,
             let characters = charactersIgnoringModifiers, characters.unicodeScalars.count == 1,

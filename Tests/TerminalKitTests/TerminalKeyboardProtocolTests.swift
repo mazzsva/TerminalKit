@@ -101,12 +101,13 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func sendsCommandKeysWithTheKittyProtocol() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 14 | od -An -tx1")
+            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 22 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
         view.keyDown(with: try keyDown("c", modifierFlags: .command))
         view.keyDown(with: try keyDown(NSLeftArrowFunctionKey, modifierFlags: .command))
+        view.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
         view.setMarkedText(
             "´",
             selectedRange: NSRange(location: 1, length: 0),
@@ -115,7 +116,9 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("c", modifierFlags: .command))
         view.unmarkText()
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("1b  5b  39  39  3b  39  75  1b  5b  31  3b  39  44  78"))
+        let lines = await session.linesAfterExit()
+        #expect(lines.contains("1b  5b  39  39  3b  39  75  1b  5b  31  3b  39  44  1b  5b  31"))
+        #expect(lines.contains("32  37  3b  39  75  78"))
     }
 
     @Test func sendsCommandCWithoutASelection() async throws {
