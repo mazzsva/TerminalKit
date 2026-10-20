@@ -20,7 +20,6 @@ public final class TerminalSession {
     public private(set) var state = State.idle
     public private(set) var title = ""
     public private(set) var bellCount = 0
-    public private(set) var commands: [Command] = []
     public private(set) var currentDirectory: URL?
 
     private(set) var liveTerminal = Terminal(columns: 80, rows: 24) {
@@ -40,8 +39,6 @@ public final class TerminalSession {
     private(set) var sizingViewChangeCount = 0
 
     @ObservationIgnored private var pseudoTerminal: PseudoTerminal?
-    @ObservationIgnored private var commandEventContinuations: [Int: AsyncStream<CommandEvent>.Continuation] = [:]
-    @ObservationIgnored private var nextCommandEventID = 0
     @ObservationIgnored private var synchronizedOutputTimer: Task<Void, Never>?
     @ObservationIgnored private var timedSynchronizedOutputCount = 0
 
@@ -88,10 +85,6 @@ public final class TerminalSession {
         pseudoTerminal?.resize(columns: columns, rows: rows)
     }
 
-    public func output(of command: Command) -> String? {
-        liveTerminal.output(ofCommandAt: command.id - liveTerminal.removedCommandCount)
-    }
-
     public var hasForegroundProcess: Bool {
         guard let pseudoTerminal, let group = pseudoTerminal.foregroundProcessGroup else {
             return false
@@ -126,14 +119,6 @@ public final class TerminalSession {
         }
         state = .exited(Termination(termination))
         pseudoTerminal = nil
-        if let last = commands.indices.last, commands[last].endDate == nil {
-            commands[last].endDate = Date()
-            send(.finished(commands[last]))
-        }
-        for continuation in commandEventContinuations.values {
-            continuation.finish()
-        }
-        commandEventContinuations.removeAll()
         if liveTerminal.isSynchronizingOutput {
             liveTerminal.endSynchronizedOutput()
         }
@@ -148,7 +133,6 @@ public final class TerminalSession {
         if currentDirectory != liveTerminal.currentDirectory {
             currentDirectory = liveTerminal.currentDirectory
         }
-        updateCommands()
         if !replies.isEmpty {
             pseudoTerminal?.write(replies)
         }
@@ -163,98 +147,6 @@ public final class TerminalSession {
                 }
                 liveTerminal.endSynchronizedOutput()
             }
-        }
-    }
-}
-
-extension TerminalSession {
-    public struct Command: Identifiable, Hashable, Sendable {
-        public let id: Int
-        public let text: String?
-        public let directory: URL?
-        public internal(set) var exitStatus: Int32?
-        public let startDate: Date
-        public internal(set) var endDate: Date?
-
-        public init(
-            id: Int,
-            text: String?,
-            directory: URL? = nil,
-            exitStatus: Int32? = nil,
-            startDate: Date,
-            endDate: Date? = nil
-        ) {
-            self.id = id
-            self.text = text
-            self.directory = directory
-            self.exitStatus = exitStatus
-            self.startDate = startDate
-            self.endDate = endDate
-        }
-    }
-
-    private func updateCommands() {
-        let firstID = liveTerminal.removedCommandCount
-        if let id = commands.first?.id, id < firstID {
-            commands.removeFirst(min(firstID - id, commands.count))
-        }
-        let date = Date()
-        let start = commands.last.map { $0.endDate == nil ? $0.id : $0.id + 1 } ?? firstID
-        for id in max(start, firstID) ..< firstID + liveTerminal.commands.count {
-            let command = liveTerminal.commands[id - firstID]
-            if id == commands.last?.id {
-                if command.isFinished {
-                    commands[commands.count - 1].exitStatus = command.exitStatus
-                    commands[commands.count - 1].endDate = date
-                    send(.finished(commands[commands.count - 1]))
-                }
-            } else {
-                var started = Command(
-                    id: id,
-                    text: command.text,
-                    directory: command.directory,
-                    exitStatus: nil,
-                    startDate: date,
-                    endDate: nil
-                )
-                send(.started(started))
-                if command.isFinished {
-                    started.exitStatus = command.exitStatus
-                    started.endDate = date
-                    send(.finished(started))
-                }
-                commands.append(started)
-            }
-        }
-    }
-}
-
-extension TerminalSession {
-    public enum CommandEvent: Hashable, Sendable {
-        case started(Command)
-        case finished(Command)
-    }
-
-    public func commandEvents() -> AsyncStream<CommandEvent> {
-        let (stream, continuation) = AsyncStream.makeStream(of: CommandEvent.self)
-        if case .exited = state {
-            continuation.finish()
-            return stream
-        }
-        let id = nextCommandEventID
-        nextCommandEventID += 1
-        commandEventContinuations[id] = continuation
-        continuation.onTermination = { [weak self] _ in
-            Task { @MainActor in
-                self?.commandEventContinuations[id] = nil
-            }
-        }
-        return stream
-    }
-
-    private func send(_ event: CommandEvent) {
-        for continuation in commandEventContinuations.values {
-            continuation.yield(event)
         }
     }
 }
