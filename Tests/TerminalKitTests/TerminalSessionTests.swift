@@ -48,6 +48,15 @@ struct TerminalSessionTests {
         #expect(environment["TERM_SESSION_ID"] == nil)
     }
 
+    @Test func runsTheCommandInTheInteractiveLoginShell() {
+        let configuration = TerminalSession.Configuration.loginShell(running: ["claude", "--resume", "it's"])
+        let loginShell = TerminalSession.Configuration.loginShell
+        #expect(configuration.executableURL == loginShell.executableURL)
+        #expect(configuration.arguments == ["-l", "-i", "-c", "exec -- 'claude' '--resume' 'it'\\''s'"])
+        #expect(configuration.environment == loginShell.environment)
+        #expect(configuration.currentDirectoryURL == loginShell.currentDirectoryURL)
+    }
+
     @Test func startsIdle() {
         #expect(TerminalSession(running: "exit").state == .idle)
     }
@@ -144,6 +153,48 @@ struct TerminalSessionTests {
         #expect(session.lines.contains("30 100"))
     }
 
+    @Test func passesEachWordOfTheCommandUnchanged() async throws {
+        let words = [
+            "a b", "it's", "\"q\"", "$HOME", "*", "", "back\\slash", "!x", "~", "café €",
+            "x'\u{301}$(/bin/echo injected)'\u{301}",
+        ]
+        let session = try await runInZsh(["/bin/sh", "-c", "printf '<%s>\\n' \"$@\"", "sh"] + words)
+        #expect(session.lines.prefix(words.count) == ArraySlice(words.map { "<\($0)>" }))
+        #expect(session.state == .exited(.exit(0)))
+    }
+
+    @Test func findsTheCommandOnThePathOfTheShellStartupFiles() async throws {
+        let session = try await runInZsh(["tool"], startup: "export PATH=\"$HOME/bin dir:$PATH\"")
+        #expect(session.lines.first == "found")
+        #expect(session.state == .exited(.exit(0)))
+    }
+
+    @Test func runsTheCommandInTheCurrentDirectory() async throws {
+        let session = try await runInZsh(["./tool"])
+        #expect(session.lines.first == "found")
+        #expect(session.state == .exited(.exit(0)))
+    }
+
+    @Test func reportsTheExitStatusOfTheCommand() async throws {
+        let session = try await runInZsh(["/bin/sh", "-c", "exit 7"], startup: "trap 'exit 1' EXIT")
+        #expect(session.state == .exited(.exit(7)))
+    }
+
+    @Test func reportsTheSignalOfTheCommand() async throws {
+        let session = try await runInZsh(["/bin/sh", "-c", "kill -TERM $$"], startup: "trap 'exit 1' EXIT")
+        #expect(session.state == .exited(.uncaughtSignal(SIGTERM)))
+    }
+
+    @Test func runsAFirstWordThatStartsWithAHyphenAsTheCommand() async throws {
+        let session = try await runInZsh(["-a", "name", "/bin/sh", "-c", "exit 7"])
+        #expect(session.state == .exited(.exit(127)))
+    }
+
+    @Test func failsWhenTheCommandIsEmpty() async throws {
+        let session = try await runInZsh([], startup: "trap 'exit 4' EXIT")
+        #expect(session.state == .exited(.exit(1)))
+    }
+
     @Test func throwsWhenTheProcessCannotStart() {
         let session = TerminalSession(configuration: .init(executableURL: URL(filePath: "/missing")))
         #expect(throws: POSIXError(.ENOENT)) {
@@ -151,4 +202,24 @@ struct TerminalSessionTests {
         }
         #expect(session.state == .idle)
     }
+}
+
+@MainActor
+private func runInZsh(_ command: [String], startup: String = "") async throws -> TerminalSession {
+    let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: home) }
+    let tool = home.appending(path: "bin dir/tool")
+    try FileManager.default.createDirectory(at: tool.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data("#!/bin/sh\necho found\n".utf8).write(to: tool)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tool.path(percentEncoded: false))
+    try Data(startup.utf8).write(to: home.appending(path: ".zshrc"))
+    var configuration = TerminalSession.Configuration.loginShell(running: command)
+    configuration.executableURL = URL(filePath: "/bin/zsh")
+    configuration.environment = TerminalSession.Configuration.terminalEnvironment(
+        inheriting: ["HOME": home.path(percentEncoded: false), "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"])
+    configuration.currentDirectoryURL = tool.deletingLastPathComponent()
+    let session = TerminalSession(configuration: configuration)
+    try session.start()
+    await session.waitForExit()
+    return session
 }

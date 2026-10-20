@@ -27,6 +27,13 @@ extension TerminalSession.Configuration {
         loginShell(inheriting: ProcessInfo.processInfo.environment)
     }
 
+    public static func loginShell(running command: [String]) -> Self {
+        var configuration = loginShell
+        let words = command.map { "'" + $0.replacingOccurrences(of: "'", with: "'\\''", options: .literal) + "'" }
+        configuration.arguments += ["-i", "-c", "exec -- " + words.joined(separator: " ")]
+        return configuration
+    }
+
     @usableFromInline
     static func terminalEnvironment(inheriting environment: [String: String]) -> [String: String] {
         var environment = environment
