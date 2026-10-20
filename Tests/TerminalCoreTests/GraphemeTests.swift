@@ -57,6 +57,17 @@ struct GraphemeTests {
         #expect(terminal.graphemes.count <= 64)
     }
 
+    @Test func keepsAnEmojiInItsOwnCellWhenEveryCharacterIsInUse() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.graphemes = Terminal.Graphemes(capacity: 64)
+        terminal.receive(clusters(count: 100) + "\r\n\u{1F44D}\u{1F3FD}\u{1F1FA}\u{1F1F8}x")
+        #expect(terminal.screen[1].prefix(7).map(\.width) == [2, 0, 2, 0, 1, 1, 1])
+        #expect(
+            terminal.screen[1].prefix(7).map(terminal.character(of:)) == [
+                "\u{1F44D}", " ", "\u{1F3FD}", " ", "\u{1F1FA}", "\u{1F1F8}", "x",
+            ])
+    }
+
     @Test func waitsLongerAfterACompactionThatFreesNothing() {
         var graphemes = Terminal.Graphemes(capacity: 64)
         let characters = Array(clusters(count: 1_000))

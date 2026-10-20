@@ -418,6 +418,9 @@ package struct Terminal: Sendable {
             combine(scalar)
             return
         }
+        if !scalar.isASCII, scalar.properties.isEmoji, combine(scalar) {
+            return
+        }
         lastCharacter = scalar
         let width = columns > 1 ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
@@ -470,7 +473,7 @@ package struct Terminal: Sendable {
 
     private mutating func repeatCharacter(_ scalar: Unicode.Scalar, count: Int) {
         var remaining = count
-        if scalar.width == 1 {
+        if scalar.width == 1, scalar.isASCII || !scalar.properties.isEmoji {
             while remaining > 0, !isWrapPending {
                 print(scalar)
                 remaining -= 1
@@ -491,29 +494,63 @@ package struct Terminal: Sendable {
     }
 
     private func repeatCount(_ count: Int, of scalar: Unicode.Scalar) -> Int {
-        let rowCount = max(columns / scalar.width, 1)
+        var rowCount = max(columns / scalar.width, 1)
+        if scalar.properties.isEmojiModifier {
+            rowCount *= Self.maximumScalarsPerCell
+        } else if ("\u{1F1E6}" ... "\u{1F1FF}").contains(scalar) {
+            rowCount = columns + columns % 2
+        }
         let screenCount = (rows + 1) * rowCount
         return count <= screenCount ? count : screenCount + (count - screenCount) % rowCount
     }
 
-    private mutating func combine(_ scalar: Unicode.Scalar) {
+    @discardableResult
+    private mutating func combine(_ scalar: Unicode.Scalar) -> Bool {
         var column = isWrapPending ? cursor.column : cursor.column - 1
         if column > 0, screen[cursor.row][column].width == 0 {
             column -= 1
         }
         guard column >= 0 else {
-            return
+            return false
         }
         var text = String(graphemes.character(of: screen[cursor.row][column]))
         guard text.unicodeScalars.count < Self.maximumScalarsPerCell else {
-            return
+            return false
         }
         text.unicodeScalars.append(scalar)
-        if let character = text.first, text.count == 1 {
-            if graphemes.needsCompaction(for: character) {
-                compactGraphemes()
-            }
-            screen[cursor.row][column] = graphemes.cell(screen[cursor.row][column], with: character)
+        guard let character = text.first, text.count == 1 else {
+            return false
+        }
+        if graphemes.needsCompaction(for: character) {
+            compactGraphemes()
+        }
+        let cell = graphemes.cell(screen[cursor.row][column], with: character)
+        guard graphemes.character(of: cell) == character else {
+            return false
+        }
+        screen[cursor.row][column] = cell
+        if scalar.width > 0, let base = text.unicodeScalars.first,
+            !scalar.properties.isEmojiModifier || base.properties.isEmojiModifierBase
+        {
+            widen(column)
+        }
+        return true
+    }
+
+    private mutating func widen(_ column: Int) {
+        guard screen[cursor.row][column].width == 1, cursor.column == column + 1 else {
+            return
+        }
+        if usesInsertMode {
+            insertCharacters(1)
+        }
+        clearWideCharacter(at: column + 1)
+        screen[cursor.row][column].width = 2
+        screen[cursor.row][column + 1] = Cell(style: screen[cursor.row][column].style, width: 0)
+        if column + 2 == columns {
+            isWrapPending = usesAutowrap
+        } else {
+            cursor.column += 1
         }
     }
 
