@@ -366,6 +366,12 @@ struct TerminalTests {
         #expect(lines(terminal) == ["b ", "c "])
     }
 
+    @Test func keepsTheRemovedScrollbackCountAfterAReset() {
+        var terminal = Terminal(columns: 20, rows: 2)
+        terminal.receive("1\r\n2\r\n3\r\n4\u{1B}[3J5\r\n6\r\n7\u{1B}c")
+        #expect(terminal.removedScrollbackCount == 2)
+    }
+
     @Test func overwritesTheLastColumnWithoutAutowrap() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("\u{1B}[?7labcdef\u{1B}[?7hgh")

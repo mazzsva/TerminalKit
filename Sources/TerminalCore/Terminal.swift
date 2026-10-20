@@ -38,8 +38,6 @@ package struct Terminal: Sendable {
     package internal(set) var graphemes = Graphemes()
     package internal(set) var links = Links()
     package private(set) var bellCount = 0
-    package internal(set) var commands: [Command] = []
-    package internal(set) var removedCommandCount = 0
     package internal(set) var currentDirectory: URL?
     package private(set) var mouseTracking = MouseTracking.off
     package private(set) var synchronizedOutputCount = 0
@@ -77,9 +75,6 @@ package struct Terminal: Sendable {
     private var tabStops: [Bool]
     private var replies: [UInt8] = []
     private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
-    var prompt: Position?
-    var input: Position?
-    var redrawnPrompt: Position?
     private var synchronizedSnapshot: [Terminal] = []
 
     package init(columns: Int, rows: Int) {
@@ -165,13 +160,6 @@ package struct Terminal: Sendable {
         rows: Int
     ) -> (screen: [Line], anchors: [(position: Position, isWrapPending: Bool)]) {
         let oldLines = scrollback + screen
-        let firstLine = removedScrollbackCount
-        var marks: [Position] = []
-        updateMarks { position in
-            if let position, oldLines.indices.contains(position.row - firstLine) {
-                marks.append(Position(row: position.row - firstLine, column: position.column))
-            }
-        }
         let positions =
             anchors.map {
                 Position(
@@ -179,14 +167,10 @@ package struct Terminal: Sendable {
                     column: min(max($0.position.column, 0), self.columns - 1)
                 )
             }
-            + marks
             + [Position(row: scrollback.count, column: 0)]
         var groupStart = positions[0].row
         while groupStart > scrollback.count, oldLines[groupStart - 1].isWrapped {
             groupStart -= 1
-        }
-        if let row = redrawnPrompt.map({ $0.row - firstLine }), (scrollback.count ..< groupStart).contains(row) {
-            groupStart = row
         }
         var groupEnd = positions[0].row
         while groupEnd < oldLines.count - 1, oldLines[groupEnd].isWrapped {
@@ -223,12 +207,6 @@ package struct Terminal: Sendable {
                         line.isWrapped = false
                         return line
                     }
-            }
-        }
-        var mappedMarks = mapped[anchors.count ..< anchors.count + marks.count].makeIterator()
-        updateMarks { position in
-            if let row = position?.row, oldLines.indices.contains(row - firstLine), let mark = mappedMarks.next() {
-                position = Position(row: firstLine + mark.row, column: mark.column)
             }
         }
         let firstRow = mapped[mapped.count - 1].row
@@ -725,8 +703,6 @@ package struct Terminal: Sendable {
             setLink(parts[1])
         case "7":
             setCurrentDirectory(parts[1])
-        case "133":
-            performShellIntegration(parts[1])
         default:
             break
         }
@@ -736,12 +712,7 @@ package struct Terminal: Sendable {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.bellCount = bellCount
-        terminal.commands = commands
-        commands = []
-        terminal.removedCommandCount = removedCommandCount
         terminal.currentDirectory = currentDirectory
-        terminal.prompt = prompt
-        terminal.input = input
         terminal.synchronizedOutputCount = synchronizedOutputCount
         terminal.graphemes = graphemes
         terminal.links = links
@@ -749,18 +720,9 @@ package struct Terminal: Sendable {
         scrollback = []
         terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount
-        terminal.forgetMarks(after: -1)
         terminal.decoder = decoder
         terminal.replies = replies
         self = terminal
-    }
-
-    var normalLines: [Line] {
-        normalScreen?.lines ?? screen
-    }
-
-    var normalCursor: Position {
-        normalScreen?.cursor ?? cursor
     }
 
     private mutating func moveForward(tabStops count: Int) {
@@ -920,9 +882,6 @@ package struct Terminal: Sendable {
             if cursor.column == 0 {
                 unwrapLine(before: cursor.row)
             }
-            if normalScreen == nil {
-                forgetMarks(after: cursor.row)
-            }
             eraseInLine(0)
             for row in cursor.row + 1 ..< rows {
                 erase(0 ..< columns, row: row)
@@ -934,9 +893,6 @@ package struct Terminal: Sendable {
             }
             eraseInLine(1)
         case 2:
-            if normalScreen == nil {
-                forgetMarks(after: -1)
-            }
             unwrapLine(before: 0)
             for row in 0 ..< rows {
                 erase(0 ..< columns, row: row)
