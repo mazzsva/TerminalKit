@@ -11,6 +11,18 @@ package struct Terminal: Sendable {
         }
     }
 
+    package struct RGB: Equatable, Sendable {
+        package var red: UInt16
+        package var green: UInt16
+        package var blue: UInt16
+
+        package init(red: UInt16, green: UInt16, blue: UInt16) {
+            self.red = red
+            self.green = green
+            self.blue = blue
+        }
+    }
+
     private struct SavedCursor {
         var position = Position(row: 0, column: 0)
         var style = Style()
@@ -41,6 +53,7 @@ package struct Terminal: Sendable {
     package internal(set) var currentDirectory: URL?
     package private(set) var mouseTracking = MouseTracking.off
     package private(set) var synchronizedOutputCount = 0
+    package var reportedColors: [RGB] = []
     private(set) var usesSGRMouseEncoding = false
 
     package var isAlternateScreenActive: Bool {
@@ -703,6 +716,10 @@ package struct Terminal: Sendable {
             setLink(parts[1])
         case "7":
             setCurrentDirectory(parts[1])
+        case "10":
+            reportColors(parts[1], from: 0)
+        case "11":
+            reportColors(parts[1], from: 1)
         default:
             break
         }
@@ -714,6 +731,7 @@ package struct Terminal: Sendable {
         terminal.bellCount = bellCount
         terminal.currentDirectory = currentDirectory
         terminal.synchronizedOutputCount = synchronizedOutputCount
+        terminal.reportedColors = reportedColors
         terminal.graphemes = graphemes
         terminal.links = links
         terminal.scrollback = scrollback
@@ -857,6 +875,15 @@ package struct Terminal: Sendable {
             replies += "\u{1B}[\(cursor.row + 1);\(cursor.column + 1)R".utf8
         default:
             break
+        }
+    }
+
+    private mutating func reportColors(_ queries: Substring, from first: Int) {
+        let queries = queries.split(separator: ";", omittingEmptySubsequences: false)
+        for (index, query) in zip(reportedColors.indices.dropFirst(first), queries) where query == "?" {
+            let color = reportedColors[index]
+            let rgb = String(format: "rgb:%04x/%04x/%04x", color.red, color.green, color.blue)
+            replies += "\u{1B}]\(10 + index);\(rgb)\u{1B}\\".utf8
         }
     }
 
