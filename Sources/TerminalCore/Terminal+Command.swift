@@ -1,7 +1,7 @@
 import Foundation
 
 extension Terminal {
-    package struct Command: Codable, Equatable, Sendable {
+    package struct Command: Equatable, Sendable {
         package var text: String?
         package var directory: URL?
         package var prompt: Position?
@@ -11,7 +11,7 @@ extension Terminal {
         package var isFinished = false
     }
 
-    static let maximumCommands = 10_000
+    private static let maximumCommands = 10_000
     private static let maximumTextLength = 4_096
     private static let commandTrimCount = 1_000
 

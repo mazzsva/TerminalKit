@@ -1,4 +1,3 @@
-import Foundation
 import Testing
 
 @testable import TerminalKit
@@ -66,21 +65,5 @@ struct TerminalCommandEventTests {
         try session.start()
         await session.waitForExit()
         #expect(await value(of: events(of: session.commandEvents())).isEmpty)
-    }
-
-    @Test func sendsNoEventsForRestoredCommands() async throws {
-        let original = TerminalSession(running: "printf '\\033]133;C;cmdline_url=old\\007\\033]133;D;0\\007'")
-        try original.start()
-        await original.waitForExit()
-        let restored = TerminalSession(
-            configuration: .init(
-                executableURL: URL(filePath: "/bin/sh"),
-                arguments: ["-c", "printf '\\033]133;C;cmdline_url=new\\007\\033]133;D;1\\007'"]
-            ),
-            restoring: original.restorationState
-        )
-        let events = events(of: restored.commandEvents())
-        try restored.start()
-        #expect(await value(of: events) == ["started 1 new true", "finished 1 new 1 true"])
     }
 }

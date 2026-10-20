@@ -1,7 +1,7 @@
 import Foundation
 
 package struct Terminal: Sendable {
-    package struct Position: Codable, Equatable, Sendable {
+    package struct Position: Equatable, Sendable {
         package var row: Int
         package var column: Int
 
@@ -757,28 +757,12 @@ package struct Terminal: Sendable {
         self = terminal
     }
 
-    init(columns: Int, rows: Int, replaying content: [UInt8]) {
-        var replayed = Terminal(columns: columns, rows: rows)
-        _ = replayed.receive(content)
-        self.init(columns: columns, rows: rows)
-        scrollback = replayed.scrollback
-        removedScrollbackCount = replayed.removedScrollbackCount
-        screen = replayed.normalLines
-        cursor = replayed.normalCursor
-        graphemes = replayed.graphemes
-        links = replayed.links
-    }
-
     var normalLines: [Line] {
         normalScreen?.lines ?? screen
     }
 
     var normalCursor: Position {
         normalScreen?.cursor ?? cursor
-    }
-
-    var isNormalWrapPending: Bool {
-        normalScreen == nil && isWrapPending
     }
 
     private mutating func moveForward(tabStops count: Int) {
