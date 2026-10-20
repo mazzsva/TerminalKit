@@ -34,6 +34,7 @@ package struct Terminal: Sendable {
     private static let maximumScalarsPerCell = 16
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
+    private static let maximumKeyboardFlagsDepth = 8
 
     package private(set) var columns: Int
     package private(set) var rows: Int
@@ -58,6 +59,10 @@ package struct Terminal: Sendable {
 
     package var isAlternateScreenActive: Bool {
         normalScreen != nil
+    }
+
+    package var usesDisambiguatedKeys: Bool {
+        keyboardFlagStacks[isAlternateScreenActive ? 1 : 0].last == 1
     }
 
     package var isSynchronizingOutput: Bool {
@@ -89,6 +94,7 @@ package struct Terminal: Sendable {
     private var replies: [UInt8] = []
     private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
     private var synchronizedSnapshot: [Terminal] = []
+    private var keyboardFlagStacks: [[Int]] = [[], []]
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -329,6 +335,10 @@ package struct Terminal: Sendable {
             for mode in sequence.parameters {
                 setPrivateMode(mode, isEnabled: sequence.final == "h")
             }
+            return
+        }
+        if sequence.privateMarker != nil, sequence.final == "u" {
+            setKeyboardFlags(sequence)
             return
         }
         guard sequence.privateMarker == nil else {
@@ -843,6 +853,32 @@ package struct Terminal: Sendable {
         screen = normalScreen.lines
         savedCursor = normalScreen.savedCursor
         self.normalScreen = nil
+    }
+
+    private mutating func setKeyboardFlags(_ sequence: EscapeSequenceParser.ControlSequence) {
+        let index = isAlternateScreenActive ? 1 : 0
+        let flags = sequence.parameter(at: 0, default: 0) & 1
+        switch sequence.privateMarker {
+        case "?":
+            replies += "\u{1B}[?\(keyboardFlagStacks[index].last ?? 0)u".utf8
+        case ">":
+            keyboardFlagStacks[index] = Array(
+                (keyboardFlagStacks[index] + [flags]).suffix(Self.maximumKeyboardFlagsDepth))
+        case "<":
+            keyboardFlagStacks[index] = Array(keyboardFlagStacks[index].dropLast(sequence.parameters.first ?? 1))
+        case "=":
+            let current = keyboardFlagStacks[index].popLast() ?? 0
+            let newFlags =
+                switch sequence.parameters.dropFirst().first ?? 1 {
+                case 1: flags
+                case 2: current | flags
+                case 3: current & ~flags
+                default: current
+                }
+            keyboardFlagStacks[index].append(newFlags)
+        default:
+            break
+        }
     }
 
     private mutating func reportMode(_ mode: Int, isPrivate: Bool) {

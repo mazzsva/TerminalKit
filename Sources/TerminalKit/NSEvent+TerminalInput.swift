@@ -41,6 +41,38 @@ extension NSEvent {
         return terminalInput(characters: characters, applicationCursorKeys: applicationCursorKeys).map { [0x1B] + $0 }
     }
 
+    func disambiguatedInput(usesOptionAsMetaKey: Bool) -> [UInt8]? {
+        guard !modifierFlags.contains(.command),
+            let key = charactersIgnoringModifiers?.lowercased().unicodeScalars.first
+        else {
+            return nil
+        }
+        let modifiers = terminalModifiers
+        let number: UInt32
+        switch NSEvent.SpecialKey(rawValue: Int(key.value)) {
+        case .carriageReturn, .enter: number = 13
+        case .tab, .backTab: number = 9
+        case .delete: number = 127
+        case .escape: number = 27
+        case let specialKey where (0xF700 ... 0xF8FF).contains(key.value):
+            return specialKey.terminalSequence(applicationCursorKeys: false, modifiers: modifiers, disambiguates: true)
+                .map { Array($0.utf8) }
+        default:
+            guard modifierFlags.contains(.control) || usesOptionAsMetaKey && modifierFlags.contains(.option),
+                let key = modifierFlags.contains(.shift)
+                    ? characters(byApplyingModifiers: [])?.unicodeScalars.first : key,
+                key.value >= 0x20, key.value < 0x7F || !modifierFlags.contains(.control)
+            else {
+                return nil
+            }
+            number = key.value
+        }
+        guard modifiers > 1 || number == 27 else {
+            return nil
+        }
+        return Array("\u{1B}[\(number)\(modifiers > 1 ? ";\(modifiers)" : "")u".utf8)
+    }
+
     func terminalInput(applicationCursorKeys: Bool = false) -> [UInt8]? {
         terminalInput(characters: characters, applicationCursorKeys: applicationCursorKeys)
     }
@@ -72,7 +104,9 @@ extension NSEvent.SpecialKey {
         Self(rawValue: 0x1B)
     }
 
-    fileprivate func terminalSequence(applicationCursorKeys: Bool, modifiers: Int) -> String? {
+    fileprivate func terminalSequence(applicationCursorKeys: Bool, modifiers: Int, disambiguates: Bool = false)
+        -> String?
+    {
         switch self {
         case .carriageReturn, .enter: "\r"
         case .tab: "\t"
@@ -80,11 +114,12 @@ extension NSEvent.SpecialKey {
         case .escape: "\u{1B}"
         case .backTab: "\u{1B}[Z"
         default:
-            if let final = cursorFinal {
+            if let final = cursorFinal, !disambiguates || self != .f3 {
                 if modifiers > 1 {
                     "\u{1B}[1;\(modifiers)\(final)"
                 } else {
-                    (applicationCursorKeys || !"ABCD".contains(final) ? "\u{1B}O" : "\u{1B}[") + final
+                    (!disambiguates && (applicationCursorKeys || !"ABCD".contains(final)) ? "\u{1B}O" : "\u{1B}[")
+                        + final
                 }
             } else if let number = tildeNumber {
                 modifiers > 1 ? "\u{1B}[\(number);\(modifiers)~" : "\u{1B}[\(number)~"
@@ -115,6 +150,7 @@ extension NSEvent.SpecialKey {
         case .deleteForward: 3
         case .pageUp: 5
         case .pageDown: 6
+        case .f3: 13
         case .f5: 15
         case .f6: 17
         case .f7: 18

@@ -286,11 +286,17 @@ final class TerminalContentView: NSView {
             return
         }
         scrollToBottom()
-        if markedText.isEmpty, let input = event.controlInput {
+        if let input = event.wordMovementInput {
             session.send(input)
             return
         }
-        if let input = event.wordMovementInput {
+        if markedText.isEmpty, session.liveTerminal.usesDisambiguatedKeys,
+            let input = event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey)
+        {
+            session.send(input)
+            return
+        }
+        if markedText.isEmpty, let input = event.controlInput {
             session.send(input)
             return
         }

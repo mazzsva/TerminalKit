@@ -113,6 +113,7 @@ struct TerminalInputTests {
 
     @Test func sendsTheFunctionKeys() throws {
         #expect(try keyDown(NSF1FunctionKey).terminalInput() == Array("\u{1B}OP".utf8))
+        #expect(try keyDown(NSF3FunctionKey).terminalInput() == Array("\u{1B}OR".utf8))
         #expect(try keyDown(NSF4FunctionKey).terminalInput() == Array("\u{1B}OS".utf8))
         #expect(try keyDown(NSF5FunctionKey).terminalInput() == Array("\u{1B}[15~".utf8))
         #expect(try keyDown(NSF12FunctionKey).terminalInput() == Array("\u{1B}[24~".utf8))
@@ -151,7 +152,8 @@ struct TerminalInputTests {
 func keyDown(
     _ characters: String,
     charactersIgnoringModifiers: String? = nil,
-    modifierFlags: NSEvent.ModifierFlags = []
+    modifierFlags: NSEvent.ModifierFlags = [],
+    keyCode: UInt16 = 0
 ) throws -> NSEvent {
     try #require(
         NSEvent.keyEvent(
@@ -164,7 +166,7 @@ func keyDown(
             characters: characters,
             charactersIgnoringModifiers: charactersIgnoringModifiers ?? characters,
             isARepeat: false,
-            keyCode: 0
+            keyCode: keyCode
         )
     )
 }
