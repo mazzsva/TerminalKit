@@ -4,7 +4,7 @@ import Testing
 
 struct MouseTests {
     @Test(arguments: [
-        ("\u{1B}[?1000h", Terminal.MouseTracking.clicks), ("\u{1B}[?1002h", .drags), ("\u{1B}[?1003h", .drags),
+        ("\u{1B}[?1000h", Terminal.MouseTracking.clicks), ("\u{1B}[?1002h", .drags), ("\u{1B}[?1003h", .anyMotion),
         ("\u{1B}[?1002h\u{1B}[?1002l", .off),
     ])
     func tracksTheMouseInTheModeOfTheProcess(sequence: String, tracking: Terminal.MouseTracking) {
