@@ -73,20 +73,28 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
     }
 
     override func layout() {
-        let isAtBottom = contentView.bounds.maxY >= terminalView.frame.height
+        let isAtBottom = contentView.bounds.maxY >= terminalView.frame.height + contentView.contentInsets.bottom
         let removedLines = terminalView.session.terminal.removedScrollbackCount - removedScrollbackCount
         removedScrollbackCount = terminalView.session.terminal.removedScrollbackCount
         super.layout()
         let size = contentSize
-        terminalView.fit(to: size)
+        terminalView.fit(to: insetContentSize)
         if contentSize != size {
-            terminalView.fit(to: contentSize)
+            terminalView.fit(to: insetContentSize)
         }
         if isAtBottom {
-            terminalView.scroll(CGPoint(x: 0, y: terminalView.frame.height - contentSize.height))
+            terminalView.scrollToBottom()
         } else if removedLines > 0 {
             let offset = CGFloat(removedLines) * terminalView.cellSize.height
-            terminalView.scroll(CGPoint(x: 0, y: max(contentView.bounds.minY - offset, 0)))
+            terminalView.scroll(CGPoint(x: 0, y: contentView.bounds.minY - offset))
         }
+    }
+
+    private var insetContentSize: CGSize {
+        let insets = contentView.contentInsets
+        return CGSize(
+            width: contentSize.width - insets.left - insets.right,
+            height: contentSize.height - insets.top - insets.bottom
+        )
     }
 }

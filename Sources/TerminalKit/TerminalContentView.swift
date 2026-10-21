@@ -314,7 +314,7 @@ final class TerminalContentView: NSView {
     }
 
     func scrollToBottom() {
-        scroll(CGPoint(x: 0, y: bounds.maxY - visibleRect.height))
+        scroll(CGPoint(x: 0, y: bounds.maxY))
     }
 
     override func doCommand(by selector: Selector) {
