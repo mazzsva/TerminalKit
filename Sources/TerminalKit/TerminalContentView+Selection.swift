@@ -35,8 +35,9 @@ extension TerminalContentView {
             reportMouse(event, button: 0)
             return
         }
-        let point = selectionPoint(at: convert(event.locationInWindow, from: nil))
-        selection = Selection(anchor: point, head: point)
+        selectionClickCount = event.clickCount
+        selectionOrigin = selectionUnit(at: convert(event.locationInWindow, from: nil))
+        selection = selectionOrigin
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -50,7 +51,53 @@ extension TerminalContentView {
             return
         }
         autoscroll(with: event)
-        selection?.head = selectionPoint(at: convert(event.locationInWindow, from: nil))
+        guard let selectionOrigin, selection != nil else {
+            return
+        }
+        let unit = selectionUnit(at: convert(event.locationInWindow, from: nil))
+        selection =
+            unit.anchor < selectionOrigin.anchor
+            ? Selection(anchor: selectionOrigin.head, head: unit.anchor)
+            : Selection(anchor: selectionOrigin.anchor, head: max(unit.head, selectionOrigin.head))
+    }
+
+    private func selectionUnit(at location: CGPoint) -> Selection {
+        if selectionClickCount == 2, let word = word(at: location) {
+            return word
+        }
+        let point = selectionPoint(at: location)
+        return Selection(anchor: point, head: point)
+    }
+
+    private func word(at location: CGPoint) -> Selection? {
+        let terminal = session.terminal
+        guard
+            let (cells, index) = cells(
+                atRow: selectionPoint(at: location).line - terminal.removedScrollbackCount,
+                column: min(max(Int(floor((location.x - Self.padding) / cellSize.width)), 0), terminal.columns - 1),
+                in: terminal
+            ),
+            let end = cells.lastIndex(where: { !$0.cell.isSpace }), index <= end
+        else {
+            return nil
+        }
+        var text = ""
+        var starts: [Int] = []
+        var count = 0
+        for cell in cells[...end] {
+            let character = terminal.character(of: cell.cell)
+            starts.append(count)
+            count += character.utf16.count
+            text.append(character)
+        }
+        let range = NSAttributedString(string: text).doubleClick(at: starts[index])
+        let first = cells[starts.lastIndex { $0 <= range.lowerBound } ?? index]
+        let last = cells[starts.lastIndex { $0 < range.upperBound } ?? index]
+        return Selection(
+            anchor: Selection.Point(line: terminal.removedScrollbackCount + first.row, column: first.column),
+            head: Selection.Point(
+                line: terminal.removedScrollbackCount + last.row, column: last.column + Int(last.cell.width))
+        )
     }
 
     private func selectionPoint(at location: CGPoint) -> Selection.Point {

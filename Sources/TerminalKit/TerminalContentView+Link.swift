@@ -53,27 +53,28 @@ extension TerminalContentView {
         return launches ? .reveal(url) : .open(url)
     }
 
-    func link(atRow row: Int, column: Int) -> Link? {
-        let terminal = session.terminal
+    func rows(ofLineAt row: Int, limit: Int, in terminal: Terminal) -> ClosedRange<Int> {
         let lineCount = terminal.scrollback.count + terminal.rows
-        guard (0 ..< lineCount).contains(row) else {
-            return nil
-        }
-        let line = { (row: Int) in
-            row < terminal.scrollback.count
-                ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
-        }
         var first = row
-        while first > 0, row - first < 64, line(first - 1).isWrapped {
+        while first > 0, row - first < limit, line(at: first - 1, in: terminal).isWrapped {
             first -= 1
         }
         var last = row
-        while last < lineCount - 1, last - row < 64, line(last).isWrapped {
+        while last < lineCount - 1, last - row < limit, line(at: last, in: terminal).isWrapped {
             last += 1
         }
+        return first ... last
+    }
+
+    func cells(
+        atRow row: Int, column: Int, in terminal: Terminal
+    ) -> (cells: [(row: Int, column: Int, cell: Terminal.Cell)], index: Int)? {
+        guard (0 ..< terminal.scrollback.count + terminal.rows).contains(row) else {
+            return nil
+        }
         var cells: [(row: Int, column: Int, cell: Terminal.Cell)] = []
-        for row in first ... last {
-            let cellsOfRow = line(row)
+        for row in rows(ofLineAt: row, limit: 64, in: terminal) {
+            let cellsOfRow = line(at: row, in: terminal)
             for column in cellsOfRow.indices where cellsOfRow[column].width > 0 && cellsOfRow[column] != .padding {
                 cells.append((row, column, cellsOfRow[column]))
             }
@@ -83,6 +84,14 @@ extension TerminalContentView {
                 $0.row == row && $0.column <= column && column < $0.column + Int($0.cell.width)
             })
         else {
+            return nil
+        }
+        return (cells, index)
+    }
+
+    func link(atRow row: Int, column: Int) -> Link? {
+        let terminal = session.terminal
+        guard let (cells, index) = cells(atRow: row, column: column, in: terminal) else {
             return nil
         }
         let range: Range<Int>
