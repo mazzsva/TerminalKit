@@ -284,7 +284,8 @@ final class TerminalContentView: NSView {
         let disambiguatedInput =
             markedText.isEmpty && session.liveTerminal.usesDisambiguatedKeys
             ? event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey) : nil
-        guard !event.modifierFlags.contains(.command) || disambiguatedInput != nil else {
+        let keyInput = disambiguatedInput ?? (markedText.isEmpty ? event.lineDeletionInput : nil)
+        guard !event.modifierFlags.contains(.command) || keyInput != nil else {
             super.keyDown(with: event)
             return
         }
@@ -293,7 +294,7 @@ final class TerminalContentView: NSView {
             session.send(input)
             return
         }
-        if let input = disambiguatedInput {
+        if let input = keyInput {
             session.send(input)
             return
         }

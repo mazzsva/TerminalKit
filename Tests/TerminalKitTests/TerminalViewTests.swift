@@ -120,6 +120,15 @@ struct TerminalViewTests {
         await session.waitForExit()
     }
 
+    @Test func scrollsToTheBottomForCommandDelete() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 50; read line")
+        scrollView.terminalView.scroll(.zero)
+        scrollView.terminalView.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
+        #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
+        scrollView.terminalView.keyDown(with: try keyDown("\r"))
+        await session.waitForExit()
+    }
+
     @Test func scrollsWhenYouSelectAboveTheView() async throws {
         let (scrollView, session) = try await scrollView(running: "seq 1 50")
         await session.waitForExit()

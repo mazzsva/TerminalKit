@@ -63,6 +63,16 @@ struct TerminalInputTests {
         #expect(try keyDown("a", modifierFlags: .option).wordMovementInput == nil)
     }
 
+    @Test func deletesToTheLineStartWithCommandDelete() throws {
+        #expect(try keyDown("\u{7F}", modifierFlags: .command).lineDeletionInput == [0x15])
+        #expect(try keyDown("\u{7F}", modifierFlags: [.command, .shift]).lineDeletionInput == [0x15])
+        #expect(try keyDown("\u{7F}", modifierFlags: [.command, .capsLock]).lineDeletionInput == [0x15])
+        #expect(try keyDown("\u{7F}").lineDeletionInput == nil)
+        #expect(try keyDown("\u{7F}", modifierFlags: [.command, .option]).lineDeletionInput == nil)
+        #expect(try keyDown("\u{7F}", modifierFlags: [.command, .control]).lineDeletionInput == nil)
+        #expect(try keyDown("u", modifierFlags: .command).lineDeletionInput == nil)
+    }
+
     @Test func ignoresKeyEquivalents() throws {
         #expect(try keyDown("c", modifierFlags: .command).terminalInput() == nil)
         #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: .command).terminalInput() == nil)

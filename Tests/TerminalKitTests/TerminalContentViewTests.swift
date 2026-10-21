@@ -491,10 +491,28 @@ struct TerminalContentViewTests {
         view.keyDown(with: try keyDown(NSUpArrowFunctionKey, modifierFlags: [.command]))
         view.keyDown(with: try keyDown("c", modifierFlags: .command))
         view.keyDown(with: try keyDown("C", modifierFlags: [.command, .shift], keyCode: 8))
-        view.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
         view.keyDown(with: try keyDown("\r", modifierFlags: .command))
         view.keyDown(with: try keyDown("a"))
         #expect(await session.linesAfterExit().contains("61"))
+    }
+
+    @Test func sendsControlUForCommandDelete() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
+        view.keyDown(with: try keyDown("\u{7F}", modifierFlags: [.command, .shift]))
+        view.keyDown(with: try keyDown("\u{7F}", modifierFlags: [.command, .option]))
+        view.setMarkedText(
+            "´",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
+        view.unmarkText()
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("15  15  78"))
     }
 
     @Test func passesCommandKeysToTheNextResponder() throws {
