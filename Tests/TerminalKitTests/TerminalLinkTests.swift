@@ -145,10 +145,132 @@ struct TerminalLinkTests {
         #expect(view.hoveredLink?.url == URL(string: "https://example.com"))
         #expect(try image(of: view) != plain)
         view.mouseExited(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view))
+        #expect(NSCursor.current == .pointingHand)
         #expect(view.hoveredLink == nil)
         #expect(try image(of: view) == plain)
         #expect(window.contentView === view)
     }
+
+    @Test func setsThePointerOnACursorUpdate() async throws {
+        let view = try await linkView(running: "printf 'https://a.com'")
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        NSCursor.arrow.set()
+        view.cursorUpdate(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view))
+        #expect(NSCursor.current == .iBeam)
+        view.updateHoveredLink(
+            at: view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil), modifierFlags: .command)
+        NSCursor.arrow.set()
+        view.cursorUpdate(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view))
+        #expect(NSCursor.current == .pointingHand)
+        #expect(view.trackingAreas.contains { $0.options.contains(.cursorUpdate) })
+    }
+
+    @Test func showsTheIBeamAfterTheWindowResignsKey() async throws {
+        let view = try await linkView(running: "printf 'https://a.com'")
+        let window = NSWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view, modifierFlags: .command))
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        NSCursor.arrow.set()
+        view.cursorUpdate(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view))
+        #expect(NSCursor.current == .iBeam)
+        #expect(view.hoveredLink == nil)
+    }
+
+    @Test func showsThePointingHandOverALinkWithCommand() async throws {
+        let view = try await linkView(running: "printf 'https://a.com'")
+        let window = NSWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view, modifierFlags: .command))
+        #expect(NSCursor.current == .pointingHand)
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view))
+        #expect(NSCursor.current == .iBeam)
+        NSCursor.arrow.set()
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 3, in: view))
+        #expect(NSCursor.current == .arrow)
+        #expect(window.contentView === view)
+    }
+
+    @Test func showsThePointingHandWhileCommandIsHeldOverALink() async throws {
+        let view = try await linkView(running: "printf 'https://a.com'")
+        let window = MouseWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        window.mouseLocation = view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil)
+        view.flagsChanged(with: try flagsChanged(.command))
+        #expect(NSCursor.current == .pointingHand)
+        view.flagsChanged(with: try flagsChanged([]))
+        #expect(NSCursor.current == .iBeam)
+        #expect(window.contentView === view)
+    }
+
+    @Test func showsTheIBeamAfterTheMouseCrossesAnotherView() async throws {
+        let view = try await linkView(running: "printf 'https://a.com'")
+        let window = NSWindow(contentView: NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 100)))
+        window.contentView?.addSubview(view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        window.contentView?.addSubview(NSView(frame: view.convert(view.rect(row: 1, columns: 5 ..< 10), to: nil)))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view, modifierFlags: .command))
+        #expect(NSCursor.current == .pointingHand)
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 7, in: view, modifierFlags: .command))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 4, in: view))
+        #expect(NSCursor.current == .iBeam)
+        #expect(window.contentView?.subviews.first === view)
+    }
+
+    @Test func keepsThePointerWhenTheMouseIsOutside() async throws {
+        let view = try await linkView(running: "printf 'https://a.com'")
+        let window = NSWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.updateHoveredLink(
+            at: view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil), modifierFlags: .command)
+        #expect(view.hoveredLink != nil)
+        NSCursor.arrow.set()
+        view.updateHoveredLink(at: CGPoint(x: -10, y: 10), modifierFlags: .command)
+        #expect(NSCursor.current == .arrow)
+        #expect(view.hoveredLink == nil)
+        #expect(window.contentView === view)
+    }
+
+    @Test func keepsThePointerBelowTheText() async throws {
+        let view = try await linkView(running: "printf 'https://a.com'")
+        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
+        let window = NSWindow(contentView: scrollView)
+        scrollView.documentView = view
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.updateHoveredLink(
+            at: view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil), modifierFlags: .command)
+        #expect(view.hoveredLink != nil)
+        NSCursor.arrow.set()
+        view.updateHoveredLink(at: view.convert(CGPoint(x: 10, y: 150), to: nil), modifierFlags: .command)
+        #expect(NSCursor.current == .arrow)
+        #expect(view.hoveredLink == nil)
+        #expect(window.contentView === scrollView)
+    }
+}
+
+private final class MouseWindow: NSWindow {
+    var mouseLocation = CGPoint.zero
+
+    override var mouseLocationOutsideOfEventStream: NSPoint {
+        mouseLocation
+    }
+}
+
+private func flagsChanged(_ modifierFlags: NSEvent.ModifierFlags) throws -> NSEvent {
+    try #require(
+        NSEvent.keyEvent(
+            with: .flagsChanged,
+            location: .zero,
+            modifierFlags: modifierFlags,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "",
+            charactersIgnoringModifiers: "",
+            isARepeat: false,
+            keyCode: 55
+        )
+    )
 }
 
 extension CGRect {

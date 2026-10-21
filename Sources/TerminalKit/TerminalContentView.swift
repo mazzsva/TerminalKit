@@ -74,9 +74,6 @@ final class TerminalContentView: NSView {
                 return
             }
             needsDisplay = true
-            if (hoveredLink == nil) != (oldValue == nil) {
-                (hoveredLink == nil ? NSCursor.arrow : NSCursor.pointingHand).set()
-            }
         }
     }
     var hoveredLinkRevision = 0
@@ -165,7 +162,7 @@ final class TerminalContentView: NSView {
         addTrackingArea(
             NSTrackingArea(
                 rect: .zero,
-                options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                options: [.mouseMoved, .mouseEnteredAndExited, .cursorUpdate, .activeInKeyWindow, .inVisibleRect],
                 owner: self
             )
         )
@@ -280,6 +277,7 @@ final class TerminalContentView: NSView {
 
     @objc private func windowKeyStateDidChange() {
         isFocused = window?.isKeyWindow == true && window?.firstResponder === self
+        hoveredLink = nil
     }
 
     override func keyDown(with event: NSEvent) {
