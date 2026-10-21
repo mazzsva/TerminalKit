@@ -94,8 +94,10 @@ struct TerminalMouseTests {
         let (view, session) = try await viewReading("head -c 1", modes: "?1000h")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .shift))
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 3, in: view, modifierFlags: .shift))
-        session.send(Array("a".utf8))
         #expect(view.selection?.head.column == 3)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 6, in: view, modifierFlags: .shift))
+        session.send(Array("a".utf8))
+        #expect(view.selection?.anchor.column == 6)
         #expect(await session.linesAfterExit().contains("a"))
     }
 

@@ -165,6 +165,94 @@ struct TerminalSelectionTests {
         #expect(view.selection == Selection(anchor: .init(line: 2, column: columns), head: .init(line: 1, column: 0)))
     }
 
+    @Test func extendsTheSelectionWithAShiftClick() async throws {
+        let view = try await view(running: "printf 'one two three'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 7, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 4, in: view))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 13, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "two three")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "one two three")
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 8, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "three")
+    }
+
+    @Test func shrinksTheShiftClickWithAShiftDrag() async throws {
+        let view = try await view(running: "printf 'one two three'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 4, in: view))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 13, in: view, modifierFlags: .shift))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 7, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "two")
+    }
+
+    @Test func extendsByLinesWithAShiftClickAfterATripleClick() async throws {
+        let view = try await view(running: "printf 'one\\ntwo\\nthree four'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "one\ntwo\nthree four")
+    }
+
+    @Test func extendsByCharactersWithAShiftClickAfterSelectAll() async throws {
+        let view = try await view(running: "printf 'one two three'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
+        view.selectAll(nil)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 4, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "two three")
+    }
+
+    @Test func extendsByCharactersWithAShiftClickAfterFind() async throws {
+        let view = try await view(running: "printf 'one two three'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 2))
+        view.selectedRanges = [NSValue(range: (view.string as NSString).range(of: "three"))]
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 5, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "wo three")
+    }
+
+    @Test func extendsByWordsWithAShiftClickAfterADoubleClick() async throws {
+        let view = try await view(running: "printf 'one two three'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 5, in: view, clickCount: 2))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 10, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "two three")
+    }
+
+    @Test func startsASelectionWithAShiftClickWithoutASelection() throws {
+        let view = viewInWindow()
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 3, in: view, modifierFlags: .shift))
+        #expect(view.selection == Selection(anchor: .init(line: 1, column: 3), head: .init(line: 1, column: 3)))
+    }
+
+    @Test func extendsTheTrimmedSelectionWithAShiftClick() async throws {
+        let view = try await view(running: "seq 1 12000")
+        let firstLine = view.session.terminal.removedScrollbackCount
+        #expect(firstLine > 0)
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: firstLine + 100, column: 2))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 10, column: 1, in: view, modifierFlags: .shift))
+        #expect(view.selection?.anchor == .init(line: firstLine + 100, column: 2))
+    }
+
+    @Test func extendsFromTheFartherEndOfABackwardSelectionWithAShiftClick() throws {
+        let view = viewInWindow()
+        let columns = view.session.terminal.columns
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 0, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 0, in: view))
+        view.mouseDown(
+            with: try mouseEvent(.leftMouseDown, row: 0, column: CGFloat(columns / 3), in: view, modifierFlags: .shift))
+        #expect(
+            view.selection == Selection(anchor: .init(line: 1, column: 0), head: .init(line: 0, column: columns / 3)))
+    }
+
+    @Test func keepsTheShiftClickWhenAShiftDragCrossesTheAnchor() async throws {
+        let view = try await view(running: "printf 'one\\ntwo\\nthree'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 1, in: view, clickCount: 3))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, modifierFlags: .shift))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 1, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "one\ntwo\nthree")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 1, in: view, clickCount: 3))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .shift))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 2, column: 1, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "one\ntwo\nthree")
+    }
+
     @Test func drawsTheSelection() throws {
         let view = viewInWindow()
         let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
