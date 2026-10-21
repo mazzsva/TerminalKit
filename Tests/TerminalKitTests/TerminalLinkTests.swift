@@ -84,9 +84,18 @@ struct TerminalLinkTests {
         #expect(view.selection != nil)
         view.selection = nil
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 2, in: view, modifierFlags: .command))
+        view.mouseDown(
+            with: try mouseEvent(.leftMouseDown, row: 0, column: 2, in: view, modifierFlags: .command, clickCount: 2))
+        view.mouseDown(
+            with: try mouseEvent(.leftMouseDown, row: 0, column: 2, in: view, modifierFlags: .command, clickCount: 3))
         #expect(actions == [.open(try #require(URL(string: "https://example.com")))])
         #expect(view.selection == nil)
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 2, in: view, modifierFlags: .command))
+        #expect(actions.count == 1)
+        #expect(view.selection != nil)
+        view.selection = nil
+        view.mouseDown(
+            with: try mouseEvent(.leftMouseDown, row: 2, column: 2, in: view, modifierFlags: .command, clickCount: 2))
         #expect(actions.count == 1)
         #expect(view.selection != nil)
         #expect(window.contentView === view)
