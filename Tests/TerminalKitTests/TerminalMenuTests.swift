@@ -37,6 +37,58 @@ struct TerminalMenuTests {
         #expect(view.selectedText == "text")
     }
 
+    @Test func offersTheSelectionToServices() async throws {
+        let session = TerminalSession(running: "printf 'text'")
+        let view = TerminalContentView(session: session)
+        let next = ServicesRequestor()
+        view.nextResponder = next
+        try session.start()
+        await session.waitForExit()
+        #expect(view.validRequestor(forSendType: .string, returnType: nil) as? ServicesRequestor === next)
+        view.selection = TerminalContentView.Selection(
+            anchor: .init(line: 0, column: 1), head: .init(line: 0, column: 1))
+        #expect(view.validRequestor(forSendType: .string, returnType: nil) as? ServicesRequestor === next)
+        view.selectAll(nil)
+        #expect(view.validRequestor(forSendType: .string, returnType: nil) as? TerminalContentView === view)
+        #expect(view.validRequestor(forSendType: .string, returnType: .string) as? ServicesRequestor === next)
+        #expect(view.validRequestor(forSendType: nil, returnType: .string) as? ServicesRequestor === next)
+        #expect(view.validRequestor(forSendType: .rtf, returnType: nil) as? ServicesRequestor === next)
+    }
+
+    @Test func writesTheSelectionForServices() async throws {
+        let session = TerminalSession(
+            running: "printf 'text\\033[>1u'; stty raw -echo; echo ready; head -c 1 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        let window = NSWindow(contentView: view)
+        window.makeFirstResponder(view)
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
+        try session.start()
+        await session.waitForText("ready")
+        #expect(!view.writeSelection(to: pasteboard, types: [.string]))
+        #expect(pasteboard.string(forType: .string) == nil)
+        view.selection = TerminalContentView.Selection(
+            anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 4))
+        pasteboard.setString("old", forType: .rtf)
+        let requestor = try #require(
+            view.validRequestor(forSendType: .string, returnType: nil) as? NSServicesMenuRequestor)
+        #expect(requestor.writeSelection?(to: pasteboard, types: [.init("NSStringPboardType")]) == true)
+        #expect(pasteboard.string(forType: .string) == "text")
+        #expect(pasteboard.string(forType: .rtf) == nil)
+        view.selection = TerminalContentView.Selection(
+            anchor: .init(line: 0, column: 20), head: .init(line: 0, column: 30))
+        #expect(view.validRequestor(forSendType: .string, returnType: nil) as? TerminalContentView === view)
+        #expect(view.writeSelection(to: pasteboard, types: [.string]))
+        #expect(pasteboard.string(forType: .string) == "")
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("78"))
+    }
+
+    @Test func hidesWritingTools() {
+        let view = TerminalContentView(session: TerminalSession(running: "true"))
+        #expect((view as NSTextInputTraits).writingToolsBehavior == NSWritingToolsBehavior.none)
+    }
+
     @Test func reportsAForegroundProcess() async throws {
         let session = TerminalSession(
             configuration: .init(
@@ -61,5 +113,13 @@ struct TerminalMenuTests {
         session.send("exit\r")
         await session.waitForExit()
         #expect(!session.hasForegroundProcess)
+    }
+}
+
+private final class ServicesRequestor: NSResponder {
+    override func validRequestor(
+        forSendType sendType: NSPasteboard.PasteboardType?, returnType: NSPasteboard.PasteboardType?
+    ) -> Any? {
+        self
     }
 }

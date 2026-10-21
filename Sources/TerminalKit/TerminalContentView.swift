@@ -168,6 +168,7 @@ final class TerminalContentView: NSView {
             )
         )
         registerForDraggedTypes([.fileURL, .string])
+        NSApp?.registerServicesMenuSendTypes([.string], returnTypes: [])
         updateReportedColors()
     }
 

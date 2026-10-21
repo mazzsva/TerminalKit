@@ -1,7 +1,7 @@
 import AppKit
 import TerminalCore
 
-extension TerminalContentView: NSMenuItemValidation {
+extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NSTextInputTraits {
     var selectedText: String? {
         guard let selection, selection.anchor != selection.head else {
             return nil
@@ -70,6 +70,26 @@ extension TerminalContentView: NSMenuItemValidation {
         }
         pasteboard.clearContents()
         pasteboard.setString(selectedText, forType: .string)
+    }
+
+    var writingToolsBehavior: NSWritingToolsBehavior {
+        get { .none }
+        set {}
+    }
+
+    override func validRequestor(
+        forSendType sendType: NSPasteboard.PasteboardType?, returnType: NSPasteboard.PasteboardType?
+    ) -> Any? {
+        sendType == .string && returnType == nil && hasSelectedText
+            ? self : super.validRequestor(forSendType: sendType, returnType: returnType)
+    }
+
+    func writeSelection(to pasteboard: NSPasteboard, types: [NSPasteboard.PasteboardType]) -> Bool {
+        guard let selectedText else {
+            return false
+        }
+        pasteboard.clearContents()
+        return pasteboard.setString(selectedText, forType: .string)
     }
 
     @objc func paste(_ sender: Any?) {
