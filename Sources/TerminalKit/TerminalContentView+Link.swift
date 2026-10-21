@@ -179,16 +179,31 @@ extension TerminalContentView {
     }
 
     func updateHoveredLink(at locationInWindow: CGPoint?, modifierFlags: NSEvent.ModifierFlags) {
-        guard modifierFlags.contains(.command), let locationInWindow else {
+        guard let location = locationInWindow.map({ convert($0, from: nil) }),
+            visibleRect.intersection(bounds).contains(location)
+        else {
             hoveredLink = nil
             return
         }
-        let location = convert(locationInWindow, from: nil)
-        hoveredLink = link(
-            atRow: Int(floor((location.y - Self.padding) / cellSize.height)),
-            column: Int(floor((location.x - Self.padding) / cellSize.width))
-        )
+        let oldValue = hoveredLink
+        hoveredLink =
+            modifierFlags.contains(.command)
+            ? link(
+                atRow: Int(floor((location.y - Self.padding) / cellSize.height)),
+                column: Int(floor((location.x - Self.padding) / cellSize.width))
+            ) : nil
         hoveredLinkRevision = session.revision
+        if hoveredLink != oldValue {
+            updatePointer()
+        }
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        updatePointer()
+    }
+
+    private func updatePointer() {
+        (hoveredLink == nil ? NSCursor.iBeam : .pointingHand).set()
     }
 
     override func mouseMoved(with event: NSEvent) {
