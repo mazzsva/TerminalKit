@@ -842,8 +842,10 @@ package struct Terminal: Sendable {
             isCursorVisible = isEnabled
         case (1000, true):
             mouseTracking = .clicks
-        case (1002, true), (1003, true):
+        case (1002, true):
             mouseTracking = .drags
+        case (1003, true):
+            mouseTracking = .anyMotion
         case (1000, false), (1002, false), (1003, false):
             mouseTracking = .off
         case (1004, _):
@@ -932,6 +934,7 @@ package struct Terminal: Sendable {
         case 47, 1047, 1049: isAlternateScreenActive
         case 1000: mouseTracking == .clicks
         case 1002: mouseTracking == .drags
+        case 1003: mouseTracking == .anyMotion
         case 1004: usesFocusReporting
         case 1006: usesSGRMouseEncoding
         case 2004: usesBracketedPaste

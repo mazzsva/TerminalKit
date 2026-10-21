@@ -182,6 +182,12 @@ extension TerminalContentView {
     }
 
     override func mouseMoved(with event: NSEvent) {
+        let location = convert(event.locationInWindow, from: nil)
+        if reportsMouse(for: event), session.liveTerminal.mouseTracking == .anyMotion, visibleRect.contains(location),
+            mousePosition(of: event) != lastMousePosition
+        {
+            reportMouse(event, button: 35)
+        }
         updateHoveredLink(at: event.locationInWindow, modifierFlags: event.modifierFlags)
     }
 
@@ -192,5 +198,6 @@ extension TerminalContentView {
 
     override func mouseExited(with event: NSEvent) {
         hoveredLink = nil
+        lastMousePosition = nil
     }
 }

@@ -13,12 +13,65 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains("E[<0;2;1ME[<0;2;1m"))
     }
 
-    @Test func reportsADragToAnotherCell() async throws {
-        let (view, session) = try await viewReading("head -c 19", modes: "?1002h\\033[?1006h")
+    @Test(arguments: ["?1002h", "?1003h"])
+    func reportsADragToAnotherCell(mode: String) async throws {
+        let (view, session) = try await viewReading("head -c 19", modes: mode + "\\033[?1006h")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view))
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 1, in: view))
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 3, in: view))
         #expect(await session.linesAfterExit().contains("E[<0;2;1ME[<32;4;2M"))
+    }
+
+    @Test func reportsAMoveToAnotherCellInsideTheView() async throws {
+        let (view, session) = try await viewReading("head -c 20", modes: "?1003h\\033[?1006h")
+        let window = NSWindow(contentView: view)
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 2, in: view, modifierFlags: .shift))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: -5, in: view))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 3, in: view, modifierFlags: .control))
+        #expect(await session.linesAfterExit().contains("E[<35;2;1ME[<51;4;2M"))
+        #expect(window.contentView === view)
+    }
+
+    @Test func reportsAMoveBackToTheLastCellAfterAnotherViewReports() async throws {
+        let (view, session) = try await viewReading("head -c 30", modes: "?1003h\\033[?1006h")
+        let otherView = TerminalContentView(session: session)
+        otherView.fit(to: CGSize(width: 400, height: 300))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
+        view.mouseExited(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
+        otherView.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: otherView))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 3, in: view))
+        #expect(await session.linesAfterExit().contains("E[<35;2;1ME[<35;3;1ME[<35;2;1M"))
+    }
+
+    @Test func reportsAMoveInTheDefaultEncoding() async throws {
+        let (view, session) = try await viewReading("head -c 6", modes: "?1003h")
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
+        #expect(await session.linesAfterExit().contains("E[MC\"!"))
+    }
+
+    @Test func reportsAMoveAndUnderlinesTheLinkWithCommand() async throws {
+        let (view, session) = try await viewReading("head -c 10", modes: "?1003h\\033[?1006hhttps://example.com\\n")
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view, modifierFlags: .command))
+        #expect(view.hoveredLink?.url == URL(string: "https://example.com"))
+        #expect(await session.linesAfterExit().contains("E[<35;3;1M"))
+    }
+
+    @Test func reportsNoMoveWhenTheProcessTracksDrags() async throws {
+        let (view, session) = try await viewReading("head -c 9", modes: "?1002h\\033[?1006h")
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 2, in: view))
+        #expect(await session.linesAfterExit().contains("E[<0;3;1M"))
+    }
+
+    @Test func reportsNoDragWhenTheProcessTracksClicks() async throws {
+        let (view, session) = try await viewReading("head -c 18", modes: "?1000h\\033[?1006h")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 3, in: view))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 3, in: view))
+        #expect(await session.linesAfterExit().contains("E[<0;2;1ME[<0;4;2m"))
     }
 
     @Test func reportsTheModifiers() async throws {

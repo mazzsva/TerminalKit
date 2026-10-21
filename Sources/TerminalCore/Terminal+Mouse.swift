@@ -3,6 +3,7 @@ extension Terminal {
         case off
         case clicks
         case drags
+        case anyMotion
     }
 
     package func mouseReport(button: Int, column: Int, row: Int, isRelease: Bool) -> [UInt8]? {
