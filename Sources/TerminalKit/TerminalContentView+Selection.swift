@@ -66,7 +66,15 @@ extension TerminalContentView {
             return word
         }
         let point = selectionPoint(at: location)
-        return Selection(anchor: point, head: point)
+        guard selectionClickCount >= 3 else {
+            return Selection(anchor: point, head: point)
+        }
+        let terminal = session.terminal
+        let rows = rows(ofLineAt: point.line - terminal.removedScrollbackCount, limit: .max, in: terminal)
+        return Selection(
+            anchor: Selection.Point(line: terminal.removedScrollbackCount + rows.lowerBound, column: 0),
+            head: Selection.Point(line: terminal.removedScrollbackCount + rows.upperBound, column: terminal.columns)
+        )
     }
 
     private func word(at location: CGPoint) -> Selection? {

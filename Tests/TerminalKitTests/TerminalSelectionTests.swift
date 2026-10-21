@@ -118,6 +118,53 @@ struct TerminalSelectionTests {
         #expect(view.selectedText == "one two three")
     }
 
+    @Test(arguments: [3, 4])
+    func selectsALineAcrossASoftWrapWithATripleClick(clickCount: Int) async throws {
+        let view = try await view(
+            running:
+                "c=$(stty size | cut -d' ' -f2); i=0; s=''; while [ $i -lt $c ]; do s=\"${s}x\"; i=$((i+1)); done; "
+                + "printf 'before\\n'; i=0; while [ $i -lt 70 ]; do printf %s \"$s\"; i=$((i+1)); done; printf 'yz\\nafter'"
+        )
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, clickCount: clickCount))
+        #expect(view.selectedText == String(repeating: "x", count: view.session.terminal.columns * 70) + "yz")
+    }
+
+    @Test func selectsNoLineBelowTheLastLineWithATripleClick() async throws {
+        let view = try await view(running: "seq 1 12000")
+        let terminal = view.session.terminal
+        let row = terminal.scrollback.count + terminal.rows - 2
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row, column: 1, in: view, clickCount: 3))
+        let line = terminal.removedScrollbackCount + row
+        #expect(
+            view.selection
+                == Selection(anchor: .init(line: line, column: 0), head: .init(line: line, column: terminal.columns))
+        )
+        #expect(view.selectedText == "12000")
+    }
+
+    @Test func selectsALineOnlyInItsScreenWithATripleClick() async throws {
+        let view = try await view(
+            running:
+                "c=$(stty size | cut -d' ' -f2); r=$(stty size | cut -d' ' -f1); i=0; "
+                + "while [ $i -lt $((2*c+3)) ]; do printf a; i=$((i+1)); done; "
+                + "i=1; while [ $i -lt $r ]; do printf '\\n'; i=$((i+1)); done; printf '\\033[?1049h\\033[Hbbb'"
+        )
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
+        #expect(view.selectedText == String(repeating: "a", count: 2 * view.session.terminal.columns))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, clickCount: 3))
+        #expect(view.selectedText == "bbb")
+    }
+
+    @Test func extendsByLinesWhenDraggingAfterATripleClick() async throws {
+        let view = try await view(running: "printf 'one\\n\\nthree\\nfour'")
+        let columns = view.session.terminal.columns
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 2, in: view, clickCount: 3))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 3, column: 1, in: view))
+        #expect(view.selectedText == "three\nfour")
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 2, in: view))
+        #expect(view.selection == Selection(anchor: .init(line: 2, column: columns), head: .init(line: 1, column: 0)))
+    }
+
     @Test func drawsTheSelection() throws {
         let view = viewInWindow()
         let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))

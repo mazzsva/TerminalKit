@@ -54,13 +54,14 @@ extension TerminalContentView {
     }
 
     func rows(ofLineAt row: Int, limit: Int, in terminal: Terminal) -> ClosedRange<Int> {
-        let lineCount = terminal.scrollback.count + terminal.rows
+        let screenStart = terminal.isAlternateScreenActive ? terminal.scrollback.count : 0
+        let bounds = row < screenStart ? 0 ..< screenStart : screenStart ..< terminal.scrollback.count + terminal.rows
         var first = row
-        while first > 0, row - first < limit, line(at: first - 1, in: terminal).isWrapped {
+        while first > bounds.lowerBound, row - first < limit, line(at: first - 1, in: terminal).isWrapped {
             first -= 1
         }
         var last = row
-        while last < lineCount - 1, last - row < limit, line(at: last, in: terminal).isWrapped {
+        while last < bounds.upperBound - 1, last - row < limit, line(at: last, in: terminal).isWrapped {
             last += 1
         }
         return first ... last
