@@ -32,38 +32,26 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
         }
     }
 
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard ownsFirstResponder, event.modifierFlags.intersection([.command, .option, .control]) == .command else {
-            return super.performKeyEquivalent(with: event)
-        }
-        let action: NSTextFinder.Action? =
-            switch (event.charactersIgnoringModifiers?.lowercased(), event.modifierFlags.contains(.shift)) {
-            case ("f", false): .showFindInterface
-            case ("g", false): .nextMatch
-            case ("g", true): .previousMatch
-            case ("e", false): .setSearchString
-            default: nil
-            }
-        guard let action else {
-            return super.performKeyEquivalent(with: event)
-        }
-        textFinder.performAction(action)
-        return true
-    }
-
     override func performTextFinderAction(_ sender: Any?) {
-        guard let tag = (sender as? NSValidatedUserInterfaceItem)?.tag, let action = NSTextFinder.Action(rawValue: tag)
+        guard let tag = (sender as? NSValidatedUserInterfaceItem)?.tag ?? (sender as? NSView)?.tag,
+            let action = NSTextFinder.Action(rawValue: tag)
         else {
             return
         }
         textFinder.performAction(action)
     }
 
+    @objc func performFindPanelAction(_ sender: Any?) {
+        performTextFinderAction(sender)
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        guard menuItem.action == #selector(performTextFinderAction(_:)) else {
-            return true
+        switch menuItem.action {
+        case #selector(performTextFinderAction(_:)), #selector(performFindPanelAction(_:)):
+            NSTextFinder.Action(rawValue: menuItem.tag).map(textFinder.validateAction) ?? false
+        default:
+            true
         }
-        return NSTextFinder.Action(rawValue: menuItem.tag).map(textFinder.validateAction) ?? false
     }
 
     private var ownsFirstResponder: Bool {

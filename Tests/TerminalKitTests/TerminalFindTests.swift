@@ -133,13 +133,12 @@ struct TerminalFindTests {
         #expect(finder.changes > changes)
     }
 
-    @Test func showsTheFindBarForCommandF() async throws {
+    @Test func showsTheFindBarForTheFindMenu() async throws {
         let scrollView = try await findView(running: "printf 'text'")
         let window = KeyWindow(contentView: scrollView)
         window.makeFirstResponder(scrollView.terminalView)
-        #expect(scrollView.performKeyEquivalent(with: try keyDown("f", modifierFlags: .command)))
+        #expect(sendFindPanelAction(.showFindPanel, in: window))
         #expect(scrollView.isFindBarVisible)
-        #expect(!scrollView.performKeyEquivalent(with: try keyDown("k", modifierFlags: .command)))
         let field = try #require(scrollView.findBarView.flatMap { searchField(in: $0) })
         window.makeFirstResponder(field)
         #expect(window.firstResponder !== scrollView.terminalView)
@@ -164,6 +163,81 @@ struct TerminalFindTests {
         #expect(window.contentView === scrollView)
     }
 
+    @Test func takesTheFindPanelActionFromTheTerminalAndTheFindBar() async throws {
+        let scrollView = try await findView(running: "printf 'text one text two'")
+        let view = scrollView.terminalView
+        let window = KeyWindow(contentView: scrollView)
+        window.makeFirstResponder(view)
+        let action = #selector(NSTextView.performFindPanelAction(_:))
+        #expect(target(of: action, in: window) === scrollView)
+        scrollView.textFinder.performAction(.showFindInterface)
+        let field = try #require(scrollView.findBarView.flatMap { searchField(in: $0) })
+        window.makeFirstResponder(field)
+        let editor = try #require(window.firstResponder as? NSTextView)
+        #expect(target(of: action, in: window) === scrollView)
+        editor.insertText("text", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(scrollView.validateMenuItem(findPanelItem(.next)))
+        #expect(scrollView.validateMenuItem(findPanelItem(.previous)))
+        #expect(sendFindPanelAction(.next, in: window))
+        #expect(view.firstSelectedRange == NSRange(location: 0, length: 4))
+        #expect(sendFindPanelAction(.next, in: window))
+        #expect(view.firstSelectedRange == NSRange(location: 9, length: 4))
+        #expect(sendFindPanelAction(.previous, in: window))
+        #expect(view.firstSelectedRange == NSRange(location: 0, length: 4))
+    }
+
+    @Test func validatesTheFindPanelAction() async throws {
+        let scrollView = try await findView(running: "printf 'text'")
+        let view = scrollView.terminalView
+        #expect(scrollView.validateMenuItem(findPanelItem(.showFindPanel)))
+        #expect(!scrollView.validateMenuItem(findPanelItem(.setFindString)))
+        view.selectedRanges = [NSValue(range: (view.string as NSString).range(of: "text"))]
+        #expect(scrollView.validateMenuItem(findPanelItem(.setFindString)))
+        #expect(!scrollView.validateMenuItem(findPanelItem(.replace)))
+        #expect(
+            scrollView.validateMenuItem(
+                NSMenuItem(title: "", action: #selector(NSResponder.selectAll(_:)), keyEquivalent: "")))
+        let item = findPanelItem(.showFindPanel)
+        item.tag = 0
+        #expect(!scrollView.validateMenuItem(item))
+    }
+
+    @Test func performsTheFindPanelActionForEachTag() async throws {
+        let scrollView = try await findView(running: "printf 'text'")
+        let finder = FinderSpy()
+        scrollView.textFinder = finder
+        let window = KeyWindow(contentView: scrollView)
+        window.makeFirstResponder(scrollView.terminalView)
+        for action in [NSFindPanelAction.showFindPanel, .next, .previous, .setFindString] {
+            #expect(sendFindPanelAction(action, in: window))
+        }
+        #expect(finder.actions == [.showFindInterface, .nextMatch, .previousMatch, .setSearchString])
+    }
+
+    @Test func performsTheFindPanelActionForAButton() async throws {
+        let scrollView = try await findView(running: "printf 'text'")
+        let window = KeyWindow(contentView: scrollView)
+        window.makeFirstResponder(scrollView.terminalView)
+        let button = NSButton()
+        button.tag = Int(NSFindPanelAction.showFindPanel.rawValue)
+        #expect(
+            window.firstResponder?.tryToPerform(#selector(NSTextView.performFindPanelAction(_:)), with: button) == true)
+        #expect(scrollView.isFindBarVisible)
+    }
+
+    @Test func leavesTheFindKeysToTheMenu() async throws {
+        let scrollView = try await findView(running: "printf 'text'")
+        let window = KeyWindow(contentView: scrollView)
+        window.makeFirstResponder(scrollView.terminalView)
+        let keys: [(String, NSEvent.ModifierFlags)] = [
+            ("f", .command), ("g", .command), ("G", [.command, .shift]), ("e", .command),
+        ]
+        for (key, modifierFlags) in keys {
+            #expect(!scrollView.performKeyEquivalent(with: try keyDown(key, modifierFlags: modifierFlags)))
+        }
+        #expect(!scrollView.isFindBarVisible)
+    }
+
     @Test func givesTheFocusBackWhenTheFindBarHides() async throws {
         let scrollView = try await findView(running: "printf 'text'")
         let window = KeyWindow(contentView: scrollView)
@@ -175,25 +249,50 @@ struct TerminalFindTests {
         #expect(window.firstResponder === scrollView.terminalView)
     }
 
-    @Test func leavesTheFindKeysToOtherViews() async throws {
+    @Test func leavesTheFocusInOtherViewsWhenTheFindBarHides() async throws {
         let scrollView = try await findView(running: "printf 'text'")
         let container = NSView()
         let field = NSTextField()
         container.addSubview(scrollView)
         container.addSubview(field)
         let window = KeyWindow(contentView: container)
-        window.makeFirstResponder(field)
-        #expect(!scrollView.performKeyEquivalent(with: try keyDown("f", modifierFlags: .command)))
-        #expect(!scrollView.isFindBarVisible)
+        scrollView.isFindBarVisible = true
+        #expect(window.makeFirstResponder(field))
+        let editor = try #require(window.firstResponder as? NSText)
+        scrollView.isFindBarVisible = false
+        #expect(window.firstResponder === editor)
     }
 }
 
 private final class FinderSpy: NSTextFinder {
     var changes = 0
+    var actions: [NSTextFinder.Action] = []
 
     override func noteClientStringWillChange() {
         changes += 1
     }
+
+    override func performAction(_ op: NSTextFinder.Action) {
+        actions.append(op)
+    }
+}
+
+@MainActor
+private func findPanelItem(_ action: NSFindPanelAction) -> NSMenuItem {
+    let item = NSMenuItem(title: "", action: #selector(NSTextView.performFindPanelAction(_:)), keyEquivalent: "")
+    item.tag = Int(action.rawValue)
+    return item
+}
+
+@MainActor
+private func sendFindPanelAction(_ action: NSFindPanelAction, in window: NSWindow) -> Bool {
+    window.firstResponder?.tryToPerform(#selector(NSTextView.performFindPanelAction(_:)), with: findPanelItem(action))
+        == true
+}
+
+@MainActor
+private func target(of action: Selector, in window: NSWindow) -> NSResponder? {
+    window.firstResponder.flatMap { sequence(first: $0, next: \.nextResponder).first { $0.responds(to: action) } }
 }
 
 @MainActor
