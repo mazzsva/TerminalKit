@@ -63,13 +63,13 @@ final class KeyWindow: NSWindow {
 func mouseEvent(
     _ type: NSEvent.EventType,
     row: Int,
-    column: Int,
+    column: CGFloat,
     in view: TerminalContentView,
     modifierFlags: NSEvent.ModifierFlags = [],
     clickCount: Int = 1
 ) throws -> NSEvent {
     let point = CGPoint(
-        x: TerminalContentView.padding + CGFloat(column) * view.cellSize.width,
+        x: TerminalContentView.padding + column * view.cellSize.width,
         y: TerminalContentView.padding + (CGFloat(row) + 0.5) * view.cellSize.height
     )
     return try #require(

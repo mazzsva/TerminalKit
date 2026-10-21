@@ -130,8 +130,8 @@ private func clickView(running script: String) async throws -> (TerminalContentV
 private func drag(
     in view: TerminalContentView,
     row: Int,
-    from start: Int,
-    to end: Int,
+    from start: CGFloat,
+    to end: CGFloat,
     modifierFlags: NSEvent.ModifierFlags = []
 ) throws {
     view.mouseDown(

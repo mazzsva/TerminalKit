@@ -54,6 +54,70 @@ struct TerminalSelectionTests {
         #expect(view.selection == Selection(anchor: .init(line: 2, column: 2), head: .init(line: 2, column: 2)))
     }
 
+    @Test(arguments: [
+        ("hello foo_bar world", 12.75, "foo_bar"), ("ls /usr/local/bin", 9, "local"), ("中文字符 abc", 5, "字符"),
+        ("😀😀😀 e\u{301}té zz", 8, "été"), ("one two", -0.5, "one"),
+    ])
+    func selectsAWordWithADoubleClick(text: String, column: CGFloat, word: String) async throws {
+        let view = try await view(running: "printf '\(text)'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: column, in: view, clickCount: 2))
+        #expect(view.selectedText == word)
+    }
+
+    @Test func selectsBothColumnsOfAWideCharacter() async throws {
+        let view = try await view(running: "printf '中文字符 abc'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 2, in: view, clickCount: 2))
+        #expect(view.selection == Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 4)))
+    }
+
+    @Test func selectsNoWordOutsideTheText() async throws {
+        let view = try await view(running: "printf 'one two'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 6, in: view, clickCount: 2))
+        #expect(view.selectedText == "two")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 7, in: view, clickCount: 2))
+        #expect(view.selection == Selection(anchor: .init(line: 0, column: 7), head: .init(line: 0, column: 7)))
+    }
+
+    @Test func selectsAWordAcrossASoftWrap() async throws {
+        let view = try await view(
+            running:
+                "c=$(stty size | cut -d' ' -f2); i=3; s=''; while [ $i -lt $c ]; do s=\"${s}x\"; i=$((i+1)); done; "
+                + "printf '%s ab%syyycd gh' \"$s\" \"$s\""
+        )
+        let word = "ab" + String(repeating: "x", count: view.session.terminal.columns - 3) + "yyycd"
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, clickCount: 2))
+        #expect(view.selectedText == word)
+        let column = CGFloat(view.session.terminal.columns) + 0.2
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: column, in: view, clickCount: 2))
+        #expect(view.selectedText == word)
+    }
+
+    @Test func selectsAWordInTheTrimmedScrollback() async throws {
+        let view = try await view(running: "seq 1 12000")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 2))
+        let removed = view.session.terminal.removedScrollbackCount
+        let head = Selection.Point(line: removed, column: "\(removed + 1)".count)
+        #expect(view.selection == Selection(anchor: .init(line: removed, column: 0), head: head))
+    }
+
+    @Test func selectsAWordWithACommandDoubleClick() async throws {
+        let view = try await view(running: "printf 'hello world'")
+        view.mouseDown(
+            with: try mouseEvent(.leftMouseDown, row: 0, column: 7, in: view, modifierFlags: .command, clickCount: 2))
+        #expect(view.selectedText == "world")
+    }
+
+    @Test func extendsByWordsWhenDraggingAfterADoubleClick() async throws {
+        let view = try await view(running: "printf 'one two three four'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 9, in: view, clickCount: 2))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 15, in: view))
+        #expect(view.selectedText == "three four")
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 1, in: view))
+        #expect(view.selectedText == "one two three")
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: -1, column: 1, in: view))
+        #expect(view.selectedText == "one two three")
+    }
+
     @Test func drawsTheSelection() throws {
         let view = viewInWindow()
         let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
@@ -79,10 +143,13 @@ struct TerminalSelectionTests {
 
     @Test func clearsTheSelectionWhenTheLinesReflow() async throws {
         let view = try await view(running: "printf 'hello world'")
-        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 5))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 5, in: view))
         view.fit(to: CGSize(width: 400, height: 200))
         #expect(view.selection != nil)
         view.fit(to: CGSize(width: 200, height: 200))
+        #expect(view.selection == nil)
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 9, in: view))
         #expect(view.selection == nil)
     }
 

@@ -41,6 +41,8 @@ final class TerminalContentView: NSView {
             scheduleAccessibilityNotification()
         }
     }
+    var selectionOrigin: Selection?
+    var selectionClickCount = 1
     var cachedAccessibilityText: AccessibilityText?
     var isAccessibilityNotificationScheduled = false
     var postAccessibilityNotifications = { (view: NSView) in

@@ -66,6 +66,16 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains("E[<0;3;1M"))
     }
 
+    @Test func reportsADoubleClickWithoutASelection() async throws {
+        let (view, session) = try await viewReading("head -c 36", modes: "?1000h\\033[?1006h")
+        for clickCount in 1 ... 2 {
+            view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: clickCount))
+            view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 0, column: 1, in: view, clickCount: clickCount))
+        }
+        #expect(await session.linesAfterExit().contains("E[<0;2;1ME[<0;2;1mE[<0;2;1ME[<0;2;1m"))
+        #expect(view.selection == nil)
+    }
+
     @Test func reportsNoDragWhenTheProcessTracksClicks() async throws {
         let (view, session) = try await viewReading("head -c 18", modes: "?1000h\\033[?1006h")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view))
