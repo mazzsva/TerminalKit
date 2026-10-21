@@ -65,7 +65,8 @@ func mouseEvent(
     row: Int,
     column: Int,
     in view: TerminalContentView,
-    modifierFlags: NSEvent.ModifierFlags = []
+    modifierFlags: NSEvent.ModifierFlags = [],
+    clickCount: Int = 1
 ) throws -> NSEvent {
     let point = CGPoint(
         x: TerminalContentView.padding + CGFloat(column) * view.cellSize.width,
@@ -80,7 +81,7 @@ func mouseEvent(
             windowNumber: view.window?.windowNumber ?? 0,
             context: nil,
             eventNumber: 0,
-            clickCount: 1,
+            clickCount: clickCount,
             pressure: 1
         )
     )

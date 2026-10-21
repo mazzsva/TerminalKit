@@ -162,7 +162,7 @@ extension TerminalContentView {
         guard event.modifierFlags.contains(.command), let link = link(at: event) else {
             return false
         }
-        if let action = Self.action(for: link.url) {
+        if event.clickCount == 1, let action = Self.action(for: link.url) {
             performLinkAction(action)
         }
         return true
