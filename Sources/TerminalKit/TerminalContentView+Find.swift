@@ -89,6 +89,7 @@ extension TerminalContentView: NSTextFinderClient {
             return
         }
         let firstLine = session.terminal.removedScrollbackCount
+        selectionClickCount = 1
         selection = Selection(
             anchor: Selection.Point(line: firstLine + start.row, column: start.column),
             head: Selection.Point(line: firstLine + end.row, column: end.column)

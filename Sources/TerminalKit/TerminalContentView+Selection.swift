@@ -35,9 +35,23 @@ extension TerminalContentView {
             reportMouse(event, button: 0)
             return
         }
-        selectionClickCount = event.clickCount
-        selectionOrigin = selectionUnit(at: convert(event.locationInWindow, from: nil))
-        selection = selectionOrigin
+        let location = convert(event.locationInWindow, from: nil)
+        guard event.modifierFlags.contains(.shift), session.liveTerminal.mouseTracking == .off, let selection else {
+            selectionClickCount = event.clickCount
+            selectionOrigin = selectionUnit(at: location)
+            selection = selectionOrigin
+            return
+        }
+        let point = selectionPoint(at: location)
+        let terminal = session.terminal
+        let start = max(
+            min(selection.anchor, selection.head), Selection.Point(line: terminal.removedScrollbackCount, column: 0))
+        let end = max(selection.anchor, selection.head)
+        let position: (Selection.Point) -> Int = { $0.line * (terminal.columns + 1) + $0.column }
+        let anchor = 2 * position(point) > position(start) + position(end) ? start : end
+        selectionOrigin = Selection(anchor: anchor, head: anchor)
+        extendSelection(to: location)
+        selectionOrigin = self.selection
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -51,14 +65,18 @@ extension TerminalContentView {
             return
         }
         autoscroll(with: event)
+        extendSelection(to: convert(event.locationInWindow, from: nil))
+    }
+
+    private func extendSelection(to location: CGPoint) {
         guard let selectionOrigin, selection != nil else {
             return
         }
-        let unit = selectionUnit(at: convert(event.locationInWindow, from: nil))
+        let unit = selectionUnit(at: location)
         selection =
             unit.anchor < selectionOrigin.anchor
-            ? Selection(anchor: selectionOrigin.head, head: unit.anchor)
-            : Selection(anchor: selectionOrigin.anchor, head: max(unit.head, selectionOrigin.head))
+            ? Selection(anchor: max(selectionOrigin.anchor, selectionOrigin.head), head: unit.anchor)
+            : Selection(anchor: min(selectionOrigin.anchor, selectionOrigin.head), head: unit.head)
     }
 
     private func selectionUnit(at location: CGPoint) -> Selection {
