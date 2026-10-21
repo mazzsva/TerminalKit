@@ -120,11 +120,12 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
-        for (title, action) in [
-            ("Copy", #selector(copy(_:))), ("Paste", #selector(paste(_:))), ("Select All", #selector(selectAll(_:))),
-        ] {
-            menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self
-        }
+        menu.items = [#selector(copy(_:)), #selector(paste(_:))]
+            .compactMap { action in
+                let item = NSTextView.defaultMenu?.items.first { $0.action == action }?.copy() as? NSMenuItem
+                item?.target = self
+                return item
+            }
         return menu
     }
 

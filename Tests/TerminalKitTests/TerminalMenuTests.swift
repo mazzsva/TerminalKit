@@ -26,13 +26,18 @@ struct TerminalMenuTests {
         await session.waitForExit()
         let event = try mouseEvent(.rightMouseDown, row: 0, column: 0, in: view)
         let menu = try #require(view.menu(for: event))
-        #expect(
-            menu.items.map(\.action) == [
-                #selector(view.copy(_:)), #selector(view.paste(_:)), #selector(view.selectAll(_:)),
-            ])
+        #expect(menu.items.map(\.action) == [#selector(view.copy(_:)), #selector(view.paste(_:))])
         #expect(menu.items.allSatisfy { $0.target === view })
+        let textMenu = try #require(NSTextView.defaultMenu)
+        #expect(
+            menu.items.map(\.title)
+                == menu.items.map { item in textMenu.items.first { $0.action == item.action }?.title })
+        #expect(
+            menu.items.map(\.identifier)
+                == menu.items.map { item in textMenu.items.first { $0.action == item.action }?.identifier })
+        #expect(textMenu.items.allSatisfy { $0.target !== view })
         #expect(!view.validateMenuItem(menu.items[0]))
-        _ = (menu.items[2].target as? NSObject)?.perform(menu.items[2].action, with: menu.items[2])
+        view.selectAll(nil)
         #expect(view.validateMenuItem(menu.items[0]))
         #expect(view.selectedText == "text")
     }
