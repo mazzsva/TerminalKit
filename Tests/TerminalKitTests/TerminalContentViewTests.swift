@@ -400,7 +400,7 @@ struct TerminalContentViewTests {
 
     @Test func sendsTheCursorKeysInTheModeOfTheProcess() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[?1h'; stty raw -echo; dd bs=3 count=1 2>/dev/null | od -An -tx1")
+            running: "stty raw -echo; printf '\\033[?1h'; dd bs=3 count=1 2>/dev/null | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         for await isEnabled in Observations({ session.terminal.usesApplicationCursorKeys }) where isEnabled {
