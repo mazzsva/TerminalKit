@@ -59,11 +59,13 @@ struct TerminalInputTests {
         #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: .option).wordMovementInput == [0x1B, 0x62])
         #expect(try keyDown(NSRightArrowFunctionKey, modifierFlags: .option).wordMovementInput == [0x1B, 0x66])
         #expect(try keyDown(NSLeftArrowFunctionKey).wordMovementInput == nil)
+        #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: [.option, .command]).wordMovementInput == nil)
         #expect(try keyDown("a", modifierFlags: .option).wordMovementInput == nil)
     }
 
     @Test func ignoresKeyEquivalents() throws {
         #expect(try keyDown("c", modifierFlags: .command).terminalInput() == nil)
+        #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: .command).terminalInput() == nil)
     }
 
     @Test func sendsTheArrowKeys() throws {
