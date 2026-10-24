@@ -2,9 +2,24 @@
 
 Native macOS terminal view in SwiftUI and AppKit.
 
+## Usage
+
+Add the package with Swift Package Manager:
+
 ```swift
+.package(url: "https://github.com/mazzsva/TerminalKit", branch: "main")
+```
+
+Then show a terminal that runs Claude Code:
+
+```swift
+import SwiftUI
+import TerminalKit
+
 struct ContentView: View {
-    @State private var session = TerminalSession(configuration: .loginShell(running: ["claude"]))
+    @State private var session = TerminalSession(
+        configuration: .loginShell(running: ["claude"])
+    )
 
     var body: some View {
         TerminalView(session: session)
@@ -12,8 +27,6 @@ struct ContentView: View {
     }
 }
 ```
-
-Add it with Swift Package Manager: `.package(url: "https://github.com/mazzsva/TerminalKit", branch: "main")`.
 
 ## Technologies
 
