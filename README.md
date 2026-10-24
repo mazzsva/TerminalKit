@@ -2,9 +2,24 @@
 
 Native macOS terminal view in SwiftUI and AppKit.
 
+## Usage
+
+Add the package with Swift Package Manager:
+
 ```swift
+.package(url: "https://github.com/mazzsva/TerminalKit", branch: "main")
+```
+
+Then show a terminal that runs Claude Code:
+
+```swift
+import SwiftUI
+import TerminalKit
+
 struct ContentView: View {
-    @State private var session = TerminalSession(configuration: .loginShell(running: ["claude"]))
+    @State private var session = TerminalSession(
+        configuration: .loginShell(running: ["claude"])
+    )
 
     var body: some View {
         TerminalView(session: session)
@@ -12,8 +27,6 @@ struct ContentView: View {
     }
 }
 ```
-
-Add it with Swift Package Manager: `.package(url: "https://github.com/mazzsva/TerminalKit", branch: "main")`.
 
 ## Technologies
 
@@ -32,15 +45,15 @@ Add it with Swift Package Manager: `.package(url: "https://github.com/mazzsva/Te
 
 **A value-type emulator.** The full terminal state is one Swift struct. Tests feed it bytes and compare values. During synchronized output, the view draws a frozen copy, so the screen never shows a frame that is half drawn.
 
-**Built for Claude Code.** Each protocol traces to the official Claude Code documentation: the kitty keyboard protocol for Shift-Return, synchronized output, mouse hover in fullscreen mode, color queries for the automatic theme, and hyperlinks.
+**Built for Claude Code.** Each protocol traces to the official Claude Code docs: the kitty keyboard protocol for Shift-Return, synchronized output, mouse hover, color queries for the automatic theme, and hyperlinks.
 
 **The right size from the first frame.** The process starts only after the first layout of the view, so a full-screen program never draws its first frame at the wrong width and then redraws.
 
-**Native AppKit behavior.** Input methods, dictation, the system find bar, Services, and VoiceOver use the same AppKit APIs as a text view. The view answers the standard Find menu actions, so it never takes a shortcut from the host app.
+**Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts.
 
 **Never touches the shell.** There are no shell integration scripts and no changes to startup files. The host gets the user's own login shell, with the same `PATH` as in Terminal.
 
-**Safe links.** A Command-click opens the hyperlinks that a program writes and the plain URLs in its output, but only web, mail, FTP, and file links. A file link to an app or an executable, even through a symbolic link, shows the file in the Finder and never launches it.
+**Safe links.** A Command-click opens web, mail, FTP, and file links, both hyperlinks and plain URLs. A file link to an app or an executable, even through a symbolic link, shows it in the Finder and never launches it.
 
 ## Quality
 
