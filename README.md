@@ -2,7 +2,7 @@
 
 Native macOS terminal view in SwiftUI and AppKit.
 
-## Technologies
+## Core technologies
 
 <table>
   <tr><td><b>Platform</b></td><td>macOS 27</td></tr>
@@ -12,13 +12,13 @@ Native macOS terminal view in SwiftUI and AppKit.
   <tr><td><b>Concurrency</b></td><td>Swift 6 strict concurrency and <a href="https://developer.apple.com/documentation/observation">Observation</a></td></tr>
 </table>
 
-## Quality
+## Quality gates
 
 - **Tests:** 635 [Swift Testing](https://github.com/swiftlang/swift-testing) tests cover every layer, and many run real programs in pseudo terminals.
 - **CI:** GitHub Actions lints and runs the full suite on every pull request that is ready for review.
 - **Accessibility:** VoiceOver reads the terminal as a text area and gets a notification when the output changes.
 
-## Usage
+## Usage example
 
 Add the package with Swift Package Manager:
 
