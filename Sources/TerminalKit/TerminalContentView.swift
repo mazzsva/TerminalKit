@@ -81,6 +81,7 @@ final class TerminalContentView: NSView {
     private var fittedColumns: Int?
     var lastMousePosition: Terminal.Position?
     var scrollWheelLines: CGFloat = 0
+    var scrollWheelColumns: CGFloat = 0
 
     private var colors = Colors(.standard)
     private(set) var fonts = Fonts(defaultFont)

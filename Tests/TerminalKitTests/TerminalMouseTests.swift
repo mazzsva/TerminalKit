@@ -189,6 +189,7 @@ struct TerminalMouseTests {
 
     @Test func sendsTheCursorKeysForTheWheelOnTheAlternateScreen() async throws {
         let (view, session) = try await viewReading("head -c 6", modes: "?1049h")
+        view.scrollWheel(with: try scrollWheelEvent(lines: 0, columns: 1))
         view.scrollWheel(with: try scrollWheelEvent(lines: 1))
         view.scrollWheel(with: try scrollWheelEvent(lines: -1))
         #expect(await session.linesAfterExit().contains("E[AE[B"))
@@ -199,6 +200,35 @@ struct TerminalMouseTests {
             "/bin/bash -c 'read -r -d M; printf %sM \"$REPLY\"'", modes: "?1000h\\033[?1006h")
         view.scrollWheel(with: try scrollWheelEvent(lines: -1))
         #expect(await session.linesAfterExit().contains { $0.hasPrefix("E[<65;") && $0.hasSuffix("M") })
+    }
+
+    @Test(arguments: [(Int32(1), 66), (-1, 67)])
+    func reportsHorizontalScrolling(columns: Int32, button: Int) async throws {
+        let (view, session) = try await viewReading(
+            "/bin/bash -c 'read -r -d M; printf %sM \"$REPLY\"'", modes: "?1000h\\033[?1006h")
+        view.scrollWheel(with: try scrollWheelEvent(lines: 0, columns: columns))
+        #expect(await session.linesAfterExit().contains { $0.hasPrefix("E[<\(button);") && $0.hasSuffix("M") })
+    }
+
+    @Test func reportsWholeColumnsOfHorizontalTrackpadScrolling() async throws {
+        let (view, session) = try await viewReading(
+            "/bin/bash -c 'read -r -d x; printf %sx \"$REPLY\"'", modes: "?1000h\\033[?1006h")
+        view.scrollWheel(with: try scrollWheelEvent(x: 20))
+        view.scrollWheel(with: try scrollWheelEvent(x: 5))
+        session.send(Array("x".utf8))
+        let lines = await session.linesAfterExit()
+        #expect(lines.contains { $0.hasPrefix("E[<66;") && $0.hasSuffix("Mx") && $0.split(separator: "E").count == 3 })
+    }
+
+    @Test func reportsBothAxesOfDiagonalTrackpadScrolling() async throws {
+        let (view, session) = try await viewReading(
+            "/bin/bash -c 'read -r -d x; printf %sx \"$REPLY\"'", modes: "?1000h\\033[?1006h")
+        for _ in 0 ..< 2 {
+            view.scrollWheel(with: try scrollWheelEvent(x: -10, y: 16))
+        }
+        session.send(Array("x".utf8))
+        let reports = await session.linesAfterExit().joined().split(separator: "E").dropFirst().map { $0.prefix(4) }
+        #expect(reports == ["[<64", "[<67", "[<64", "[<67"])
     }
 }
 
