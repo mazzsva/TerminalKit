@@ -95,13 +95,13 @@ struct TerminalMenuTests {
     }
 
     @Test func reportsAForegroundProcess() async throws {
-        let session = TerminalSession(
-            configuration: .init(
-                executableURL: URL(filePath: "/bin/zsh"),
-                arguments: ["-f", "-i"],
-                environment: ["HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"]
-            )
+        var configuration = TerminalSession.Configuration(
+            executableURL: URL(filePath: "/bin/zsh"),
+            arguments: ["-f", "-i"],
+            environment: ["HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"]
         )
+        configuration.isLoginShell = true
+        let session = TerminalSession(configuration: configuration)
         #expect(!session.hasForegroundProcess)
         try session.start()
         session.send("echo ready\r")
@@ -116,6 +116,34 @@ struct TerminalMenuTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         session.send("exit\r")
+        await session.waitForExit()
+        #expect(!session.hasForegroundProcess)
+    }
+
+    @Test func reportsTheCommandOfALoginShellAsAForegroundProcess() async throws {
+        var configuration = TerminalSession.Configuration.loginShell(running: [
+            "/bin/sh", "-c", "echo running; exec /bin/sleep 30",
+        ])
+        configuration.executableURL = URL(filePath: "/bin/zsh")
+        configuration.environment = TerminalSession.Configuration.terminalEnvironment(
+            inheriting: ["HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"])
+        let session = TerminalSession(configuration: configuration)
+        #expect(!session.hasForegroundProcess)
+        try session.start()
+        await session.waitForText("running")
+        #expect(session.hasForegroundProcess)
+        session.terminate()
+        await session.waitForExit()
+        #expect(!session.hasForegroundProcess)
+    }
+
+    @Test func reportsTheProgramAsAForegroundProcess() async throws {
+        let session = TerminalSession(running: "echo running; exec /bin/sleep 30")
+        #expect(!session.hasForegroundProcess)
+        try session.start()
+        await session.waitForText("running")
+        #expect(session.hasForegroundProcess)
+        session.terminate()
         await session.waitForExit()
         #expect(!session.hasForegroundProcess)
     }

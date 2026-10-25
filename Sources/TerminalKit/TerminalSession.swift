@@ -102,7 +102,7 @@ public final class TerminalSession {
         guard let pseudoTerminal, let group = pseudoTerminal.foregroundProcessGroup else {
             return false
         }
-        return group != pseudoTerminal.processIdentifier
+        return !configuration.isLoginShell || group != pseudoTerminal.processIdentifier
     }
 
     public func terminate() {
