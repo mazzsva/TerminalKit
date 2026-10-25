@@ -78,8 +78,9 @@ extension Terminal {
             flags = isOn ? flags | 1 << bit : flags & ~(1 << bit)
         }
 
-        mutating func apply(_ parameters: [Int]) {
-            var parameters = (parameters.isEmpty ? [0] : parameters).makeIterator()
+        mutating func apply(_ parameters: [Int], subparameters: Set<Int> = []) {
+            var parameters = (parameters.isEmpty ? [0] : Self.parameters(parameters, grouping: subparameters))
+                .makeIterator()
             while let parameter = parameters.next() {
                 switch parameter {
                 case 0:
@@ -132,6 +133,38 @@ extension Terminal {
                 default:
                     break
                 }
+            }
+        }
+
+        private static func parameters(_ parameters: [Int], grouping subparameters: Set<Int>) -> [Int] {
+            guard !subparameters.isEmpty else {
+                return parameters
+            }
+            var groups: [[Int]] = []
+            for (index, parameter) in parameters.enumerated() {
+                if subparameters.contains(index) {
+                    groups[groups.count - 1].append(parameter)
+                } else {
+                    groups.append([parameter])
+                }
+            }
+            return groups.flatMap { $0.count == 1 ? $0 : Self.parameters(fromSubparameters: $0) }
+        }
+
+        private static func parameters(fromSubparameters group: [Int]) -> [Int] {
+            switch (group[0], group[1], group.count) {
+            case (4, 0, 2):
+                [24]
+            case (4, 1 ... 5, 2):
+                [4]
+            case (38, 5, 3), (48, 5, 3), (38, 2, 5), (48, 2, 5):
+                group
+            case (38, 2, 6), (48, 2, 6):
+                Array(group.prefix(2) + group.suffix(3))
+            case (4, _, _), (38, _, _), (48, _, _), (58, _, _):
+                []
+            default:
+                [group[0]]
             }
         }
 

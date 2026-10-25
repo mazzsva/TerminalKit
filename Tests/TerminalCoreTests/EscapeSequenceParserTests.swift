@@ -49,6 +49,13 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}[5;H") == [controlSequence(parameters: [5, 0], final: "H")])
     }
 
+    @Test func collectsSubparameters() {
+        #expect(
+            parse("\u{1B}[1;38:2::1:2:3m")
+                == [controlSequence(parameters: [1, 38, 2, 0, 1, 2, 3], subparameters: [2, 3, 4, 5, 6], final: "m")])
+        #expect(parse("\u{1B}[:5m") == [controlSequence(parameters: [0, 5], subparameters: [1], final: "m")])
+    }
+
     @Test func collectsThePrivateMarker() {
         #expect(parse("\u{1B}[?1049h") == [controlSequence(privateMarker: "?", parameters: [1049], final: "h")])
     }
@@ -65,6 +72,7 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}[1?hA") == [.print("A")])
         #expect(parse("\u{1B}[ 1qA") == [.print("A")])
         #expect(parse("\u{1B}[\(String(repeating: ";", count: 32))mA") == [.print("A")])
+        #expect(parse("\u{1B}[\(String(repeating: ":", count: 32))mA") == [.print("A")])
     }
 
     @Test func executesControlCharactersInsideControlSequences() {
@@ -107,6 +115,7 @@ private func parse(_ text: String) -> [EscapeSequenceParser.Action] {
 private func controlSequence(
     privateMarker: Unicode.Scalar? = nil,
     parameters: [Int] = [],
+    subparameters: Set<Int> = [],
     intermediates: String = "",
     final: Unicode.Scalar
 ) -> EscapeSequenceParser.Action {
@@ -114,6 +123,7 @@ private func controlSequence(
         EscapeSequenceParser.ControlSequence(
             privateMarker: privateMarker,
             parameters: parameters,
+            subparameters: subparameters,
             intermediates: intermediates,
             final: final
         )

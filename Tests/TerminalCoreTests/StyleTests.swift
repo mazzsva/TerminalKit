@@ -133,11 +133,58 @@ struct StyleTests {
         #expect(style == Terminal.Style(foreground: .indexed(1), isUnderlined: true))
     }
 
+    @Test func setsTheTrueColorsWithColons() {
+        #expect(
+            style("38:2::255:128:0;48:2:1:2:3")
+                == Terminal.Style(
+                    foreground: .rgb(red: 255, green: 128, blue: 0), background: .rgb(red: 1, green: 2, blue: 3)))
+        #expect(
+            style("38:2:1:2:3;48:2::4:5:6")
+                == Terminal.Style(
+                    foreground: .rgb(red: 1, green: 2, blue: 3), background: .rgb(red: 4, green: 5, blue: 6)))
+    }
+
+    @Test func setsThe256ColorsWithColons() {
+        #expect(style("38:5:208;48:5:17") == Terminal.Style(foreground: .indexed(208), background: .indexed(17)))
+    }
+
+    @Test(arguments: 1 ... 5)
+    func treatsEachUnderlineStyleAsUnderline(underline: Int) {
+        #expect(style("4:\(underline)") == Terminal.Style(isUnderlined: true))
+    }
+
+    @Test func clearsTheUnderlineWithAColon() {
+        #expect(style("1;4;4:0") == Terminal.Style(isBold: true))
+    }
+
+    @Test func appliesAMixedSequenceWithColons() {
+        #expect(
+            style("1;38:2::10:20:30;4:3")
+                == Terminal.Style(foreground: .rgb(red: 10, green: 20, blue: 30), isBold: true, isUnderlined: true))
+    }
+
+    @Test func skipsTheUnderlineColorWithColons() {
+        #expect(style("58:2::255:0:0;1;58:5:1;4") == Terminal.Style(isBold: true, isUnderlined: true))
+        #expect(style("58:2::255:0:0") == Terminal.Style())
+    }
+
+    @Test func ignoresUnknownSubparameters() {
+        #expect(
+            style("38:9:1;3;48:2:1:2;9;1:31;38:5:1:2;48:5:1:2;48:5:300;4:3:1;4:6")
+                == Terminal.Style(isBold: true, isItalic: true, isStrikethrough: true))
+    }
+
     @Test func printsWithTheCurrentStyle() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("a\u{1B}[1mb\u{1B}[mc")
         #expect(terminal.screen[0].prefix(3).map(\.style.isBold) == [false, true, false])
     }
+}
+
+private func style(_ parameters: String) -> Terminal.Style {
+    var terminal = Terminal(columns: 1, rows: 1)
+    terminal.receive("\u{1B}[\(parameters)mA")
+    return terminal.screen[0][0].style
 }
 
 private func backgroundCells(_ count: Int) -> [Terminal.Style] {
