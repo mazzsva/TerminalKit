@@ -78,6 +78,11 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
         }
     }
 
+    override func reflectScrolledClipView(_ clipView: NSClipView) {
+        super.reflectScrolledClipView(clipView)
+        terminalView.updateHoveredLink()
+    }
+
     private var insetContentSize: CGSize {
         let insets = contentView.contentInsets
         return CGSize(
