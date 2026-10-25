@@ -341,16 +341,19 @@ package struct Terminal: Sendable {
             setKeyboardFlags(sequence)
             return
         }
-        guard sequence.privateMarker == nil else {
+        guard
+            sequence.privateMarker == nil
+                || sequence.privateMarker == "?" && (sequence.final == "J" || sequence.final == "K")
+        else {
             return
         }
         let count = sequence.parameter(at: 0, default: 1)
         switch sequence.final {
         case "A":
             moveCursor(row: max(cursor.row - count, topLimit), column: cursor.column)
-        case "B":
+        case "B", "e":
             moveCursor(row: min(cursor.row + count, bottomLimit), column: cursor.column)
-        case "C":
+        case "C", "a":
             moveCursor(row: cursor.row, column: cursor.column + count)
         case "D":
             moveCursor(row: cursor.row, column: cursor.column - count)
@@ -358,7 +361,7 @@ package struct Terminal: Sendable {
             moveCursor(row: min(cursor.row + count, bottomLimit), column: 0)
         case "F":
             moveCursor(row: max(cursor.row - count, topLimit), column: 0)
-        case "G":
+        case "G", "`":
             moveCursor(row: cursor.row, column: count - 1)
         case "I":
             moveForward(tabStops: count)
@@ -864,6 +867,10 @@ package struct Terminal: Sendable {
             enterAlternateScreen()
         case (47, false), (1047, false):
             exitAlternateScreen()
+        case (1048, true):
+            saveCursor()
+        case (1048, false):
+            restoreCursor()
         case (1049, true):
             saveCursor()
             enterAlternateScreen()
