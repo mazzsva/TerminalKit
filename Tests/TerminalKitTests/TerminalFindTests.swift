@@ -90,13 +90,13 @@ struct TerminalFindTests {
     }
 
     @Test func drawsTheFoundCharacters() async throws {
-        let scrollView = try await findView(running: "printf 'ab'")
+        let scrollView = try await findView(running: "printf '\\033[31ma\\033[0m cbd\\033[31me'")
         let view = scrollView.terminalView
-        let rect = view.rect(row: 0, columns: 1 ..< 2)
+        let rect = view.rect(row: 0, columns: 3 ..< 4)
         let image = NSImage(size: view.bounds.size, flipped: true) { _ in
             NSColor.yellow.setFill()
             view.bounds.fill()
-            view.drawCharacters(in: NSRange(location: 1, length: 1), forContentView: view)
+            view.drawCharacters(in: NSRange(location: 3, length: 1), forContentView: view)
             return true
         }
         let representation = try #require(
@@ -111,7 +111,8 @@ struct TerminalFindTests {
                 }
         }
         #expect(pixels(rect).contains { $0 < 0.5 })
-        #expect(pixels(view.rect(row: 0, columns: 0 ..< 1)).allSatisfy { $0 > 0.5 })
+        #expect(pixels(view.rect(row: 0, columns: 0 ..< 3)).allSatisfy { $0 > 0.5 })
+        #expect(pixels(view.rect(row: 0, columns: 4 ..< 6)).allSatisfy { $0 > 0.5 })
     }
 
     @Test func tellsTheFinderWhenTheTextChanges() async throws {
