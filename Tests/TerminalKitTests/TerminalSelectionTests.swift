@@ -70,6 +70,27 @@ struct TerminalSelectionTests {
         #expect(view.selection == Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 4)))
     }
 
+    @Test(arguments: [(1.4, 5.4, 2, 6, "文字"), (0.6, 4.6, 0, 4, "中文")])
+    func selectsAWideCharacterAsAWholeWithTheMouse(
+        start: CGFloat, end: CGFloat, anchor: Int, head: Int, text: String
+    ) async throws {
+        let view = try await view(running: "printf '中文字符'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: start, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: end, in: view))
+        #expect(view.selection == Selection(anchor: .init(line: 0, column: anchor), head: .init(line: 0, column: head)))
+        #expect(view.selectedText == text)
+    }
+
+    @Test func keepsTheSelectionInTheLinesWhenDraggingOutside() async throws {
+        let view = try await view(running: "printf 'one two'")
+        let rows = view.session.terminal.rows
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 3, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: -3, column: 1, in: view))
+        #expect(view.selection == Selection(anchor: .init(line: 0, column: 3), head: .init(line: 0, column: 1)))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: rows + 3, column: 1, in: view))
+        #expect(view.selection == Selection(anchor: .init(line: 0, column: 3), head: .init(line: rows - 1, column: 1)))
+    }
+
     @Test func selectsNoWordOutsideTheText() async throws {
         let view = try await view(running: "printf 'one two'")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 6, in: view, clickCount: 2))
