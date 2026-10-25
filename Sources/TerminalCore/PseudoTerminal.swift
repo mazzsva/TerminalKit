@@ -81,6 +81,7 @@ package final class PseudoTerminal: Sendable {
     deinit {
         cancelSources()
         wakeUp.finish()
+        killLater()
     }
 
     package var foregroundProcessGroup: pid_t? {
@@ -97,14 +98,7 @@ package final class PseudoTerminal: Sendable {
         queue.async { [weak self] in
             self?.cancelSources()
         }
-        let processIdentifier = processIdentifier
-        queue.asyncAfter(deadline: .now() + Self.killDelay) { [child] in
-            child.isReaped.withLock { isReaped in
-                if !isReaped {
-                    kill(-processIdentifier, SIGKILL)
-                }
-            }
-        }
+        killLater()
     }
 
     package func write(_ bytes: [UInt8]) {
@@ -161,6 +155,17 @@ package final class PseudoTerminal: Sendable {
             input.offset = 0
             input.writeSource?.cancel()
             input.writeSource = nil
+        }
+    }
+
+    private func killLater() {
+        let processIdentifier = processIdentifier
+        queue.asyncAfter(deadline: .now() + Self.killDelay) { [child] in
+            child.isReaped.withLock { isReaped in
+                if !isReaped {
+                    kill(-processIdentifier, SIGKILL)
+                }
+            }
         }
     }
 
