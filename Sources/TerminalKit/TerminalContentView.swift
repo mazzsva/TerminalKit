@@ -348,7 +348,7 @@ final class TerminalContentView: NSView {
             for (columns, style) in runs {
                 if let background = colors(for: style).background {
                     background.setFill()
-                    rect(row: row, columns: columns).fill()
+                    backingAlignedRect(rect(row: row, columns: columns), options: .alignAllEdgesNearest).fill()
                 }
             }
             if let columns = selection?
@@ -358,7 +358,7 @@ final class TerminalContentView: NSView {
                 )
             {
                 selectionColor.setFill()
-                rect(row: row, columns: columns).fill()
+                backingAlignedRect(rect(row: row, columns: columns), options: .alignAllEdgesNearest).fill()
             }
             for (columns, style) in runs {
                 drawText(
