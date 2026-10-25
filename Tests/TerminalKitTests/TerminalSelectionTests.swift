@@ -176,6 +176,29 @@ struct TerminalSelectionTests {
         #expect(view.selectedText == "bbb")
     }
 
+    @Test func copiesTheScrollbackAndTheAlternateScreenAsSeparateLines() async throws {
+        let view = try await view(
+            running:
+                "c=$(stty size | cut -d' ' -f2); r=$(stty size | cut -d' ' -f1); i=0; "
+                + "while [ $i -lt $((2*c+3)) ]; do printf a; i=$((i+1)); done; "
+                + "i=1; while [ $i -lt $r ]; do printf '\\n'; i=$((i+1)); done; printf '\\033[?1049h\\033[Hbbb'"
+        )
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 2, column: 3, in: view))
+        #expect(view.selectedText == String(repeating: "a", count: 2 * view.session.terminal.columns) + "\nbbb")
+    }
+
+    @Test func copiesAWrappedLineOnTheAlternateScreen() async throws {
+        let view = try await view(
+            running:
+                "c=$(stty size | cut -d' ' -f2); printf '\\033[?1049h\\033[H'; "
+                + "i=0; while [ $i -lt $((c+3)) ]; do printf b; i=$((i+1)); done"
+        )
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 3, in: view))
+        #expect(view.selectedText == String(repeating: "b", count: view.session.terminal.columns + 3))
+    }
+
     @Test func extendsByLinesWhenDraggingAfterATripleClick() async throws {
         let view = try await view(running: "printf 'one\\n\\nthree\\nfour'")
         let columns = view.session.terminal.columns

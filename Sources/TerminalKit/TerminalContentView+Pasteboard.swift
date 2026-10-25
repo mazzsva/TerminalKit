@@ -18,7 +18,9 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
                 else {
                     return nil
                 }
-                let continues = line.isWrapped && row < lastRow
+                let continues =
+                    line.isWrapped && row < lastRow
+                    && (row != terminal.scrollback.count - 1 || !terminal.isAlternateScreenActive)
                 let end =
                     continues
                     ? columns.upperBound
