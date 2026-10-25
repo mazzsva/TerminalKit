@@ -55,7 +55,7 @@ package struct Terminal: Sendable {
     package private(set) var mouseTracking = MouseTracking.off
     package private(set) var synchronizedOutputCount = 0
     package var reportedColors: [RGB] = []
-    private(set) var usesSGRMouseEncoding = false
+    package private(set) var usesSGRMouseEncoding = false
 
     package var isAlternateScreenActive: Bool {
         normalScreen != nil
