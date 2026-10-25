@@ -40,12 +40,17 @@ struct TerminalSessionTests {
     @Test func removesTheIdentityOfTheParentTerminal() {
         let environment = TerminalSession.Configuration
             .loginShell(
-                inheriting: ["TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "470", "TERM_SESSION_ID": "1"]
+                inheriting: [
+                    "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "470", "TERM_SESSION_ID": "1",
+                    "TMUX": "/tmp/tmux-501/default,1,0", "TMUX_PANE": "%0", "STY": "1.ttys000.host",
+                    "LC_TERMINAL": "iTerm2", "LC_TERMINAL_VERSION": "3.5.0", "ITERM_SESSION_ID": "w0t0p0:1",
+                    "ITERM_PROFILE": "Default", "KITTY_WINDOW_ID": "1", "KITTY_PID": "1", "COLORFGBG": "15;0",
+                    "COLUMNS": "20", "LINES": "5", "TERMINFO": "/tmp/terminfo", "CLAUDECODE": "1",
+                    "CLAUDE_CODE_CHILD_SESSION": "1",
+                ]
             )
             .environment
-        #expect(environment["TERM_PROGRAM"] == nil)
-        #expect(environment["TERM_PROGRAM_VERSION"] == nil)
-        #expect(environment["TERM_SESSION_ID"] == nil)
+        #expect(environment == ["TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8"])
     }
 
     @Test func runsTheCommandInTheInteractiveLoginShell() {
