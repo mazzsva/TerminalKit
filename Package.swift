@@ -3,19 +3,19 @@
 import PackageDescription
 
 let swiftSettings: [SwiftSetting] = [
-    .enableUpcomingFeature("ApproachableConcurrency"),
+    .enableUpcomingFeature("ApproachableConcurrency")
 ]
 
 let package = Package(
     name: "TerminalKit",
     platforms: [
-        .macOS(.v27),
+        .macOS(.v27)
     ],
     products: [
         .library(
             name: "TerminalKit",
             targets: ["TerminalKit"]
-        ),
+        )
     ],
     targets: [
         .target(name: "CTerminalCore"),
