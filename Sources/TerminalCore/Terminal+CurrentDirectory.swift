@@ -11,13 +11,17 @@ extension Terminal {
         return String(decoding: name.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self).lowercased()
     }
 
+    package static func isLocal(_ url: URL) -> Bool {
+        let host = url.host()?.lowercased() ?? ""
+        return ["", "localhost", launchHostName, currentHostName].contains(host)
+    }
+
     mutating func setCurrentDirectory(_ location: Substring) {
         guard let url = URL(string: String(location)), url.isFileURL else {
             return
         }
         let path = url.path(percentEncoded: false)
-        let host = url.host(percentEncoded: false)?.lowercased() ?? ""
-        guard ["", "localhost", Self.launchHostName, Self.currentHostName].contains(host), path.hasPrefix("/") else {
+        guard Self.isLocal(url), path.hasPrefix("/") else {
             currentDirectory = nil
             return
         }

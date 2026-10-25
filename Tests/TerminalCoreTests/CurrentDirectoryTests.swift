@@ -31,6 +31,8 @@ struct CurrentDirectoryTests {
         #expect(terminal.currentDirectory == nil)
         terminal.receive("\u{1B}]7;file:///a\u{7}\u{1B}]7;file://localhost\u{7}")
         #expect(terminal.currentDirectory == nil)
+        terminal.receive("\u{1B}]7;file:///a\u{7}\u{1B}]7;file://%FF/a\u{7}")
+        #expect(terminal.currentDirectory == nil)
     }
 
     @Test func keepsTheCurrentDirectoryAfterAReset() {

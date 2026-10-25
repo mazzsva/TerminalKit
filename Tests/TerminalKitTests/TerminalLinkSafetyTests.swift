@@ -112,6 +112,23 @@ struct TerminalLinkSafetyTests {
         try Data("<plist><dict><key>URL</key><string>x-scheme://run</string></dict></plist>".utf8).write(to: file)
         #expect(TerminalContentView.action(for: file) == .reveal(file))
     }
+
+    @Test func opensAFileLinkOnlyOnThisMac() throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try Data("text".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let path = file.path(percentEncoded: true)
+        var name = [CChar](repeating: 0, count: Int(MAXHOSTNAMELEN) + 1)
+        try #require(gethostname(&name, Int(MAXHOSTNAMELEN)) == 0)
+        let host = String(decoding: name.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self)
+        for location in ["\(host)\(path)", "localhost\(path)", path] {
+            let url = try #require(URL(string: "file://\(location)"))
+            #expect(TerminalContentView.action(for: url) == .open(url))
+        }
+        for location in ["server.example.com\(path)", "%FF\(path)"] {
+            #expect(TerminalContentView.action(for: try #require(URL(string: "file://\(location)"))) == nil)
+        }
+    }
 }
 
 @MainActor
