@@ -76,7 +76,12 @@ struct TerminalKeyboardProtocolTests {
         #expect(try input(keyDown(NSF3FunctionKey, modifierFlags: .shift)) == "\u{1B}[13;2~")
         #expect(try input(keyDown(NSUpArrowFunctionKey, modifierFlags: .control)) == "\u{1B}[1;5A")
         #expect(try input(keyDown(NSPageUpFunctionKey)) == "\u{1B}[5~")
-        #expect(try input(keyDown(NSF13FunctionKey)) == nil)
+        #expect(try input(keyDown(NSF12FunctionKey)) == "\u{1B}[24~")
+        #expect(try input(keyDown(NSF13FunctionKey)) == "\u{1B}[57376u")
+        #expect(try input(keyDown(NSF20FunctionKey)) == "\u{1B}[57383u")
+        #expect(try input(keyDown(NSF16FunctionKey, modifierFlags: .shift)) == "\u{1B}[57379;2u")
+        #expect(try input(keyDown(NSHelpFunctionKey)) == "\u{1B}[2~")
+        #expect(try input(keyDown(NSF21FunctionKey)) == nil)
     }
 
     @Test func sendsShiftReturnWithTheKittyProtocol() async throws {
