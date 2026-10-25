@@ -202,6 +202,24 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityRange(for: point) == NSRange(location: 4, length: 1))
     }
 
+    @Test func findsAWideCharacterAtBothHalves() async throws {
+        let view = try await accessibleView(running: "printf '\\r\\n12345678中'")
+        let window = NSWindow(contentView: view)
+        for column in 8 ... 9 {
+            let cell = view.rect(row: 1, columns: column ..< column + 1)
+            let point = window.convertPoint(toScreen: view.convert(CGPoint(x: cell.midX, y: cell.midY), to: nil))
+            #expect(view.accessibilityRange(for: point) == NSRange(location: 9, length: 1))
+        }
+    }
+
+    @Test func findsTheEndOfARowPastTheLastColumn() async throws {
+        let view = try await accessibleView(running: "printf 'ab'")
+        let window = NSWindow(contentView: view)
+        let cell = view.rect(row: 0, columns: 10 ..< 11)
+        let point = window.convertPoint(toScreen: view.convert(CGPoint(x: cell.midX, y: cell.midY), to: nil))
+        #expect(view.accessibilityRange(for: point) == NSRange(location: 2, length: 1))
+    }
+
     @Test func givesTheVisibleText() async throws {
         let session = TerminalSession(running: "printf '1\\r\\n2\\r\\n3\\r\\n4\\r\\n5'")
         let scrollView = TerminalScrollView(session: session)

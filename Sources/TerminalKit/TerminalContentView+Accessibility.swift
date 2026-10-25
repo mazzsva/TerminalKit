@@ -260,7 +260,11 @@ extension TerminalContentView {
         let text = accessibilityText
         let location = convert(window.convertPoint(fromScreen: point), from: nil)
         let row = row(at: location.y, in: text)
-        let column = Int(max(location.x - Self.padding, 0) / cellSize.width)
+        var column = Int(max(location.x - Self.padding, 0) / cellSize.width)
+        let line = line(at: row)
+        if column < line.count, line[column].width == 0 {
+            column -= 1
+        }
         return accessibilityRange(for: min(index(row: row, column: column, in: text), max(text.length - 1, 0)))
     }
 
