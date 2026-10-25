@@ -112,14 +112,28 @@ final class TerminalContentView: NSView {
             return resolved
         }
 
-        init(_ palette: TerminalPalette) {
-            foreground = NSColor(palette.foreground)
-            background = NSColor(palette.background)
-            cursor = NSColor(palette.cursor)
+        func colors(for style: Terminal.Style) -> (foreground: NSColor, background: NSColor?) {
+            let foreground = color(style.foreground) ?? self.foreground
+            let background = color(style.background)
+            return style.isInverse ? (background ?? self.background, foreground) : (foreground, background)
+        }
+
+        init(_ palette: TerminalPalette, isReversed: Bool = false) {
+            foreground = NSColor(isReversed ? palette.background : palette.foreground)
+            background = NSColor(isReversed ? palette.foreground : palette.background)
+            let cursor = NSColor(palette.cursor)
+            self.cursor =
+                isReversed && cursor.terminalRGB == background.terminalRGB
+                ? foreground.withAlphaComponent(cursor.alphaComponent) : cursor
             selection = NSColor(palette.selection)
-            ansiColors =
+            var ansiColors =
                 (palette.ansiColors.prefix(16) + TerminalPalette.standard.ansiColors.dropFirst(palette.ansiColors.count))
                 .map(NSColor.init)
+            if isReversed {
+                ansiColors.swapAt(0, 7)
+                ansiColors.swapAt(8, 15)
+            }
+            self.ansiColors = ansiColors
         }
     }
 
@@ -333,11 +347,12 @@ final class TerminalContentView: NSView {
             scheduleAccessibilityNotification()
             textFinder?.noteClientStringWillChange()
         }
+        let terminal = session.terminal
+        let colors = terminal.usesReverseVideo ? Colors(palette, isReversed: true) : self.colors
         colors.background.setFill()
         dirtyRect.fill()
 
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.foreground]
-        let terminal = session.terminal
         let graphemes = terminal.graphemes
         let lineCount = terminal.scrollback.count + terminal.rows
         let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height), 0)
@@ -346,7 +361,7 @@ final class TerminalContentView: NSView {
             let line = line(at: row, in: terminal)
             let runs = Self.runs(in: line)
             for (columns, style) in runs {
-                if let background = colors(for: style).background {
+                if let background = colors.colors(for: style).background {
                     background.setFill()
                     rect(row: row, columns: columns).fill()
                 }
@@ -366,7 +381,7 @@ final class TerminalContentView: NSView {
                     columns: columns,
                     row: row,
                     style: style,
-                    foreground: colors(for: style).foreground,
+                    foreground: colors.colors(for: style).foreground,
                     graphemes: graphemes
                 )
             }
@@ -421,7 +436,7 @@ final class TerminalContentView: NSView {
             columns: cursorColumns,
             row: terminal.scrollback.count + terminal.cursor.row,
             style: style,
-            foreground: colors(for: style).background ?? colors.background,
+            foreground: colors.colors(for: style).background ?? colors.background,
             graphemes: graphemes
         )
     }
@@ -455,12 +470,6 @@ final class TerminalContentView: NSView {
             column = end
         }
         return runs
-    }
-
-    private func colors(for style: Terminal.Style) -> (foreground: NSColor, background: NSColor?) {
-        let foreground = colors.color(style.foreground) ?? colors.foreground
-        let background = colors.color(style.background)
-        return style.isInverse ? (background ?? colors.background, foreground) : (foreground, background)
     }
 
     func drawText(

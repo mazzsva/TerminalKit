@@ -47,6 +47,7 @@ package struct Terminal: Sendable {
     package private(set) var isCursorVisible = true
     package private(set) var cursorShape = CursorShape.block
     package private(set) var usesFocusReporting = false
+    package private(set) var usesReverseVideo = false
     package private(set) var title = ""
     package internal(set) var graphemes = Graphemes()
     package internal(set) var links = Links()
@@ -861,6 +862,8 @@ package struct Terminal: Sendable {
         switch (mode, isEnabled) {
         case (1, _):
             usesApplicationCursorKeys = isEnabled
+        case (5, _):
+            usesReverseVideo = isEnabled
         case (7, _):
             usesAutowrap = isEnabled
         case (25, _):
@@ -958,6 +961,7 @@ package struct Terminal: Sendable {
     private func isPrivateModeEnabled(_ mode: Int) -> Bool? {
         switch mode {
         case 1: usesApplicationCursorKeys
+        case 5: usesReverseVideo
         case 7: usesAutowrap
         case 25: isCursorVisible
         case 47, 1047, 1049: isAlternateScreenActive
@@ -986,7 +990,7 @@ package struct Terminal: Sendable {
     private mutating func reportColors(_ queries: Substring, from first: Int) {
         let queries = queries.split(separator: ";", omittingEmptySubsequences: false)
         for (index, query) in zip(reportedColors.indices.dropFirst(first), queries) where query == "?" {
-            let color = reportedColors[index]
+            let color = reportedColors[usesReverseVideo ? 1 - index : index]
             let rgb = String(format: "rgb:%04x/%04x/%04x", color.red, color.green, color.blue)
             replies += "\u{1B}]\(10 + index);\(rgb)\u{1B}\\".utf8
         }

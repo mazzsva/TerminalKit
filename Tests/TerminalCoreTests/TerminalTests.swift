@@ -396,9 +396,18 @@ struct TerminalTests {
         #expect(lines(terminal) == ["xbc "])
     }
 
+    @Test func switchesToReverseVideo() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?5h")
+        #expect(terminal.usesReverseVideo)
+        terminal.receive("\u{1B}[?5l")
+        #expect(!terminal.usesReverseVideo)
+    }
+
     @Test func resetsTheTerminal() {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("a\r\nb\r\nc\u{1B}[?1h\u{1B}[?2004h\u{1B}[?25l\u{1B}[?1004h\u{1B}[?1049h\u{1B}[1mx\u{1B}c")
+        terminal.receive(
+            "a\r\nb\r\nc\u{1B}[?1h\u{1B}[?2004h\u{1B}[?25l\u{1B}[?1004h\u{1B}[?5h\u{1B}[?1049h\u{1B}[1mx\u{1B}c")
         #expect(lines(terminal) == ["    ", "    "])
         #expect(scrollback(terminal) == ["a"])
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
@@ -406,6 +415,7 @@ struct TerminalTests {
         #expect(!terminal.usesBracketedPaste)
         #expect(terminal.isCursorVisible)
         #expect(!terminal.usesFocusReporting)
+        #expect(!terminal.usesReverseVideo)
         terminal.receive("y")
         #expect(terminal.screen[0][0].style == Terminal.Style())
     }
@@ -424,10 +434,11 @@ struct TerminalTests {
 
     @Test func softResetsTheModes() {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}[?1h\u{1B}[?25l\u{1B}[5 q\u{1B}[!p")
+        terminal.receive("\u{1B}[?1h\u{1B}[?25l\u{1B}[5 q\u{1B}[?5h\u{1B}[!p")
         #expect(!terminal.usesApplicationCursorKeys)
         #expect(terminal.isCursorVisible)
         #expect(terminal.cursorShape == .block)
+        #expect(terminal.usesReverseVideo)
     }
 
     @Test func softResetsInsertMode() {
