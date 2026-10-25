@@ -6,6 +6,18 @@ extension Unicode.Scalar {
             return 1
         }
         let width = Int(character_width(value))
-        return width < 0 ? 1 : width
+        guard width < 0 else {
+            return width
+        }
+        if self != "\u{AD}",
+            properties.isDefaultIgnorableCodePoint
+                || [.nonspacingMark, .enclosingMark, .format].contains(properties.generalCategory)
+        {
+            return 0
+        }
+        if properties.isEmojiPresentation || properties.isIdeographic || ("\u{2E80}" ... "\u{A4CF}").contains(self) {
+            return 2
+        }
+        return 1
     }
 }

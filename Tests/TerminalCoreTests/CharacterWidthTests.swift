@@ -17,4 +17,19 @@ struct CharacterWidthTests {
     func measuresZeroWidthCharacters(character: Unicode.Scalar) {
         #expect(character.width == 0)
     }
+
+    @Test(arguments: ["\u{AD}", "\u{1C89}"])
+    func measuresUnknownNarrowCharacters(character: Unicode.Scalar) {
+        #expect(character.width == 1)
+    }
+
+    @Test(arguments: ["\u{1FAE9}", "\u{1F6D8}", "\u{2FFC}", "\u{31E4}", "\u{31EF}", "\u{2EBF0}", "\u{323B0}"])
+    func measuresUnknownWideCharacters(character: Unicode.Scalar) {
+        #expect(character.width == 2)
+    }
+
+    @Test(arguments: ["\u{FEFF}", "\u{897}", "\u{1ACF}"])
+    func measuresUnknownZeroWidthCharacters(character: Unicode.Scalar) {
+        #expect(character.width == 0)
+    }
 }
