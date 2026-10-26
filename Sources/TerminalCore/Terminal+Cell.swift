@@ -90,10 +90,20 @@ extension Terminal {
                 newIndices[index] = UInt32(kept.count)
                 kept.append(character)
             }
+            if kept.count < characters.count - kept.count {
+                indices.removeAll(keepingCapacity: true)
+                for (index, character) in kept.enumerated() {
+                    indices[character] = UInt32(index)
+                }
+            } else {
+                for (index, character) in characters.enumerated() where !used[index] {
+                    indices[character] = nil
+                }
+                indices = indices.mapValues { newIndices[Int($0)] }
+            }
             compactionInterval =
                 kept.count > characters.count * 3 / 4 ? min(compactionInterval * 2, capacity) : max(capacity / 64, 1)
             characters = kept
-            indices = Dictionary(uniqueKeysWithValues: kept.enumerated().map { ($1, UInt32($0)) })
             additionsSinceCompaction = 0
             return newIndices
         }

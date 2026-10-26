@@ -91,6 +91,23 @@ struct GraphemeTests {
         #expect(graphemes.needsCompaction(for: "z\u{20D0}"))
     }
 
+    @Test(arguments: [2, 3])
+    func keepsTheUsedCharactersWhenItCompactsALargeTable(keepingEvery stride: Int) {
+        var graphemes = Terminal.Graphemes()
+        let characters = Array(clusters(count: graphemes.capacity))
+        var lines = [Terminal.Line(characters.map { graphemes.cell(Terminal.Cell(), with: $0) })]
+        let used = characters.indices.map { $0.isMultiple(of: stride) }
+        let newIndices = graphemes.compact(keeping: used)
+        Terminal.Graphemes.remapIndices(in: &lines, with: newIndices)
+        let kept = characters.indices.filter { used[$0] }
+        #expect(graphemes.count == kept.count)
+        #expect(kept.allSatisfy { graphemes.character(of: lines[0][$0]) == characters[$0] })
+        #expect(kept.allSatisfy { graphemes.cell(Terminal.Cell(), with: characters[$0]) == lines[0][$0] })
+        let added = graphemes.cell(Terminal.Cell(), with: characters[1])
+        #expect(graphemes.character(of: added) == characters[1])
+        #expect(graphemes.count == kept.count + 1)
+    }
+
     @Test func keepsANewCharacterAfterTheScrollbackIsCleared() {
         var terminal = Terminal(columns: 10, rows: 2)
         terminal.graphemes = Terminal.Graphemes(capacity: 128)
