@@ -1,4 +1,5 @@
 import AppKit
+import TerminalCore
 import Testing
 
 @testable import TerminalKit
@@ -38,6 +39,21 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityLine(for: 8) == 1)
         #expect(view.accessibilityInsertionPointLineNumber() == 0)
         #expect(view.accessibilitySelectedTextRange() == NSRange(location: 7, length: 0))
+    }
+
+    @Test func endsTheScrollbackLineAtTheAlternateScreen() async throws {
+        let view = try await accessibleView(running: "printf 'abcdefghijKLMNOP\\nx\\ny\\033[?1049h\\033[Hvim'")
+        #expect(view.accessibilityValue() as? String == "abcdefghij\nvim\n\n")
+        #expect(view.accessibilityRange(forLine: 0) == NSRange(location: 0, length: 11))
+    }
+
+    @Test func rebuildsTheLastScrollbackRowForTheAlternateScreen() {
+        var terminal = Terminal(columns: 10, rows: 3)
+        _ = terminal.receive(Array("abcdefghij0123456789KLM\r\nx\r\ny".utf8))
+        let before = TerminalContentView.AccessibilityText(terminal, revision: 0)
+        _ = terminal.receive(Array("\u{1B}[?1049h\u{1B}[Hvim".utf8))
+        let after = TerminalContentView.AccessibilityText(terminal, revision: 1, reusing: before)
+        #expect(after.string == "abcdefghij0123456789\nvim\n\n")
     }
 
     @Test func leavesOutThePaddingOfAWideCharacterThatWraps() async throws {

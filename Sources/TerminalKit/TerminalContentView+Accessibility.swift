@@ -31,14 +31,16 @@ extension TerminalContentView {
             let graphemes = terminal.graphemes
             scrollback = terminal.scrollback.indices.map { index in
                 let line = terminal.scrollback[index]
+                let continues =
+                    line.isWrapped && (index != terminal.scrollback.count - 1 || !terminal.isAlternateScreenActive)
                 if let reusable,
                     case let cached = terminal.removedScrollbackCount + index - reusable.firstLine,
                     reusable.scrollback.indices.contains(cached),
-                    reusable.scrollback[cached].isWrapped == line.isWrapped
+                    reusable.scrollback[cached].isWrapped == continues
                 {
                     return reusable.scrollback[cached]
                 }
-                return Self.row(line, continues: line.isWrapped, cursorColumn: nil, graphemes: graphemes)
+                return Self.row(line, continues: continues, cursorColumn: nil, graphemes: graphemes)
             }
             let cursorRow = terminal.cursor.row
             let screen = terminal.screen.indices.map { row in

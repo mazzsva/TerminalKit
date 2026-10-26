@@ -89,6 +89,18 @@ struct TerminalFindTests {
         #expect(view.selectedText == "alternate")
     }
 
+    @Test func findsNoTextAcrossTheAlternateScreen() async throws {
+        let scrollView = try await findView(
+            running:
+                "r=$(stty size | cut -d' ' -f1); printf abcdefghijKLMNOP; "
+                + "i=1; while [ $i -lt $r ]; do printf '\\n'; i=$((i+1)); done; printf '\\033[?1049h\\033[Hvim'",
+            columns: 10
+        )
+        let view = scrollView.terminalView
+        #expect((view.string as NSString).range(of: "jvim").location == NSNotFound)
+        #expect((view.string as NSString).range(of: "abcdefghij\nvim").location == 0)
+    }
+
     @Test func drawsTheFoundCharacters() async throws {
         let scrollView = try await findView(running: "printf '\\033[31ma\\033[0m cbd\\033[31me'")
         let view = scrollView.terminalView
