@@ -335,6 +335,85 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: edge, of: view).allSatisfy { isClose($0, to: selected) || isClose($0, to: fill) })
     }
 
+    @Test(
+        arguments: [
+            ("█", [CGRect(x: 0, y: 0, width: 1, height: 1)]), ("▀", [CGRect(x: 0, y: 0, width: 1, height: 0.5)]),
+            ("▁", [CGRect(x: 0, y: 7.0 / 8, width: 1, height: 1.0 / 8)]),
+            ("▄", [CGRect(x: 0, y: 0.5, width: 1, height: 0.5)]),
+            ("▉", [CGRect(x: 0, y: 0, width: 7.0 / 8, height: 1)]),
+            ("▌", [CGRect(x: 0, y: 0, width: 0.5, height: 1)]), ("▐", [CGRect(x: 0.5, y: 0, width: 0.5, height: 1)]),
+            ("▔", [CGRect(x: 0, y: 0, width: 1, height: 1.0 / 8)]),
+            ("▕", [CGRect(x: 7.0 / 8, y: 0, width: 1.0 / 8, height: 1)]),
+            ("▖", [CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5)]),
+            ("▘", [CGRect(x: 0, y: 0, width: 0.5, height: 0.5)]),
+            ("▝", [CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5)]),
+            ("▗", [CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)]),
+            ("▛", [CGRect(x: 0, y: 0, width: 1, height: 0.5), CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5)]),
+            ("▙", [CGRect(x: 0, y: 0, width: 0.5, height: 0.5), CGRect(x: 0, y: 0.5, width: 1, height: 0.5)]),
+            ("▚", [CGRect(x: 0, y: 0, width: 0.5, height: 0.5), CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)]),
+            ("▜", [CGRect(x: 0, y: 0, width: 1, height: 0.5), CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)]),
+            ("▞", [CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5), CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5)]),
+            ("▟", [CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5), CGRect(x: 0, y: 0.5, width: 1, height: 0.5)]),
+        ] as [(String, [CGRect])])
+    func drawsABlockElementAsARectangle(character: String, units: [CGRect]) async throws {
+        let view = try await drawnView(running: "printf '\\033[31m\(character)\\n'")
+        let cell = CGRect(x: 4, y: 4, width: view.cellSize.width, height: view.cellSize.height)
+        let filled = try units.map {
+            try pixels(
+                in: $0.applying(
+                    CGAffineTransform(translationX: 4, y: 4).scaledBy(x: view.cellSize.width, y: view.cellSize.height)),
+                of: view)
+        }
+        #expect(filled.joined().allSatisfy { isClose($0, to: red) })
+        #expect(try pixels(in: cell, of: view).count { isClose($0, to: red) } == filled.joined().count)
+    }
+
+    @Test(arguments: ["▏", "▕"])
+    func drawsAnEighthBlockInEveryColumnAtAStandardScale(character: String) async throws {
+        let view = try await drawnView(running: "printf '\\033[31m\(String(repeating: character, count: 20))\\n'")
+        let window = StandardScaleWindow(contentView: view)
+        view.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        let (width, y) = (view.cellSize.width, 4 + view.cellSize.height / 2)
+        let cells = (0 ..< 20).map { CGRect(x: 4 + CGFloat($0) * width, y: y, width: width, height: 1) }
+            .map { view.backingAlignedRect($0, options: .alignAllEdgesNearest) }
+        let background = color(in: try representation(of: view), at: CGPoint(x: 190, y: 90))
+        let ink = try cells.map { try pixels(in: $0, of: view).filter { !isClose($0, to: background) } }
+        #expect(ink.allSatisfy { $0.count == 1 && isClose($0[0], to: ink[0][0]) })
+        #expect(window.contentView === view)
+    }
+
+    @Test func drawsAShadeWithTheForegroundAtPartialAlpha() async throws {
+        let view = try await drawnView(running: "printf '\\033[4;31m \\n░▒▓ \\033[2;24m█\\n'")
+        let font = view.fonts.regular
+        let underline = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let representation = try representation(of: view)
+        let background = color(in: representation, at: CGPoint(x: 190, y: 90))
+        let foreground = NSColor(srgbRed: red[0], green: red[1], blue: red[2], alpha: 1)
+        func point(row: Int, column: Int, y: CGFloat) -> CGPoint {
+            CGPoint(x: 4 + (CGFloat(column) + 0.5) * view.cellSize.width, y: y + CGFloat(row) * view.cellSize.height)
+        }
+        for (column, alpha): (Int, CGFloat) in [(0, 0.25), (1, 0.5), (2, 0.75), (4, 0.5)] {
+            let blended = background?.blended(withFraction: alpha, of: foreground)
+            let center = point(row: 1, column: column, y: 4 + view.cellSize.height / 2)
+            #expect(isClose(color(in: representation, at: center), to: blended))
+        }
+        let plainUnderline = try #require(color(in: representation, at: point(row: 0, column: 0, y: underline)))
+        #expect(isClose(color(in: representation, at: point(row: 1, column: 3, y: underline)), to: plainUnderline))
+        #expect(!isClose(plainUnderline, to: background))
+    }
+
+    @Test func drawsAStackOfFullBlocksWithoutAGap() async throws {
+        let view = try await drawnView(running: "printf '\\033[31m█\\n█\\n█\\n'")
+        let column = CGRect(x: 4 + view.cellSize.width / 2, y: 4, width: 1, height: 3 * view.cellSize.height)
+        #expect(try pixels(in: column, of: view).allSatisfy { isClose($0, to: red) })
+    }
+
+    @Test func drawsARowOfFullBlocksWithoutAGap() async throws {
+        let view = try await drawnView(running: "printf '\\033[31m███\\n'")
+        let row = CGRect(x: 4, y: 4 + view.cellSize.height / 2, width: 3 * view.cellSize.width, height: 1)
+        #expect(try pixels(in: row, of: view).allSatisfy { isClose($0, to: red) })
+    }
+
     @Test func drawsTheScrollback() async throws {
         let session = TerminalSession(running: "printf '\\033[41m  \\033[m'; seq 1 30")
         let view = TerminalContentView(session: session)
@@ -770,6 +849,8 @@ private func pixels(in rect: CGRect, of view: NSView) throws -> [NSColor?] {
         }
 }
 
+private let red: [CGFloat] = [194 / 255, 54 / 255, 33 / 255]
+
 private func isClose(_ color: NSColor?, to other: NSColor?) -> Bool {
     guard let other = other?.usingColorSpace(.sRGB) else {
         return false
@@ -783,6 +864,12 @@ private func isClose(_ color: NSColor?, to components: [CGFloat]) -> Bool {
     }
     return zip([color.redComponent, color.greenComponent, color.blueComponent], components)
         .allSatisfy { abs($0 - $1) < 0.02 }
+}
+
+private final class StandardScaleWindow: NSWindow {
+    override var backingScaleFactor: CGFloat {
+        1
+    }
 }
 
 private final class KeyRecorder: NSResponder {

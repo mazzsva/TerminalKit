@@ -505,6 +505,17 @@ final class TerminalContentView: NSView {
             guard character != " " else {
                 continue
             }
+            if let block = Self.blockElement(character) {
+                let cell = backingAlignedRect(
+                    rect(row: row, columns: column ..< column + 1), options: .alignAllEdgesNearest)
+                let transform = CGAffineTransform(translationX: cell.minX, y: cell.minY)
+                    .scaledBy(x: cell.width, y: cell.height)
+                context.setFillColor(color.withAlphaComponent(color.alphaComponent * block.alpha).cgColor)
+                context.fill(
+                    block.rects.map { backingAlignedRect($0.applying(transform), options: .alignAllEdgesNearest) })
+                context.setFillColor(color.cgColor)
+                continue
+            }
             let entry = fonts.glyphs.entry(for: character, font: font, index: index)
             let x = Self.padding + CGFloat(column) * cellSize.width
             let baseline = top + entry.ascent
@@ -528,6 +539,36 @@ final class TerminalContentView: NSView {
         if style.isStrikethrough {
             context.fill(
                 CGRect(x: left, y: baseline - font.xHeight / 2 - thickness / 2, width: width, height: thickness))
+        }
+    }
+
+    private static func blockElement(_ character: Character) -> (rects: [CGRect], alpha: CGFloat)? {
+        guard character.unicodeScalars.count == 1, let value = character.unicodeScalars.first?.value else {
+            return nil
+        }
+        switch value {
+        case 0x2580:
+            return ([CGRect(x: 0, y: 0, width: 1, height: 0.5)], 1)
+        case 0x2581 ... 0x2588:
+            let height = CGFloat(value - 0x2580) / 8
+            return ([CGRect(x: 0, y: 1 - height, width: 1, height: height)], 1)
+        case 0x2589 ... 0x258F:
+            return ([CGRect(x: 0, y: 0, width: CGFloat(0x2590 - value) / 8, height: 1)], 1)
+        case 0x2590:
+            return ([CGRect(x: 0.5, y: 0, width: 0.5, height: 1)], 1)
+        case 0x2591 ... 0x2593:
+            return ([CGRect(x: 0, y: 0, width: 1, height: 1)], CGFloat(value - 0x2590) / 4)
+        case 0x2594:
+            return ([CGRect(x: 0, y: 0, width: 1, height: 1.0 / 8)], 1)
+        case 0x2595:
+            return ([CGRect(x: 7.0 / 8, y: 0, width: 1.0 / 8, height: 1)], 1)
+        case 0x2596 ... 0x259F:
+            let quadrants = [4, 8, 1, 13, 9, 7, 11, 2, 6, 14][Int(value - 0x2596)]
+            let rects = (0 ..< 4).filter { quadrants >> $0 & 1 == 1 }
+                .map { CGRect(x: CGFloat($0 % 2) / 2, y: CGFloat($0 / 2) / 2, width: 0.5, height: 0.5) }
+            return (rects, 1)
+        default:
+            return nil
         }
     }
 
