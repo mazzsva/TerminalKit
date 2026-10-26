@@ -146,19 +146,21 @@ extension TerminalContentView {
                 position = match.range.lowerBound
                 let lowerBound = offset
                 var characters = scalars[match.range].map(Character.init)
-                while let last = characters.last, shouldTrim(last, from: characters) {
+                var counts = Dictionary(characters.map { ($0, 1) }, uniquingKeysWith: +)
+                while let last = characters.last, shouldTrim(last, counts: counts) {
                     characters.removeLast()
+                    counts[last, default: 0] -= 1
                 }
                 return lowerBound ..< lowerBound + characters.count
             }
     }
 
-    private static func shouldTrim(_ character: Character, from characters: [Character]) -> Bool {
+    private static func shouldTrim(_ character: Character, counts: [Character: Int]) -> Bool {
         let pairs: [Character: Character] = [")": "(", "]": "[", "}": "{", ">": "<"]
         guard let opening = pairs[character] else {
             return ".,;:!?".contains(character)
         }
-        return characters.count { $0 == character } > characters.count { $0 == opening }
+        return counts[character, default: 0] > counts[opening, default: 0]
     }
 
     func link(at event: NSEvent) -> Link? {

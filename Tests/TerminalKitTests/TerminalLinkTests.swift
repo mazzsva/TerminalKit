@@ -15,6 +15,7 @@ struct TerminalLinkTests {
         ("mail mailto:me@example.com!", "mailto:me@example.com"),
         ("open file:///tmp/a b", "file:///tmp/a"),
         ("ftp://host/file]", "ftp://host/file"),
+        ("https://a/" + String(repeating: ")", count: 50_000), "https://a/"),
     ])
     func detectsALink(text: String, link: String) {
         let ranges = TerminalContentView.detectedLinks(in: text)
