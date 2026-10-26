@@ -63,7 +63,7 @@ extension TerminalContentView: NSTextFinderClient {
             let lowerBound = row == start.row ? start.column : 0
             let upperBound = row == end.row ? end.column : line.count
             for (columns, style) in Self.runs(in: line) {
-                let clipped = max(columns.lowerBound, lowerBound) ..< min(columns.upperBound, upperBound)
+                let clipped = columns.clamped(to: lowerBound ..< upperBound)
                 if !clipped.isEmpty {
                     drawText(line, columns: clipped, row: row, style: style, foreground: .black, graphemes: graphemes)
                 }
