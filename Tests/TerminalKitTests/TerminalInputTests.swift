@@ -129,10 +129,22 @@ struct TerminalInputTests {
         #expect(try keyDown(NSF4FunctionKey).terminalInput() == Array("\u{1B}OS".utf8))
         #expect(try keyDown(NSF5FunctionKey).terminalInput() == Array("\u{1B}[15~".utf8))
         #expect(try keyDown(NSF12FunctionKey).terminalInput() == Array("\u{1B}[24~".utf8))
+        #expect(try keyDown(NSF13FunctionKey).terminalInput() == Array("\u{1B}[25~".utf8))
+        #expect(try keyDown(NSF14FunctionKey).terminalInput() == Array("\u{1B}[26~".utf8))
+        #expect(try keyDown(NSF15FunctionKey).terminalInput() == Array("\u{1B}[28~".utf8))
+        #expect(try keyDown(NSF16FunctionKey).terminalInput() == Array("\u{1B}[29~".utf8))
+        #expect(try keyDown(NSF17FunctionKey).terminalInput() == Array("\u{1B}[31~".utf8))
+        #expect(try keyDown(NSF18FunctionKey).terminalInput() == Array("\u{1B}[32~".utf8))
+        #expect(try keyDown(NSF19FunctionKey).terminalInput() == Array("\u{1B}[33~".utf8))
+        #expect(try keyDown(NSF20FunctionKey).terminalInput() == Array("\u{1B}[34~".utf8))
+    }
+
+    @Test func sendsInsertForTheHelpKey() throws {
+        #expect(try keyDown(NSHelpFunctionKey).terminalInput() == Array("\u{1B}[2~".utf8))
     }
 
     @Test func ignoresOtherFunctionKeys() throws {
-        #expect(try keyDown(NSF13FunctionKey).terminalInput() == nil)
+        #expect(try keyDown(NSF21FunctionKey).terminalInput() == nil)
     }
 
     @Test func sendsTheModifiersOfSpecialKeys() throws {
@@ -147,6 +159,10 @@ struct TerminalInputTests {
         #expect(
             try keyDown(NSF5FunctionKey, modifierFlags: [.shift, .option, .control]).terminalInput()
                 == Array("\u{1B}[15;8~".utf8))
+        #expect(
+            try keyDown(NSF13FunctionKey, modifierFlags: .shift).terminalInput() == Array("\u{1B}[25;2~".utf8))
+        #expect(
+            try keyDown(NSHelpFunctionKey, modifierFlags: .control).terminalInput() == Array("\u{1B}[2;5~".utf8))
     }
 
     @Test func sendsModifiedCursorKeysInApplicationMode() throws {

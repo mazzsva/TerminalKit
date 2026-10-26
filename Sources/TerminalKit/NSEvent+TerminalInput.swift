@@ -120,6 +120,8 @@ extension NSEvent.SpecialKey {
         case .delete: "\u{7F}"
         case .escape: "\u{1B}"
         case .backTab: "\u{1B}[Z"
+        case _ where disambiguates && (NSF13FunctionKey ... NSF20FunctionKey).contains(rawValue):
+            "\u{1B}[\(57376 + rawValue - NSF13FunctionKey)\(modifiers > 1 ? ";\(modifiers)" : "")u"
         default:
             if let final = cursorFinal, !disambiguates || self != .f3 {
                 if modifiers > 1 {
@@ -154,6 +156,7 @@ extension NSEvent.SpecialKey {
 
     private var tildeNumber: Int? {
         switch self {
+        case .help: 2
         case .deleteForward: 3
         case .pageUp: 5
         case .pageDown: 6
@@ -166,6 +169,14 @@ extension NSEvent.SpecialKey {
         case .f10: 21
         case .f11: 23
         case .f12: 24
+        case .f13: 25
+        case .f14: 26
+        case .f15: 28
+        case .f16: 29
+        case .f17: 31
+        case .f18: 32
+        case .f19: 33
+        case .f20: 34
         default: nil
         }
     }
