@@ -313,6 +313,28 @@ struct TerminalContentViewTests {
         #expect(abs(color.blueComponent - 33 / 255) < 0.02)
     }
 
+    @Test func drawsTheBackgroundColorWithoutASeamBetweenRuns() async throws {
+        let view = try await drawnView(running: "printf '\\033[44m        \\033[31m        \\033[m'")
+        #expect(view.cellSize.width != view.cellSize.width.rounded())
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let fill = color(in: try representation(of: view), at: center)
+        let edge = CGRect(x: 4 + view.cellSize.width * 8 - 2, y: center.y, width: 4, height: 1)
+        #expect(try pixels(in: edge, of: view).allSatisfy { isClose($0, to: fill) })
+    }
+
+    @Test func drawsTheSelectionWithoutASeamAtItsEdge() async throws {
+        let view = try await drawnView(running: "printf '        \\033[44m        \\033[m'")
+        view.selection = TerminalContentView.Selection(
+            anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 8))
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let representation = try representation(of: view)
+        let selected = color(in: representation, at: center)
+        let fill = color(in: representation, at: CGPoint(x: center.x + view.cellSize.width * 12, y: center.y))
+        let edge = CGRect(x: 4 + view.cellSize.width * 8 - 2, y: center.y, width: 4, height: 1)
+        #expect(!isClose(selected, to: fill))
+        #expect(try pixels(in: edge, of: view).allSatisfy { isClose($0, to: selected) || isClose($0, to: fill) })
+    }
+
     @Test func drawsTheScrollback() async throws {
         let session = TerminalSession(running: "printf '\\033[41m  \\033[m'; seq 1 30")
         let view = TerminalContentView(session: session)
