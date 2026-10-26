@@ -43,7 +43,7 @@ extension TerminalContentView {
         let resolved = url.resolvingSymlinksInPath()
         let path = resolved.path(percentEncoded: false)
         var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
+        guard Terminal.isLocal(url), FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
             return nil
         }
         let launches =
