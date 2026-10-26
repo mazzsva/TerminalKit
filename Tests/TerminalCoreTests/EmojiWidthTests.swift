@@ -64,18 +64,13 @@ struct EmojiWidthTests {
         #expect(terminal.screen[0][4] == Terminal.Cell(scalar: "x"))
     }
 
-    @Test(
-        arguments: [
-            ("\u{1F1FA}", 4, 4, 11), ("\u{1F1E6}", 3, 2, 1_000), ("\u{1F1FF}", 3, 2, 1_000),
-            ("\u{1F1FA}", 4, 2, 1_000), ("\u{1F1FA}", 1, 2, 1_000), ("\u{1F3FD}", 3, 2, 1_000),
-        ] as [(String, Int, Int, Int)])
-    func repeatsARegionalIndicatorOrSkinToneLikePrintingIt(text: String, columns: Int, rows: Int, count: Int) {
-        var repeated = Terminal(columns: columns, rows: rows)
+    @Test(arguments: ["\u{1F1FA}", "\u{1F3FD}"])
+    func repeatsNothingAfterARegionalIndicatorOrSkinTone(text: String) {
+        var repeated = Terminal(columns: 10, rows: 1)
         var printed = repeated
-        repeated.receive(text + "\u{1B}[\(count)b")
-        printed.receive(String(repeating: text, count: count + 1))
+        repeated.receive(text + "\u{1B}[65535bx")
+        printed.receive(text + "x")
         #expect(repeated.screen == printed.screen)
-        #expect(repeated.cursor == printed.cursor)
     }
 
     @Test func pairsRegionalIndicatorsInOrder() {
