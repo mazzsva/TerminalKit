@@ -40,7 +40,11 @@ extension TerminalSession.Configuration {
     @usableFromInline
     static func terminalEnvironment(inheriting environment: [String: String]) -> [String: String] {
         var environment = environment
-        for name in ["TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID"] {
+        for name in [
+            "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID", "TMUX", "TMUX_PANE", "STY", "LC_TERMINAL",
+            "LC_TERMINAL_VERSION", "ITERM_SESSION_ID", "ITERM_PROFILE", "KITTY_WINDOW_ID", "KITTY_PID", "COLORFGBG",
+            "COLUMNS", "LINES", "TERMINFO", "CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION",
+        ] {
             environment[name] = nil
         }
         environment["TERM"] = "xterm-256color"
