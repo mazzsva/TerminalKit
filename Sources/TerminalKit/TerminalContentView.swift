@@ -16,6 +16,7 @@ final class TerminalContentView: NSView {
         didSet {
             fonts = Fonts(font)
             cellSize = Self.cellSize(of: font)
+            updateHoveredLink()
             enclosingScrollView?.needsLayout = true
             needsDisplay = true
         }
@@ -67,6 +68,7 @@ final class TerminalContentView: NSView {
     }
     var ringBell = { NSSound.beep() }
     var currentDate = { Date() }
+    var currentModifierFlags = { NSEvent.modifierFlags }
     var performLinkAction = performWithWorkspace
     var hoveredLink: Link? {
         didSet {
@@ -74,6 +76,7 @@ final class TerminalContentView: NSView {
                 return
             }
             needsDisplay = true
+            toolTip = hoveredLink?.toolTip
         }
     }
     var hoveredLinkRevision = 0
@@ -86,6 +89,7 @@ final class TerminalContentView: NSView {
     private(set) var fonts = Fonts(defaultFont)
     private var keyDownEvent: NSEvent?
     private var bellTask: Task<Void, Never>?
+    private var flagsMonitor: Any?
     private var lastBellDate: Date?
 
     private struct Colors {
@@ -244,11 +248,17 @@ final class TerminalContentView: NSView {
         windowKeyStateDidChange()
         bellTask?.cancel()
         bellTask = nil
+        flagsMonitor.map(NSEvent.removeMonitor)
+        flagsMonitor = nil
         if window != nil {
             bellTask = Task { [weak self, session] in
                 for await _ in Observations({ session.bellCount }).dropFirst() {
                     self?.bellDidRing()
                 }
+            }
+            flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+                self?.updateHoveredLink()
+                return event
             }
         }
     }
@@ -387,7 +397,10 @@ final class TerminalContentView: NSView {
             }
         }
 
-        if let hoveredLink, hoveredLinkRevision == session.revision {
+        if hoveredLinkRevision != session.revision {
+            updateHoveredLink()
+        }
+        if let hoveredLink {
             colors.foreground.setFill()
             for span in hoveredLink.spans {
                 let rect = rect(row: span.row, columns: span.columns)

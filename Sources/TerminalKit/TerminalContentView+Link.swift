@@ -10,6 +10,7 @@ extension TerminalContentView {
 
         var url: URL
         var spans: [Span]
+        var toolTip: String?
     }
 
     enum LinkAction: Equatable {
@@ -132,7 +133,7 @@ extension TerminalContentView {
                     columns: cells[0].column ..< cells[cells.count - 1].column + Int(cells[cells.count - 1].cell.width))
             }
             .sorted { $0.row < $1.row }
-        return Link(url: url, spans: spans)
+        return Link(url: url, spans: spans, toolTip: cells[index].cell.style.link > 0 ? url.absoluteString : nil)
     }
 
     static func detectedLinks(in text: String) -> [Range<Int>] {
@@ -195,6 +196,12 @@ extension TerminalContentView {
         hoveredLinkRevision = session.revision
         if hoveredLink != oldValue {
             updatePointer()
+        }
+    }
+
+    func updateHoveredLink() {
+        if hoveredLink != nil {
+            updateHoveredLink(at: window?.mouseLocationOutsideOfEventStream, modifierFlags: currentModifierFlags())
         }
     }
 
