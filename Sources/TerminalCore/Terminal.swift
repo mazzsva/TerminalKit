@@ -385,8 +385,10 @@ package struct Terminal: Sendable {
         case "@":
             insertCharacters(count)
         case "b":
-            if let lastCharacter {
-                repeatCharacter(lastCharacter, count: repeatCount(count, of: lastCharacter))
+            if let lastCharacter, !lastCharacter.properties.isEmojiModifier,
+                !("\u{1F1E6}" ... "\u{1F1FF}").contains(lastCharacter)
+            {
+                repeatCharacter(lastCharacter, count: count)
             }
         case "P":
             deleteCharacters(count)
@@ -429,6 +431,10 @@ package struct Terminal: Sendable {
         if !scalar.isASCII, scalar.properties.isEmoji, combine(scalar) {
             return
         }
+        place(scalar)
+    }
+
+    private mutating func place(_ scalar: Unicode.Scalar) {
         lastCharacter = scalar
         let width = columns > 1 ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
@@ -480,36 +486,39 @@ package struct Terminal: Sendable {
     }
 
     private mutating func repeatCharacter(_ scalar: Unicode.Scalar, count: Int) {
-        var remaining = count
-        if scalar.width == 1, scalar.isASCII || !scalar.properties.isEmoji {
-            while remaining > 0, !isWrapPending {
+        print(scalar)
+        let width = columns > 1 ? scalar.width : 1
+        let rowCount = columns / width
+        guard usesAutowrap else {
+            for _ in 0 ..< min(count - 1, rowCount + 2) {
                 print(scalar)
-                remaining -= 1
             }
-            var line = Line(repeatElement(Cell(scalar: scalar, style: style), count: columns))
-            while remaining >= columns {
-                print(scalar)
-                line.isWrapped = screen[cursor.row].isWrapped
-                screen[cursor.row] = line
-                cursor.column = columns - 1
-                isWrapPending = true
-                remaining -= columns
+            return
+        }
+        let screenCount = (2 * rows - cursor.row) * rowCount
+        var remaining = count - 1 <= screenCount ? count - 1 : screenCount + (count - 1 - screenCount) % rowCount
+        while remaining > 0, !isWrapPending, cursor.column + width <= columns {
+            place(scalar)
+            remaining -= 1
+        }
+        let cells = [Cell(scalar: scalar, style: style, width: UInt8(width)), Cell(style: style, width: 0)]
+        var line = Line((0 ..< columns).map { cells[$0 % width] })
+        while remaining >= rowCount {
+            place(scalar)
+            if columns % width != 0 {
+                let end = screen[cursor.row][usesInsertMode ? 2 : columns - 1]
+                let isBroken = usesInsertMode ? end.width == 2 : screen[cursor.row][columns - 2].width == 2
+                line[columns - 1] = isBroken ? blank : end
             }
+            line.isWrapped = screen[cursor.row].isWrapped
+            screen[cursor.row] = line
+            cursor.column = columns - 1
+            isWrapPending = columns % width == 0
+            remaining -= rowCount
         }
         for _ in 0 ..< remaining {
-            print(scalar)
+            place(scalar)
         }
-    }
-
-    private func repeatCount(_ count: Int, of scalar: Unicode.Scalar) -> Int {
-        var rowCount = max(columns / scalar.width, 1)
-        if scalar.properties.isEmojiModifier {
-            rowCount *= Self.maximumScalarsPerCell
-        } else if ("\u{1F1E6}" ... "\u{1F1FF}").contains(scalar) {
-            rowCount = columns + columns % 2
-        }
-        let screenCount = (rows + 1) * rowCount
-        return count <= screenCount ? count : screenCount + (count - screenCount) % rowCount
     }
 
     @discardableResult

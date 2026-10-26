@@ -290,7 +290,7 @@ struct TerminalTests {
 
     @Test(arguments: [
         (4, 3, "a"), (5, 2, "中"), (1, 3, "中"), (7, 1, "x"), (3, 4, "é"), (2, 2, "b"), (6, 3, "\u{1B}(0q"),
-        (1, 3, "a"),
+        (1, 3, "a"), (4, 3, "中"), (6, 2, "\u{1F44D}"), (5, 3, "\u{1F44D}"), (3, 2, "\u{A9}"),
     ])
     func repeatsLikePrintingTheCharacter(columns: Int, rows: Int, character: String) {
         for start in ["", "\u{1B}[2;3H", "\u{1B}[2;3r\u{1B}[1;2H", "\u{1B}[?7l", "\u{1B}[4h\u{1B}[1;2H"] {
@@ -342,6 +342,81 @@ struct TerminalTests {
             repeated.receive("w")
             printed.receive("w")
             #expect(repeated.screen == printed.screen)
+        }
+    }
+
+    @Test(arguments: ["中", "\u{1F44D}"])
+    func repeatsAWideCharacterOverOldTextLikePrintingIt(character: String) {
+        for start in ["", "\u{1B}[4h", "\u{1B}[41m"] {
+            for count in 1 ... 40 {
+                var repeated = Terminal(columns: 5, rows: 4)
+                repeated.receive("abcde\r\nabc中\r\n中中x\r\nab中\u{1B}[H\(start)")
+                var printed = repeated
+                repeated.receive(character + "\u{1B}[\(count)b")
+                printed.receive(String(repeating: character, count: count + 1))
+                #expect(repeated.screen == printed.screen)
+                #expect(repeated.cursor == printed.cursor)
+                if count <= 16 {
+                    #expect(repeated.scrollback == printed.scrollback)
+                }
+            }
+        }
+    }
+
+    @Test func repeatsLikePrintingAfterCursorMovesAndModeChanges() {
+        var state: UInt64 = 17
+        func random(_ range: ClosedRange<Int>) -> Int {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return range.lowerBound + Int((state >> 33) % UInt64(range.count))
+        }
+        let prefixes = [
+            "a", "中", "\u{1F44D}", "\u{A9}", "ab中", "\r\n", "\u{1B}[41m", "\u{1B}[0m", "\u{1B}[2;4r", "\u{1B}[r",
+            "\u{1B}[3;2H", "\u{1B}[K", "\u{1B}[4h", "\u{1B}[4l", "\u{1B}[?7l", "\u{1B}[?7h", "x\u{200D}",
+            "\u{1B}[1;3H\u{A9}\u{200D}",
+        ]
+        let suffixes = [
+            "\u{200D}", "\u{1B}7", "\u{1B}8", "\r", "\u{1B}[1;2H", "\u{1B}[H", "\u{1B}[?7l", "\u{1B}[?7h", "\u{1B}[4h",
+            "\u{1B}[4l", "\u{1B}[2;3r", "\u{1B}[41m", "\u{1B}[3C", "\u{1B}[2D", "\n", "\u{FE0F}",
+        ]
+        let characters = ["a", "\u{E9}", "中", "\u{1F44D}", "\u{A9}"]
+        for _ in 0 ..< 3_000 {
+            var repeated = Terminal(columns: random(1 ... 9), rows: random(1 ... 5))
+            let character = characters[random(0 ... characters.count - 1)]
+            let prefix = (0 ..< random(0 ... 10)).map { _ in prefixes[random(0 ... prefixes.count - 1)] }.joined()
+            let suffix = (0 ..< random(0 ... 5)).map { _ in suffixes[random(0 ... suffixes.count - 1)] }.joined()
+            let count = random(0 ... 9) == 0 ? random(61 ... 400) : random(1 ... 60)
+            repeated.receive(prefix + "\r" + character + suffix)
+            var printed = repeated
+            repeated.receive("\u{1B}[\(count)b")
+            printed.receive(String(repeating: character, count: count))
+            #expect(repeated.screen == printed.screen)
+            #expect(repeated.cursor == printed.cursor)
+        }
+    }
+
+    @Test(arguments: ["a", "中", "\u{1F44D}"])
+    func repeatsWithoutAutowrapLikePrintingIt(character: String) {
+        for columns in 1 ... 6 {
+            for start in ["", "a中b中c", "\u{1B}[4ha中b"] {
+                for count in 1 ... 12 {
+                    var repeated = Terminal(columns: columns, rows: 2)
+                    repeated.receive("\u{1B}[?7l" + start + "\u{1B}[H")
+                    var printed = repeated
+                    repeated.receive(character + "\u{1B}[\(count)b")
+                    printed.receive(String(repeating: character, count: count + 1))
+                    #expect(repeated.screen == printed.screen)
+                    #expect(repeated.cursor == printed.cursor)
+                }
+            }
+        }
+    }
+
+    @Test(arguments: ["a", "中", "\u{1F44D}"])
+    func repeatsQuicklyAfterAnyCharacter(character: String) {
+        for start in ["", "\u{1B}[?7l", "\u{1B}[4h"] {
+            var terminal = Terminal(columns: 201, rows: 80)
+            terminal.receive(start + character + String(repeating: "\u{1B}[H\u{1B}[65535b", count: 500))
+            #expect(terminal.character(of: terminal.screen[0][0]) == Character(character))
         }
     }
 
