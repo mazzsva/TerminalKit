@@ -422,6 +422,62 @@ struct TerminalTests {
         #expect(lines(terminal) == ["é   "])
     }
 
+    @Test func softResetsTheModes() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?1h\u{1B}[?25l\u{1B}[5 q\u{1B}[!p")
+        #expect(!terminal.usesApplicationCursorKeys)
+        #expect(terminal.isCursorVisible)
+        #expect(terminal.cursorShape == .block)
+    }
+
+    @Test func softResetsInsertMode() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("abc\r\u{1B}[4h\u{1B}[!px")
+        #expect(lines(terminal) == ["xbc "])
+    }
+
+    @Test func softResetsAutowrap() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("\u{1B}[?7l\u{1B}[!pabc")
+        #expect(lines(terminal) == ["ab", "c "])
+    }
+
+    @Test func softResetsTheScrollRegion() {
+        var terminal = Terminal(columns: 1, rows: 3)
+        terminal.receive("1\r\n2\r\n3\u{1B}[1;2r\u{1B}[!p\u{1B}[3H\nX")
+        #expect(lines(terminal) == ["2", "3", "X"])
+    }
+
+    @Test func softResetsTheStyle() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[1;7;31m\u{1B}[!pa")
+        #expect(terminal.screen[0][0].style == Terminal.Style())
+    }
+
+    @Test func softResetsTheGraphicsCharacters() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}(0\u{1B}[!pq")
+        #expect(lines(terminal) == ["q   "])
+    }
+
+    @Test func softResetsTheSavedCursor() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[1m\u{1B}(0\u{1B}7\u{1B}[!p\u{1B}[4m\u{1B}(0\r\n\u{1B}8xq")
+        #expect(lines(terminal) == ["xq  ", "    "])
+        #expect(terminal.screen[0][0].style == Terminal.Style())
+    }
+
+    @Test func keepsTheScreenOnASoftReset() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("a\r\nb\r\nc\u{1B}[!p")
+        #expect(lines(terminal) == ["b   ", "c   "])
+        #expect(scrollback(terminal) == ["a"])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+        terminal.receive("\u{1B}[?1049h\u{1B}[>1u\u{1B}[!p")
+        #expect(terminal.isAlternateScreenActive)
+        #expect(terminal.usesDisambiguatedKeys)
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")

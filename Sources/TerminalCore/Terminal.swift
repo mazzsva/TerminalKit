@@ -328,6 +328,10 @@ package struct Terminal: Sendable {
             reportMode(sequence.parameter(at: 0, default: 0), isPrivate: sequence.privateMarker == "?")
             return
         }
+        if sequence.privateMarker == nil, sequence.intermediates == "!", sequence.final == "p" {
+            softReset()
+            return
+        }
         guard sequence.intermediates.isEmpty else {
             return
         }
@@ -797,6 +801,18 @@ package struct Terminal: Sendable {
         terminal.decoder = decoder
         terminal.replies = replies
         self = terminal
+    }
+
+    private mutating func softReset() {
+        usesInsertMode = false
+        usesApplicationCursorKeys = false
+        usesAutowrap = true
+        isCursorVisible = true
+        cursorShape = .block
+        scrollRegion = 0 ..< rows
+        style = Style()
+        usesLineDrawing = false
+        savedCursor = SavedCursor()
     }
 
     private mutating func moveForward(tabStops count: Int) {
