@@ -467,6 +467,8 @@ struct TerminalTests {
         ("D", Terminal.Position(row: 4, column: 2)),
         ("E", Terminal.Position(row: 6, column: 0)),
         ("F", Terminal.Position(row: 2, column: 0)),
+        ("a", Terminal.Position(row: 4, column: 6)),
+        ("e", Terminal.Position(row: 6, column: 4)),
     ])
     func movesTheCursorRelativeToItsPosition(final: String, position: Terminal.Position) {
         var terminal = Terminal(columns: 10, rows: 10)
@@ -479,6 +481,7 @@ struct TerminalTests {
         ("B", 2, 4), ("B", 4, 4), ("B", 0, 4), ("B", 5, 5),
         ("F", 3, 1), ("F", 5, 1), ("F", 0, 0),
         ("E", 2, 4), ("E", 0, 4), ("E", 5, 5),
+        ("e", 2, 4), ("e", 0, 4), ("e", 5, 5),
     ])
     func stopsTheCursorAtTheMarginsOfTheScrollRegion(final: String, row: Int, stop: Int) {
         var terminal = Terminal(columns: 10, rows: 6)
@@ -507,6 +510,7 @@ struct TerminalTests {
         ("\u{1B}[3H", Terminal.Position(row: 2, column: 0)),
         ("\u{1B}[;5H", Terminal.Position(row: 0, column: 4)),
         ("\u{1B}[5G", Terminal.Position(row: 1, column: 4)),
+        ("\u{1B}[5`", Terminal.Position(row: 1, column: 4)),
         ("\u{1B}[5d", Terminal.Position(row: 4, column: 1)),
         ("\u{1B}[99;99H", Terminal.Position(row: 9, column: 9)),
     ])
@@ -521,6 +525,7 @@ struct TerminalTests {
         ("\u{1B}[0K", "ab  "),
         ("\u{1B}[1K", "   d"),
         ("\u{1B}[2K", "    "),
+        ("\u{1B}[?1K", "   d"),
     ])
     func erasesInLine(sequence: String, line: String) {
         var terminal = Terminal(columns: 4, rows: 2)
@@ -540,6 +545,7 @@ struct TerminalTests {
         ("\u{1B}[0J", ["abcd", "e   ", "    "]),
         ("\u{1B}[1J", ["    ", "  gh", "ijkl"]),
         ("\u{1B}[2J", ["    ", "    ", "    "]),
+        ("\u{1B}[?J", ["abcd", "e   ", "    "]),
     ])
     func erasesInDisplay(sequence: String, screen: [String]) {
         var terminal = Terminal(columns: 4, rows: 3)
@@ -769,6 +775,12 @@ struct TerminalTests {
     @Test func restoresTheSavedCursorWithAControlSequence() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("ab\u{1B}[scd\r\n\u{1B}[ux")
+        #expect(lines(terminal) == ["abxd", "    "])
+    }
+
+    @Test func restoresTheSavedCursorWithAMode() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[?1048hcd\r\n\u{1B}[?1048lx")
         #expect(lines(terminal) == ["abxd", "    "])
     }
 
