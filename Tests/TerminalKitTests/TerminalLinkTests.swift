@@ -199,6 +199,32 @@ struct TerminalLinkTests {
         #expect(window.contentView === view)
     }
 
+    @Test func keepsTheUnderlineDuringOutput() async throws {
+        let session = TerminalSession(
+            running: "printf 'https://a.com'; read x; printf '\\033[3;1Hz'; read x; printf '\\033[H\\033[2@ab'"
+        )
+        session.resize(columns: 20, rows: 4)
+        let view = TerminalContentView(session: session)
+        let window = MouseWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.currentModifierFlags = { .command }
+        try session.start()
+        await session.waitForText("a.com")
+        window.mouseLocation = view.convert(view.rect(row: 0, columns: 4 ..< 5).center, to: nil)
+        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
+        session.send(Array("\r".utf8))
+        await session.waitForText("z")
+        view.display()
+        #expect(view.hoveredLink?.spans == [.init(row: 0, columns: 0 ..< 13)])
+        session.send(Array("\r".utf8))
+        await session.waitForText("abhttps")
+        let underlined = try image(of: view)
+        #expect(view.hoveredLink?.spans == [.init(row: 0, columns: 2 ..< 15)])
+        view.mouseExited(with: try mouseEvent(.mouseMoved, row: 0, column: 4, in: view))
+        #expect(try image(of: view) != underlined)
+        #expect(window.contentView === view)
+    }
+
     @Test func updatesTheTargetAfterAScroll() async throws {
         let session = TerminalSession(
             running:
