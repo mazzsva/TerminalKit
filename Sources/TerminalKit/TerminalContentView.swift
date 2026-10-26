@@ -316,11 +316,7 @@ final class TerminalContentView: NSView {
             return
         }
         scrollToBottom()
-        if let input = event.wordMovementInput {
-            session.send(input)
-            return
-        }
-        if let input = keyInput {
+        if let input = keyInput ?? event.wordMovementInput {
             session.send(input)
             return
         }

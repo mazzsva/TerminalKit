@@ -86,7 +86,7 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func sendsShiftReturnWithTheKittyProtocol() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 29 | od -An -tx1")
+            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 37 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -100,8 +100,9 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option))
         view.keyDown(with: try keyDown("\r"))
         let lines = await session.linesAfterExit()
-        #expect(lines.contains("1b  5b  31  33  3b  32  75  1b  62  1b  66  1b  5b  39  39  3b"))
-        #expect(lines.contains("35  75  03  c3  a5  1b  5b  39  37  3b  33  75  0d"))
+        #expect(lines.contains("1b  5b  31  33  3b  32  75  1b  5b  31  3b  33  44  1b  5b  31"))
+        #expect(lines.contains("3b  33  43  1b  5b  39  39  3b  35  75  03  c3  a5  1b  5b  39"))
+        #expect(lines.contains("37  3b  33  75  0d"))
     }
 
     @Test func sendsCommandKeysWithTheKittyProtocol() async throws {

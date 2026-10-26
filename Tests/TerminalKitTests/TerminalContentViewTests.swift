@@ -626,6 +626,17 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains(bytes))
     }
 
+    @Test func sendsTheOptionArrowsAsWordMovement() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown(NSLeftArrowFunctionKey, modifierFlags: .option))
+        view.keyDown(with: try keyDown(NSRightArrowFunctionKey, modifierFlags: .option))
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("1b  62  1b  66  78"))
+    }
+
     @Test func sendsControlKeysThatTheInputSystemDrops() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
         let view = TerminalContentView(session: session)
