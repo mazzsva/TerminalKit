@@ -78,6 +78,16 @@ extension TerminalContentView {
                 session.send(Array((cursorKey + (lines > 0 ? "A" : "B")).utf8))
             }
         }
+        guard terminal.mouseTracking != .off else {
+            return
+        }
+        scrollWheelColumns +=
+            event.hasPreciseScrollingDeltas ? event.scrollingDeltaX / cellSize.width : event.scrollingDeltaX
+        let columns = Int(scrollWheelColumns)
+        scrollWheelColumns -= CGFloat(columns)
+        for _ in 0 ..< abs(columns) {
+            reportMouse(event, button: columns > 0 ? 66 : 67)
+        }
     }
 
     func reportsMouse(for event: NSEvent) -> Bool {
