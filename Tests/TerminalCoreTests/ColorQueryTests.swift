@@ -22,6 +22,13 @@ struct ColorQueryTests {
         #expect(terminal.receive("\u{1B}]11;?;?\u{7}") == backgroundReply)
     }
 
+    @Test func reportsTheSwappedColorsInReverseVideo() {
+        var terminal = coloredTerminal()
+        #expect(
+            terminal.receive("\u{1B}[?5h\u{1B}]10;?;?\u{7}")
+                == "\u{1B}]10;rgb:ffff/fefe/0000\u{1B}\\\u{1B}]11;rgb:0001/abcd/1234\u{1B}\\")
+    }
+
     @Test func reportsTheColorsBeforeTheDeviceAttributes() {
         var terminal = coloredTerminal()
         #expect(terminal.receive("\u{1B}]11;?\u{7}\u{1B}[c") == backgroundReply + "\u{1B}[?1;2c")

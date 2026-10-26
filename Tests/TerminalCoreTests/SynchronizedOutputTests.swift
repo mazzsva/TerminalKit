@@ -74,6 +74,7 @@ struct SynchronizedOutputTests {
     @Test(arguments: [
         ("", "2"), ("\u{1B}[?2026h", "1"), ("\u{1B}[?1h", "1"), ("\u{1B}[?7l", "2"), ("\u{1B}[?25l", "2"),
         ("\u{1B}[?2004h", "1"), ("\u{1B}[?1049h", "1"), ("\u{1B}[?1006h", "1"), ("\u{1B}[?1004h", "1"),
+        ("\u{1B}[?5h", "1"),
     ])
     func reportsAPrivateMode(setup: String, status: String) {
         var terminal = Terminal(columns: 4, rows: 1)
@@ -87,7 +88,7 @@ struct SynchronizedOutputTests {
     @Test(arguments: [
         ("\u{1B}[?1000h", [1000: "1", 1002: "2"]), ("\u{1B}[?1002h", [1000: "2", 1002: "1", 1003: "2"]),
         ("\u{1B}[?1003h", [1000: "2", 1002: "2", 1003: "1"]), ("\u{1B}[?47h", [47: "1", 1047: "1", 1049: "1"]),
-        ("", [47: "2", 1047: "2", 1049: "2", 7: "1", 25: "1", 1: "2", 1004: "2", 9999: "0", 0: "0"]),
+        ("", [47: "2", 1047: "2", 1049: "2", 7: "1", 25: "1", 1: "2", 1004: "2", 5: "2", 9999: "0", 0: "0"]),
     ])
     func reportsTheTrackedModes(setup: String, statuses: [Int: String]) {
         var terminal = Terminal(columns: 4, rows: 1)

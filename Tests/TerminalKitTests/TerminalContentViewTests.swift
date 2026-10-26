@@ -382,6 +382,110 @@ struct TerminalContentViewTests {
         #expect(color(in: representation, at: center) != color(in: representation, at: CGPoint(x: 190, y: 90)))
     }
 
+    @Test func drawsInReverseVideo() async throws {
+        let view = try await drawnView(
+            running:
+                "printf '\\033[?5h\\033[41m \\033[0;7m \\033[0;40m \\033[0;47m \\033[0;107m \\033[m\u{2588}\\033[7m\u{2588}\\033[0;100m \\033[?25l'"
+        )
+        var palette = TerminalPalette.standard
+        palette.foreground = Color(.sRGB, red: 0.2, green: 0.3, blue: 0.4)
+        palette.background = Color(.sRGB, red: 0.6, green: 0.7, blue: 0.8)
+        view.palette = palette
+        view.setMarkedText(
+            " \u{2588}",
+            selectedRange: NSRange(location: 2, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        let representation = try representation(of: view)
+        let points = (0 ..< 10)
+            .map { CGPoint(x: 4 + view.cellSize.width * (CGFloat($0) + 0.5), y: 4 + view.cellSize.height / 2) }
+        #expect(isClose(color(in: representation, at: points[0]), to: [194.0 / 255, 54.0 / 255, 33.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[1]), to: [0.6, 0.7, 0.8]))
+        #expect(isClose(color(in: representation, at: points[2]), to: [203.0 / 255, 204.0 / 255, 205.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[3]), to: [0, 0, 0]))
+        #expect(isClose(color(in: representation, at: points[4]), to: [129.0 / 255, 131.0 / 255, 131.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[5]), to: [0.6, 0.7, 0.8]))
+        #expect(isClose(color(in: representation, at: points[6]), to: [0.2, 0.3, 0.4]))
+        #expect(isClose(color(in: representation, at: points[7]), to: [233.0 / 255, 235.0 / 255, 235.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[8]), to: [0.2, 0.3, 0.4]))
+        #expect(isClose(color(in: representation, at: points[9]), to: [0.6, 0.7, 0.8]))
+        #expect(isClose(color(in: representation, at: CGPoint(x: 190, y: 90)), to: [0.2, 0.3, 0.4]))
+    }
+
+    @Test(arguments: [NSAppearance.Name.aqua, .darkAqua])
+    func drawsTheCursorInReverseVideo(appearance: NSAppearance.Name) async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[?5h'")
+        view.appearance = NSAppearance(named: appearance)
+        let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
+        let edge = CGPoint(x: view.cursorRect.minX + 0.5, y: view.cursorRect.midY)
+        let corner = CGPoint(x: 190, y: 90)
+        let focused = try representation(of: view)
+        #expect(!isClose(color(in: focused, at: center), to: color(in: focused, at: corner)))
+
+        window.isKey = false
+        let unfocused = try representation(of: view)
+        #expect(!isClose(color(in: unfocused, at: edge), to: color(in: unfocused, at: corner)))
+    }
+
+    @Test(arguments: [
+        (Color(.sRGB, red: 0.2, green: 0.3, blue: 0.4).opacity(0.5), "102;128;153"),
+        (Color(.sRGB, red: 1, green: 0.5, blue: 0), "255;128;0"),
+    ])
+    func drawsTheCursorColorInReverseVideo(cursor: Color, background: String) async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[?5h\\033[48;2;\(background)m \\033[m'")
+        var palette = TerminalPalette.standard
+        palette.foreground = Color(.sRGB, red: 0.2, green: 0.3, blue: 0.4)
+        palette.background = Color(.sRGB, red: 0.6, green: 0.7, blue: 0.8)
+        palette.cursor = cursor
+        view.palette = palette
+        let representation = try representation(of: view)
+        let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
+        let cell = CGPoint(x: center.x - view.cellSize.width, y: center.y)
+        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: cell)))
+        #expect(window.firstResponder === view)
+    }
+
+    @Test func drawsTheCursorInTheBackgroundColor() async throws {
+        let (view, window) = try await focusedView(running: "exit")
+        var palette = TerminalPalette.standard
+        palette.cursor = palette.background
+        view.palette = palette
+        let representation = try representation(of: view)
+        let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
+        let corner = CGPoint(x: 190, y: 90)
+        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: corner)))
+        #expect(window.firstResponder === view)
+    }
+
+    @Test func drawsTheTextUnderTheCursorInReverseVideo() async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[?5h\u{2588}\\r'")
+        let representation = try representation(of: view)
+        let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
+        let corner = CGPoint(x: 190, y: 90)
+        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: corner)))
+        #expect(window.firstResponder === view)
+    }
+
+    @Test func drawsTheTextUnderTheCursorOnAColorInReverseVideo() async throws {
+        let (view, window) = try await focusedView(
+            running: "printf '\\033[?5h\\033[40m\u{2588}\\033[0;30m\u{2588}\\r'")
+        let representation = try representation(of: view)
+        let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
+        let cell = CGPoint(x: center.x + view.cellSize.width, y: center.y)
+        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: cell)))
+        #expect(window.firstResponder === view)
+    }
+
+    @Test func underlinesTheHoveredLinkInReverseVideo() async throws {
+        let view = try await drawnView(running: "printf '\\033[?5hhttps://example.com'")
+        let rect = view.rect(row: 0, columns: 0 ..< 1)
+        view.updateHoveredLink(at: view.convert(CGPoint(x: rect.midX, y: rect.midY), to: nil), modifierFlags: .command)
+        let representation = try representation(of: view)
+        let underline = color(in: representation, at: CGPoint(x: rect.midX, y: rect.maxY - 0.5))
+        #expect(view.hoveredLink != nil)
+        #expect(!isClose(underline, to: color(in: representation, at: CGPoint(x: 190, y: 90))))
+    }
+
     @Test func hidesHiddenText() async throws {
         let blank = try image(of: try await drawnView(running: "printf ' \\r'"))
         let hidden = try image(of: try await drawnView(running: "printf '\\033[8mX\\r'"))
