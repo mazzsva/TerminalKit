@@ -32,6 +32,20 @@ struct TerminalSessionControlTests {
         #expect(session.state == .exited(.uncaughtSignal(SIGKILL)))
     }
 
+    @Test func killsAProcessThatIgnoresTheHangUpWhenReleased() async throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        var session: TerminalSession? = TerminalSession(
+            running: "trap '' HUP; /bin/sleep 120 & echo $! > '\(file.path(percentEncoded: false))'; echo ready; wait")
+        try session?.start()
+        await session?.waitForText("ready")
+        let childIdentifier = try #require(
+            pid_t(String(contentsOf: file, encoding: .utf8).trimmingCharacters(in: .newlines)))
+        session = nil
+        while kill(childIdentifier, 0) == 0 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
     @Test func terminatesAnInteractiveShell() async throws {
         let session = TerminalSession(
             configuration: .init(
