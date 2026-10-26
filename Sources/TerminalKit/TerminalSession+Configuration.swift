@@ -6,6 +6,7 @@ extension TerminalSession {
         public var arguments: [String]
         public var environment: [String: String]
         public var currentDirectoryURL: URL?
+        var isLoginShell = false
 
         public init(
             executableURL: URL,
@@ -24,11 +25,13 @@ extension TerminalSession {
 
 extension TerminalSession.Configuration {
     public static var loginShell: Self {
-        loginShell(inheriting: ProcessInfo.processInfo.environment)
+        var configuration = loginShell(inheriting: ProcessInfo.processInfo.environment)
+        configuration.isLoginShell = true
+        return configuration
     }
 
     public static func loginShell(running command: [String]) -> Self {
-        var configuration = loginShell
+        var configuration = loginShell(inheriting: ProcessInfo.processInfo.environment)
         let words = command.map { "'" + $0.replacingOccurrences(of: "'", with: "'\\''", options: .literal) + "'" }
         configuration.arguments += ["-i", "-c", "exec -- " + words.joined(separator: " ")]
         return configuration

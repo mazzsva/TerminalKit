@@ -55,6 +55,8 @@ struct TerminalSessionTests {
         #expect(configuration.arguments == ["-l", "-i", "-c", "exec -- 'claude' '--resume' 'it'\\''s'"])
         #expect(configuration.environment == loginShell.environment)
         #expect(configuration.currentDirectoryURL == loginShell.currentDirectoryURL)
+        #expect(loginShell.isLoginShell)
+        #expect(!configuration.isLoginShell)
     }
 
     @Test func startsIdle() {
