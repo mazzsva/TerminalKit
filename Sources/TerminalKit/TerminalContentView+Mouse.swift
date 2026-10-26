@@ -12,6 +12,54 @@ extension TerminalContentView {
         }
     }
 
+    override func rightMouseDown(with event: NSEvent) {
+        if reportsMouse(for: event) {
+            reportMouse(event, button: 2)
+        } else {
+            super.rightMouseDown(with: event)
+        }
+    }
+
+    override func rightMouseDragged(with event: NSEvent) {
+        if reportsMouse(for: event) {
+            reportDrag(event, button: 34)
+        } else {
+            super.rightMouseDragged(with: event)
+        }
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        if reportsMouse(for: event) {
+            reportMouse(event, button: 2, isRelease: true)
+        } else {
+            super.rightMouseUp(with: event)
+        }
+    }
+
+    override func otherMouseDown(with event: NSEvent) {
+        if event.buttonNumber == 2, reportsMouse(for: event) {
+            reportMouse(event, button: 1)
+        } else {
+            super.otherMouseDown(with: event)
+        }
+    }
+
+    override func otherMouseDragged(with event: NSEvent) {
+        if event.buttonNumber == 2, reportsMouse(for: event) {
+            reportDrag(event, button: 33)
+        } else {
+            super.otherMouseDragged(with: event)
+        }
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        if event.buttonNumber == 2, reportsMouse(for: event) {
+            reportMouse(event, button: 1, isRelease: true)
+        } else {
+            super.otherMouseUp(with: event)
+        }
+    }
+
     override func scrollWheel(with event: NSEvent) {
         let terminal = session.liveTerminal
         guard terminal.mouseTracking != .off || terminal.isAlternateScreenActive else {
@@ -48,6 +96,12 @@ extension TerminalContentView {
             isRelease: isRelease
         ) {
             session.send(report)
+        }
+    }
+
+    func reportDrag(_ event: NSEvent, button: Int) {
+        if session.liveTerminal.mouseTracking != .clicks, mousePosition(of: event) != lastMousePosition {
+            reportMouse(event, button: button)
         }
     }
 
