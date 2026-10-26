@@ -673,9 +673,15 @@ package struct Terminal: Sendable {
     }
 
     private mutating func keepInScrollback(_ lines: ArraySlice<Line>) {
+        var previousLine: Line?
+        var keptLine = Line()
         for line in lines {
-            let end = line.isWrapped ? line.count : (line.lastIndex { !$0.isBlank } ?? -1) + 1
-            scrollback.append(end == line.count ? line : Line(line[..<end]))
+            if line != previousLine {
+                let end = line.isWrapped ? line.count : (line.lastIndex { !$0.isBlank } ?? -1) + 1
+                keptLine = end == line.count ? line : Line(line[..<end])
+                previousLine = line
+            }
+            scrollback.append(keptLine)
         }
         trimScrollback()
     }
@@ -997,9 +1003,8 @@ package struct Terminal: Sendable {
             eraseInLine(1)
         case 2:
             unwrapLine(before: 0)
-            for row in 0 ..< rows {
-                erase(0 ..< columns, row: row)
-            }
+            isWrapPending = false
+            screen = blankLines(rows)
         case 3:
             removedScrollbackCount += scrollback.count
             scrollback.removeAll()

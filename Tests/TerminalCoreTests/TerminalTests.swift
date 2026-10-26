@@ -548,6 +548,14 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
     }
 
+    @Test func erasesTheDisplayWithTheBackgroundColor() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("abcd\u{1B}[44m\u{1B}[2Jx")
+        #expect(lines(terminal) == ["  ", " x"])
+        #expect(terminal.screen.flatMap { $0.map(\.style.background) } == Array(repeating: .indexed(4), count: 4))
+        #expect(terminal.screen.map(\.isWrapped) == [false, false])
+    }
+
     @Test(arguments: ["0", "2"])
     func setsTheTitle(command: String) {
         var terminal = Terminal(columns: 4, rows: 2)
@@ -1161,6 +1169,19 @@ struct TerminalTests {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("ab\r\n\u{1B}[41m \u{1B}[m\r\nabcd\r\n")
         #expect(terminal.scrollback.map(\.count) == [2, 1, 4])
+    }
+
+    @Test func keepsTheBlankLinesThatScrollOffTheScreen() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("a\u{1B}[9S\u{1B}[44m\u{1B}[2H\u{1B}[K\u{1B}[9S\u{1B}[9S")
+        #expect(scrollback(terminal) == ["a", "", "", "  ", "  ", "  "])
+    }
+
+    @Test func keepsTheWrapOfEachLineThatScrollsOffTheScreen() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("a a \u{1B}[2S")
+        #expect(scrollback(terminal) == ["a ", "a"])
+        #expect(terminal.scrollback.map(\.isWrapped) == [true, false])
     }
 
     @Test func keepsTheLinesThatScrollOffAScrollRegionAtTheTop() {
