@@ -1271,6 +1271,20 @@ struct TerminalTests {
         #expect(terminal.character(of: terminal.screen[0][0]) == "x")
     }
 
+    @Test(arguments: ["\u{1B}[2:2H", "\u{1B}[4:1h", "\u{1B}[2:1J", "\u{1B}[1:2P"])
+    func ignoresColonsInOtherControlSequences(sequence: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[H" + sequence + "x")
+        #expect(lines(terminal) == ["xb  ", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+    }
+
+    @Test func ignoresAColonInACursorShapeSequence() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        terminal.receive("\u{1B}[5 q\u{1B}[2:1 q")
+        #expect(terminal.cursorShape == .bar)
+    }
+
     @Test func keepsTheCursorShapeOnTheAlternateScreen() {
         var terminal = Terminal(columns: 1, rows: 1)
         terminal.receive("\u{1B}[5 q\u{1B}[?1049h")

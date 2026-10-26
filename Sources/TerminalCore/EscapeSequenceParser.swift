@@ -10,6 +10,7 @@ struct EscapeSequenceParser: Sendable {
     struct ControlSequence: Equatable, Sendable {
         var privateMarker: Unicode.Scalar?
         var parameters: [Int]
+        var subparameters: Set<Int>
         var intermediates: String
         var final: Unicode.Scalar
 
@@ -40,6 +41,7 @@ struct EscapeSequenceParser: Sendable {
     private var intermediates = ""
     private var privateMarker: Unicode.Scalar?
     private var parameters: [Int] = []
+    private var subparameters: Set<Int> = []
     private var string: [Unicode.Scalar] = []
 
     mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
@@ -133,9 +135,12 @@ struct EscapeSequenceParser: Sendable {
         case "0" ... "9" where intermediates.isEmpty:
             let value = (parameters.popLast() ?? 0) * 10 + Int(scalar.value - 0x30)
             parameters.append(min(value, Self.maximumParameterValue))
-        case ";" where intermediates.isEmpty && parameters.count < Self.maximumParameters:
+        case ":" ... ";" where intermediates.isEmpty && parameters.count < Self.maximumParameters:
             if parameters.isEmpty {
                 parameters.append(0)
+            }
+            if scalar == ":" {
+                subparameters.insert(parameters.count)
             }
             parameters.append(0)
         case "<" ... "?" where intermediates.isEmpty && parameters.isEmpty && privateMarker == nil:
@@ -150,6 +155,7 @@ struct EscapeSequenceParser: Sendable {
                 ControlSequence(
                     privateMarker: privateMarker,
                     parameters: parameters,
+                    subparameters: subparameters,
                     intermediates: intermediates,
                     final: scalar
                 )
@@ -172,6 +178,7 @@ struct EscapeSequenceParser: Sendable {
         intermediates = ""
         privateMarker = nil
         parameters = []
+        subparameters = []
         string = []
     }
 

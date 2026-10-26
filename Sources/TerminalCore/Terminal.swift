@@ -319,6 +319,9 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
+        guard sequence.subparameters.isEmpty || sequence.final == "m" else {
+            return
+        }
         if sequence.privateMarker == nil, sequence.intermediates == " ", sequence.final == "q" {
             setCursorShape(sequence.parameter(at: 0, default: 0))
             return
@@ -409,7 +412,7 @@ package struct Terminal: Sendable {
         case "l" where sequence.parameters.contains(4):
             usesInsertMode = false
         case "m":
-            style.apply(sequence.parameters)
+            style.apply(sequence.parameters, subparameters: sequence.subparameters)
         case "n":
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
