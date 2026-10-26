@@ -52,6 +52,15 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains("E[MC\"!"))
     }
 
+    @Test func reportsOneMoveBeyondTheDefaultEncoding() async throws {
+        let (view, session) = try await viewReading("head -c 12 | od -An -tx1", modes: "?1003h")
+        view.fit(to: CGSize(width: 4000, height: 300))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 250.5, in: view))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 260.5, in: view))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 5.5, in: view))
+        #expect(await session.linesAfterExit().contains("1b  5b  4d  43  ff  21  1b  5b  4d  43  26  21"))
+    }
+
     @Test func reportsAMoveAndUnderlinesTheLinkWithCommand() async throws {
         let (view, session) = try await viewReading("head -c 10", modes: "?1003h\\033[?1006hhttps://example.com\\n")
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view, modifierFlags: .command))

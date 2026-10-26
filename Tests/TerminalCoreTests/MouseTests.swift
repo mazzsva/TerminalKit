@@ -19,9 +19,12 @@ struct MouseTests {
         #expect(terminal.mouseReport(button: 4, column: 0, row: 0, isRelease: true) == Array("\u{1B}[M'!!".utf8))
     }
 
-    @Test func reportsNothingBeyondTheDefaultEncoding() {
-        let terminal = Terminal(columns: 300, rows: 2)
-        #expect(terminal.mouseReport(button: 0, column: 223, row: 0, isRelease: false) == nil)
+    @Test func clampsReportsBeyondTheDefaultEncoding() {
+        let terminal = Terminal(columns: 400, rows: 400)
+        let report = terminal.mouseReport(button: 0, column: 300, row: 300, isRelease: true)
+        #expect(report == Array("\u{1B}[M#".utf8) + [255, 255])
+        let clampedReport = terminal.mouseReport(button: 0, column: 250, row: 0, isRelease: false)
+        #expect(clampedReport == Array("\u{1B}[M ".utf8) + [255, 33])
     }
 
     @Test func reportsInTheSGREncoding() {

@@ -99,14 +99,14 @@ extension TerminalContentView {
         let modifiers = [(NSEvent.ModifierFlags.option, 8), (.control, 16)]
             .reduce(0) { event.modifierFlags.contains($1.0) ? $0 | $1.1 : $0 }
         lastMousePosition = position
-        if let report = session.liveTerminal.mouseReport(
-            button: button | modifiers,
-            column: position.column,
-            row: position.row,
-            isRelease: isRelease
-        ) {
-            session.send(report)
-        }
+        session.send(
+            session.liveTerminal.mouseReport(
+                button: button | modifiers,
+                column: position.column,
+                row: position.row,
+                isRelease: isRelease
+            )
+        )
     }
 
     func reportDrag(_ event: NSEvent, button: Int) {
@@ -120,7 +120,8 @@ extension TerminalContentView {
         let location = convert(event.locationInWindow, from: nil)
         let row = Int((location.y - Self.padding) / cellSize.height) - terminal.scrollback.count
         let column = Int((location.x - Self.padding) / cellSize.width)
+        let limit = session.liveTerminal.usesSGRMouseEncoding ? Int.max : 222
         return Terminal.Position(
-            row: min(max(row, 0), terminal.rows - 1), column: min(max(column, 0), terminal.columns - 1))
+            row: min(max(row, 0), terminal.rows - 1, limit), column: min(max(column, 0), terminal.columns - 1, limit))
     }
 }
