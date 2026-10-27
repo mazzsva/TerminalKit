@@ -21,7 +21,7 @@ extension TerminalContentView {
     private static let schemes: Set<String> = ["http", "https", "mailto", "ftp", "file"]
     private static let launchingExtensions: Set<String> = [
         "app", "command", "tool", "terminal", "workflow", "action", "pkg", "mpkg", "scpt", "scptd", "applescript",
-        "jar", "webloc", "fileloc", "inetloc", "mobileconfig", "prefpane", "saver",
+        "jar", "url", "mobileconfig", "prefpane", "saver",
     ]
     private static let pattern = #/(?:https?|ftp|file)://[^\s<>"'`]+|mailto:[^\s<>"'`]+/#.ignoresCase()
 
@@ -47,9 +47,10 @@ extension TerminalContentView {
         guard Terminal.isLocal(url), FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
             return nil
         }
+        let values = try? resolved.resourceValues(forKeys: [.contentTypeKey, .isApplicationKey])
         let launches =
             launchingExtensions.contains(resolved.pathExtension.lowercased())
-            || (try? resolved.resourceValues(forKeys: [.isApplicationKey]).isApplication) == true
+            || values?.contentType?.conforms(to: .internetLocation) == true || values?.isApplication == true
             || !isDirectory.boolValue && FileManager.default.isExecutableFile(atPath: path)
         return launches ? .reveal(url) : .open(url)
     }
