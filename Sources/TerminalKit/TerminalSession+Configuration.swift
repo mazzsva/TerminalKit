@@ -52,6 +52,9 @@ extension TerminalSession.Configuration {
         if environment["LANG"] == nil {
             environment["LANG"] = "en_US.UTF-8"
         }
+        if environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == nil {
+            environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] = "1"
+        }
         return environment
     }
 

@@ -18,7 +18,10 @@ struct TerminalSessionTests {
         let environment = TerminalSession.Configuration.loginShell(inheriting: ["TERM": "dumb", "PATH": "/bin"])
             .environment
         #expect(
-            environment == ["TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8", "PATH": "/bin"])
+            environment == [
+                "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
+                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "PATH": "/bin",
+            ])
     }
 
     @Test func describesTheTerminalToAnyProcess() {
@@ -27,6 +30,8 @@ struct TerminalSessionTests {
         #expect(environment["TERM"] == "xterm-256color")
         #expect(environment["COLORTERM"] == "truecolor")
         #expect(environment["LANG"] == inherited["LANG"] ?? "en_US.UTF-8")
+        #expect(
+            environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == inherited["CLAUDE_CODE_FORCE_STRIKETHROUGH"] ?? "1")
         #expect(environment["PATH"] == inherited["PATH"])
         #expect(environment["TERM_PROGRAM"] == nil)
         #expect(environment["TERM_SESSION_ID"] == nil)
@@ -35,6 +40,12 @@ struct TerminalSessionTests {
     @Test func keepsTheLanguageOfTheUser() {
         let environment = TerminalSession.Configuration.loginShell(inheriting: ["LANG": "pt_BR.UTF-8"]).environment
         #expect(environment["LANG"] == "pt_BR.UTF-8")
+    }
+
+    @Test func keepsTheStrikethroughSettingOfTheUser() {
+        let environment = TerminalSession.Configuration.loginShell(inheriting: ["CLAUDE_CODE_FORCE_STRIKETHROUGH": "0"])
+            .environment
+        #expect(environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == "0")
     }
 
     @Test func removesTheIdentityOfTheParentTerminal() {
@@ -50,7 +61,11 @@ struct TerminalSessionTests {
                 ]
             )
             .environment
-        #expect(environment == ["TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8"])
+        #expect(
+            environment == [
+                "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
+                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1",
+            ])
     }
 
     @Test func runsTheCommandInTheInteractiveLoginShell() {
