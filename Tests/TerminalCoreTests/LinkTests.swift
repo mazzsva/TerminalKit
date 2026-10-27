@@ -113,6 +113,15 @@ struct LinkTests {
         #expect(uris(terminal.screen[0].prefix(3), in: terminal) == ["12345", "67890", nil])
     }
 
+    @Test(arguments: ["\u{7}", "\u{1B}\\"])
+    func ignoresALinkOverTheLengthLimit(terminator: String) {
+        let uri = String(repeating: "u", count: 4_093)
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive("\u{1B}]8;;\(uri)u\(terminator)a\u{1B}]8;;\(uri)\(terminator)b")
+        #expect(uris(terminal.screen[0].prefix(2), in: terminal) == [nil, uri])
+        #expect(terminal.screen[0].prefix(2).map(terminal.character(of:)) == ["a", "b"])
+    }
+
     @Test func keepsTheLinksOfTheScrollbackAfterAReset() {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive("\u{1B}]8;;u\u{7}a\r\n\u{1B}cb")
