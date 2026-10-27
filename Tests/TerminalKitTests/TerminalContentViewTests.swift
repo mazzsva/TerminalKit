@@ -304,6 +304,31 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: cells, of: first) == pixels(in: cells, of: spaced))
     }
 
+    @Test(arguments: ["⏺", "⏸"], [1, 2] as [CGFloat])
+    func drawsTheGlyphsOfTheFallbackFontOnTheBaseline(character: Character, scale: CGFloat) async throws {
+        let view = try await drawnView(running: "printf 'a \(character)\\n'")
+        let window = ScaledWindow(contentView: view)
+        window.scale = scale
+        let font = view.fonts.regular
+        let representation = try representation(of: view)
+        #expect(CGFloat(representation.pixelsWide) == scale * view.bounds.width)
+        let background = try #require(color(in: representation, at: CGPoint(x: 190, y: 90))?.usingColorSpace(.sRGB))
+        for (column, glyph) in [(0, "a"), (2, character)] {
+            let run = try #require(view.fonts.glyphs.entry(for: glyph, font: font, index: 0).runs.first)
+            let bounds = CTFontGetBoundingRectsForGlyphs(run.font, .default, run.glyphs, nil, 1)
+            let x = 4 + CGFloat(column) * view.cellSize.width
+            let top = stride(from: 4, to: 4 + view.cellSize.height, by: 1 / scale)
+                .first { y in
+                    stride(from: x, to: x + view.cellSize.width, by: 1 / scale)
+                        .contains {
+                            let pixel = color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)
+                            return abs((pixel?.brightnessComponent ?? 0) - background.brightnessComponent) > 0.5
+                        }
+                }
+            #expect(abs(try #require(top) - (4 + font.ascender - bounds.maxY)) < 1)
+        }
+    }
+
     @Test func underlinesARunWithAWideCharacter() async throws {
         let view = try await drawnView(running: "printf '\\033[4ma\\344\\270\\255b\\033[m\\r'")
         let font = view.fonts.regular
@@ -382,7 +407,7 @@ struct TerminalContentViewTests {
     @Test(arguments: ["▏", "▕"])
     func drawsAnEighthBlockInEveryColumnAtAStandardScale(character: String) async throws {
         let view = try await drawnView(running: "printf '\\033[31m\(String(repeating: character, count: 20))\\n'")
-        let window = StandardScaleWindow(contentView: view)
+        let window = ScaledWindow(contentView: view)
         view.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         let (width, y) = (view.cellSize.width, 4 + view.cellSize.height / 2)
         let cells = (0 ..< 20).map { CGRect(x: 4 + CGFloat($0) * width, y: y, width: width, height: 1) }
@@ -888,9 +913,11 @@ private func isClose(_ color: NSColor?, to components: [CGFloat]) -> Bool {
         .allSatisfy { abs($0 - $1) < 0.02 }
 }
 
-private final class StandardScaleWindow: NSWindow {
+private final class ScaledWindow: NSWindow {
+    var scale: CGFloat = 1
+
     override var backingScaleFactor: CGFloat {
-        1
+        scale
     }
 }
 
