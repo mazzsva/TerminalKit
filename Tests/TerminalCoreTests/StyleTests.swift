@@ -174,6 +174,11 @@ struct StyleTests {
                 == Terminal.Style(isBold: true, isItalic: true, isStrikethrough: true))
     }
 
+    @Test func appliesOnlyTheFirst32Parameters() {
+        let parameters = ["31"] + Array(repeating: "1", count: 31) + Array(repeating: "0", count: 8)
+        #expect(style(parameters.joined(separator: ";")) == Terminal.Style(foreground: .indexed(1), isBold: true))
+    }
+
     @Test func printsWithTheCurrentStyle() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("a\u{1B}[1mb\u{1B}[mc")

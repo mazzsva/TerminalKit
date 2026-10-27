@@ -42,6 +42,7 @@ struct EscapeSequenceParser: Sendable {
     private var privateMarker: Unicode.Scalar?
     private var parameters: [Int] = []
     private var subparameters: Set<Int> = []
+    private var isOverflowing = false
     private var string: [Unicode.Scalar] = []
 
     mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
@@ -132,7 +133,7 @@ struct EscapeSequenceParser: Sendable {
 
     private mutating func controlSequence(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
-        case "0" ... "9" where intermediates.isEmpty:
+        case "0" ... "9" where intermediates.isEmpty && !isOverflowing:
             let value = (parameters.popLast() ?? 0) * 10 + Int(scalar.value - 0x30)
             parameters.append(min(value, Self.maximumParameterValue))
         case ":" ... ";" where intermediates.isEmpty && parameters.count < Self.maximumParameters:
@@ -143,6 +144,11 @@ struct EscapeSequenceParser: Sendable {
                 subparameters.insert(parameters.count)
             }
             parameters.append(0)
+        case "0" ... ";" where intermediates.isEmpty:
+            if scalar == ":" {
+                subparameters.insert(parameters.count)
+            }
+            isOverflowing = true
         case "<" ... "?" where intermediates.isEmpty && parameters.isEmpty && privateMarker == nil:
             privateMarker = scalar
         case "0" ... "?":
@@ -179,6 +185,7 @@ struct EscapeSequenceParser: Sendable {
         privateMarker = nil
         parameters = []
         subparameters = []
+        isOverflowing = false
         string = []
     }
 

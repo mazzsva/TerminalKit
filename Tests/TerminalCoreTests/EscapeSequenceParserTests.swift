@@ -71,8 +71,25 @@ struct EscapeSequenceParserTests {
     @Test func ignoresMalformedControlSequences() {
         #expect(parse("\u{1B}[1?hA") == [.print("A")])
         #expect(parse("\u{1B}[ 1qA") == [.print("A")])
-        #expect(parse("\u{1B}[\(String(repeating: ";", count: 32))mA") == [.print("A")])
-        #expect(parse("\u{1B}[\(String(repeating: ":", count: 32))mA") == [.print("A")])
+    }
+
+    @Test func ignoresParametersAfterThe32nd() {
+        #expect(
+            parse("\u{1B}[\(String(repeating: "1;", count: 40))mA")
+                == [controlSequence(parameters: Array(repeating: 1, count: 32), final: "m"), .print("A")])
+        #expect(
+            parse("\u{1B}[\(String(repeating: "1;", count: 40))m\u{1B}[2mA")
+                == [
+                    controlSequence(parameters: Array(repeating: 1, count: 32), final: "m"),
+                    controlSequence(parameters: [2], final: "m"), .print("A"),
+                ])
+        #expect(
+            parse("\u{1B}[\(String(repeating: ":", count: 40))mA")
+                == [
+                    controlSequence(
+                        parameters: Array(repeating: 0, count: 32), subparameters: Set(1 ... 32), final: "m"),
+                    .print("A"),
+                ])
     }
 
     @Test func executesControlCharactersInsideControlSequences() {
