@@ -58,8 +58,13 @@ struct TerminalInputTests {
     @Test func movesByWordsWithOptionAndTheArrowKeys() throws {
         #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: .option).wordMovementInput == [0x1B, 0x62])
         #expect(try keyDown(NSRightArrowFunctionKey, modifierFlags: .option).wordMovementInput == [0x1B, 0x66])
+        let optionLeft = try keyDown(
+            NSLeftArrowFunctionKey, modifierFlags: [.option, .capsLock, .function, .numericPad])
+        #expect(optionLeft.wordMovementInput == [0x1B, 0x62])
         #expect(try keyDown(NSLeftArrowFunctionKey).wordMovementInput == nil)
         #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: [.option, .command]).wordMovementInput == nil)
+        #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: [.option, .control]).wordMovementInput == nil)
+        #expect(try keyDown(NSLeftArrowFunctionKey, modifierFlags: [.option, .shift]).wordMovementInput == nil)
         #expect(try keyDown("a", modifierFlags: .option).wordMovementInput == nil)
     }
 

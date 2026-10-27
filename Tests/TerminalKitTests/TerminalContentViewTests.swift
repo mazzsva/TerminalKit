@@ -637,6 +637,21 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains("1b  62  1b  66  78"))
     }
 
+    @Test(arguments: [
+        (NSEvent.ModifierFlags([.control, .option]), "1b  5b  31  3b  37  44  1b  5b  31  3b  37  43  78"),
+        (NSEvent.ModifierFlags([.shift, .option]), "1b  5b  31  3b  34  44  1b  5b  31  3b  34  43  78"),
+    ])
+    func sendsTheOtherModifiersOfTheOptionArrows(modifierFlags: NSEvent.ModifierFlags, bytes: String) async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 13 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown(NSLeftArrowFunctionKey, modifierFlags: modifierFlags))
+        view.keyDown(with: try keyDown(NSRightArrowFunctionKey, modifierFlags: modifierFlags))
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains(bytes))
+    }
+
     @Test func sendsControlKeysThatTheInputSystemDrops() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
         let view = TerminalContentView(session: session)
