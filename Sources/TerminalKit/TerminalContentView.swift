@@ -38,6 +38,9 @@ final class TerminalContentView: NSView {
     }
     var selection: Selection? {
         didSet {
+            guard selection != oldValue else {
+                return
+            }
             needsDisplay = true
             scheduleAccessibilityNotification()
         }
@@ -69,6 +72,7 @@ final class TerminalContentView: NSView {
     var ringBell = { NSSound.beep() }
     var currentDate = { Date() }
     var currentModifierFlags = { NSEvent.modifierFlags }
+    var pressedMouseButtons = { NSEvent.pressedMouseButtons }
     var performLinkAction = performWithWorkspace
     var hoveredLink: Link? {
         didSet {
@@ -85,6 +89,8 @@ final class TerminalContentView: NSView {
     var lastMousePosition: Terminal.Position?
     var scrollWheelLines: CGFloat = 0
     var scrollWheelColumns: CGFloat = 0
+    var autoscrollTask: Task<Void, Never>?
+    var autoscrollClock: any Clock<Duration> = ContinuousClock()
 
     private var colors = Colors(.standard)
     private(set) var fonts = Fonts(defaultFont)
@@ -249,6 +255,8 @@ final class TerminalContentView: NSView {
         windowKeyStateDidChange()
         bellTask?.cancel()
         bellTask = nil
+        autoscrollTask?.cancel()
+        autoscrollTask = nil
         flagsMonitor.map(NSEvent.removeMonitor)
         flagsMonitor = nil
         if window != nil {

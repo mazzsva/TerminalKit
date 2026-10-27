@@ -91,6 +91,111 @@ struct TerminalSelectionTests {
         #expect(view.selection == Selection(anchor: .init(line: 0, column: 3), head: .init(line: rows - 1, column: 1)))
     }
 
+    @Test func keepsScrollingWhileTheDragHoldsOutside() async throws {
+        let (scrollView, window) = try await window(running: "seq 1 300")
+        let view = scrollView.terminalView
+        let clip = scrollView.contentView
+        let clock = ManualClock()
+        view.autoscrollClock = clock
+        view.pressedMouseButtons = { 1 }
+        let row = view.session.terminal.scrollback.count
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row + 3, column: 1, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: row - 3, column: 1, in: view))
+        let scroll = clip.bounds.minY
+        let selection = try #require(view.selection)
+        try await clock.waitForSleepers(1)
+        clock.advance(by: .milliseconds(49))
+        try await clock.waitForSleepers(1)
+        #expect(clip.bounds.minY == scroll)
+        clock.advance(by: .milliseconds(1))
+        try await clock.waitForSleepers(1)
+        #expect(clip.bounds.minY < scroll)
+        #expect(try #require(view.selection).head < selection.head)
+        let task = try #require(view.autoscrollTask)
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: row - 3, column: 1, in: view))
+        clock.advance(by: .milliseconds(50))
+        await task.value
+        #expect(view.autoscrollTask == nil)
+        #expect(window.contentView === scrollView)
+    }
+
+    @Test(arguments: ["seq 1 300", "seq 1 300; printf '\\033[?1000h'"])
+    func stopsScrollingWhenTheDragComesBackInside(script: String) async throws {
+        let (scrollView, window) = try await window(running: script)
+        let view = scrollView.terminalView
+        let clip = scrollView.contentView
+        let row = view.session.terminal.scrollback.count
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row + 3, column: 1, in: view, modifierFlags: .shift))
+        view.mouseDragged(
+            with: try mouseEvent(.leftMouseDragged, row: row - 3, column: 1, in: view, modifierFlags: .shift))
+        let task = try #require(view.autoscrollTask)
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: row + 3, column: 1, in: view))
+        let scroll = clip.bounds.minY
+        let selection = view.selection
+        await task.value
+        #expect(view.autoscrollTask == nil)
+        #expect(clip.bounds.minY == scroll)
+        #expect(view.selection == selection)
+        #expect(window.contentView === scrollView)
+    }
+
+    @Test func postsNoChangeWhileTheDragCannotScroll() async throws {
+        let (scrollView, window) = try await window(running: "seq 1 300")
+        let view = scrollView.terminalView
+        let clock = ManualClock()
+        view.autoscrollClock = clock
+        view.pressedMouseButtons = { 1 }
+        view.scroll(.zero)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 3, column: 1, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: -3, column: 1, in: view))
+        view.isAccessibilityNotificationScheduled = false
+        for _ in 0 ..< 2 {
+            try await clock.waitForSleepers(1)
+            clock.advance(by: .milliseconds(50))
+        }
+        try await clock.waitForSleepers(1)
+        #expect(!view.isAccessibilityNotificationScheduled)
+        let task = try #require(view.autoscrollTask)
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: -3, column: 1, in: view))
+        clock.advance(by: .milliseconds(50))
+        await task.value
+        #expect(window.contentView === scrollView)
+    }
+
+    @Test func stopsScrollingWhenTheButtonIsReleased() async throws {
+        let (scrollView, window) = try await window(running: "seq 1 300")
+        let view = scrollView.terminalView
+        let clip = scrollView.contentView
+        let clock = ManualClock()
+        view.autoscrollClock = clock
+        view.pressedMouseButtons = { 1 }
+        let row = view.session.terminal.scrollback.count
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row + 3, column: 1, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: row - 3, column: 1, in: view))
+        let scroll = clip.bounds.minY
+        let selection = view.selection
+        let task = try #require(view.autoscrollTask)
+        view.pressedMouseButtons = { 0 }
+        try await clock.waitForSleepers(1)
+        clock.advance(by: .milliseconds(50))
+        await task.value
+        #expect(clip.bounds.minY == scroll)
+        #expect(view.selection == selection)
+        #expect(window.contentView === scrollView)
+    }
+
+    @Test func stopsScrollingWhenTheViewLeavesItsWindow() async throws {
+        let (scrollView, window) = try await window(running: "seq 1 300")
+        let view = scrollView.terminalView
+        let row = view.session.terminal.scrollback.count
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row + 3, column: 1, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: row - 3, column: 1, in: view))
+        let task = try #require(view.autoscrollTask)
+        window.contentView = nil
+        await task.value
+        #expect(view.autoscrollTask == nil)
+    }
+
     @Test func selectsNoWordOutsideTheText() async throws {
         let view = try await view(running: "printf 'one two'")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 6, in: view, clickCount: 2))
@@ -432,4 +537,16 @@ private func viewInWindow() -> TerminalContentView {
     let window = NSWindow(contentView: view)
     view.fit(to: window.frame.size)
     return view
+}
+
+@MainActor
+private func window(running script: String) async throws -> (TerminalScrollView, NSWindow) {
+    let session = TerminalSession(running: script)
+    let scrollView = TerminalScrollView(session: session)
+    let window = NSWindow(contentView: scrollView)
+    scrollView.layoutSubtreeIfNeeded()
+    try session.start()
+    await session.waitForExit()
+    scrollView.layoutSubtreeIfNeeded()
+    return (scrollView, window)
 }
