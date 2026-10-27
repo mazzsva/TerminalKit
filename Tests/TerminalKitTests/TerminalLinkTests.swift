@@ -16,6 +16,21 @@ struct TerminalLinkTests {
         ("open file:///tmp/a b", "file:///tmp/a"),
         ("ftp://host/file]", "ftp://host/file"),
         ("https://a/" + String(repeating: ")", count: 50_000), "https://a/"),
+        ("（https://example.com/docs）", "https://example.com/docs"),
+        ("（https://example.com）を参照。", "https://example.com"),
+        ("「https://example.com/a」", "https://example.com/a"),
+        ("見て https://example.com/a。", "https://example.com/a"),
+        ("【https://example.com】", "https://example.com"),
+        ("https://ja.wikipedia.org/wiki/A（B）", "https://ja.wikipedia.org/wiki/A（B）"),
+        ("{https://a/[b]{c}『d』〔e〕［f］｛g｝}", "https://a/[b]{c}『d』〔e〕［f］｛g｝"),
+        ("https://a/x;:?、，！？；：", "https://a/x"),
+        ("\"https://a.com/x\"", "https://a.com/x"),
+        ("`https://a.com/x`", "https://a.com/x"),
+        ("https://a.com/x<b", "https://a.com/x"),
+        ("『https://a/x』", "https://a/x"),
+        ("〔https://a/x〕", "https://a/x"),
+        ("［https://a/x］", "https://a/x"),
+        ("｛https://a/x｝", "https://a/x"),
     ])
     func detectsALink(text: String, link: String) {
         let ranges = TerminalContentView.detectedLinks(in: text)
@@ -23,7 +38,26 @@ struct TerminalLinkTests {
         #expect(ranges.map { String(characters[$0]) } == [link])
     }
 
-    @Test(arguments: ["no link here", "https:/broken", "javascript:alert(1)", "ssh://host"])
+    @Test(arguments: [
+        ("「https://a.com」と「https://b.com」", ["https://a.com", "https://b.com"]),
+        ("(https://a.com)(https://b.com)", ["https://a.com", "https://b.com"]),
+    ])
+    func detectsEachLink(text: String, links: [String]) {
+        let characters = Array(text)
+        #expect(TerminalContentView.detectedLinks(in: text).map { String(characters[$0]) } == links)
+    }
+
+    @Test func detectsLongLinks() {
+        let link = "https://a/" + String(repeating: "()", count: 50_000)
+        #expect(TerminalContentView.detectedLinks(in: link + ")") == [0 ..< link.count])
+        #expect(
+            TerminalContentView.detectedLinks(in: String(repeating: "https://a/)", count: 50_000))
+                == (0 ..< 50_000).map { $0 * 11 ..< $0 * 11 + 10 })
+    }
+
+    @Test(arguments: [
+        "no link here", "https:/broken", "javascript:alert(1)", "ssh://host", "see https:// now", "mailto: me",
+    ])
     func detectsNoLink(text: String) {
         #expect(TerminalContentView.detectedLinks(in: text).isEmpty)
     }

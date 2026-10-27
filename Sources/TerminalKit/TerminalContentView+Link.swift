@@ -23,7 +23,11 @@ extension TerminalContentView {
         "app", "command", "tool", "terminal", "workflow", "action", "pkg", "mpkg", "scpt", "scptd", "applescript",
         "jar", "url", "mobileconfig", "prefpane", "saver",
     ]
-    private static let pattern = #/(?:https?|ftp|file)://[^\s<>"'`]+|mailto:[^\s<>"'`]+/#.ignoresCase()
+    private static let pairs: [Character: Character] = [
+        ")": "(", "]": "[", "}": "{", "）": "（", "」": "「", "』": "『", "】": "【", "〕": "〔", "］": "［", "｝": "｛",
+    ]
+    private static let pattern = #/(?:https?|ftp|file)://[^\s<>"'`]|mailto:[^\s<>"'`]/#.ignoresCase()
+        .matchingSemantics(.unicodeScalar)
 
     static func performWithWorkspace(_ action: LinkAction) {
         switch action {
@@ -139,29 +143,33 @@ extension TerminalContentView {
 
     static func detectedLinks(in text: String) -> [Range<Int>] {
         let scalars = text.unicodeScalars
+        var links: [Range<Int>] = []
         var position = scalars.startIndex
         var offset = 0
-        return text.matches(of: pattern.matchingSemantics(.unicodeScalar))
-            .map { match in
-                offset += scalars.distance(from: position, to: match.range.lowerBound)
-                position = match.range.lowerBound
-                let lowerBound = offset
-                var characters = scalars[match.range].map(Character.init)
-                var counts = Dictionary(characters.map { ($0, 1) }, uniquingKeysWith: +)
-                while let last = characters.last, shouldTrim(last, counts: counts) {
-                    characters.removeLast()
-                    counts[last, default: 0] -= 1
+        while let match = Substring(scalars[position...]).firstMatch(of: pattern) {
+            offset += scalars.distance(from: position, to: match.range.lowerBound)
+            position = match.range.lowerBound
+            let lowerBound = offset
+            var characters: [Character] = []
+            var counts: [Character: Int] = [:]
+            for character in scalars[position...].lazy.map(Character.init) {
+                if character.isWhitespace || "<>\"'`".contains(character) {
+                    break
                 }
-                return lowerBound ..< lowerBound + characters.count
+                if let opening = pairs[character], counts[character, default: 0] >= counts[opening, default: 0] {
+                    break
+                }
+                characters.append(character)
+                counts[character, default: 0] += 1
             }
-    }
-
-    private static func shouldTrim(_ character: Character, counts: [Character: Int]) -> Bool {
-        let pairs: [Character: Character] = [")": "(", "]": "[", "}": "{", ">": "<"]
-        guard let opening = pairs[character] else {
-            return ".,;:!?".contains(character)
+            offset += characters.count
+            position = scalars.index(position, offsetBy: characters.count)
+            while let last = characters.last, ".,;:!?。、，！？；：".contains(last) {
+                characters.removeLast()
+            }
+            links.append(lowerBound ..< lowerBound + characters.count)
         }
-        return counts[character, default: 0] > counts[opening, default: 0]
+        return links
     }
 
     func link(at event: NSEvent) -> Link? {
