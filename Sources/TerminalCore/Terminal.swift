@@ -442,6 +442,11 @@ package struct Terminal: Sendable {
     private mutating func place(_ scalar: Unicode.Scalar) {
         lastCharacter = scalar
         let width = columns > 1 && !scalar.isASCII ? max(scalar.width, 1) : 1
+        place(Cell(scalar: scalar, style: style, width: UInt8(width)))
+    }
+
+    private mutating func place(_ cell: Cell) {
+        let width = Int(cell.width)
         if isWrapPending || cursor.column + width > columns {
             if usesAutowrap {
                 let row = cursor.row
@@ -467,9 +472,9 @@ package struct Terminal: Sendable {
         for column in cursor.column ..< cursor.column + width {
             clearWideCharacter(at: column)
         }
-        screen[cursor.row][cursor.column] = Cell(scalar: scalar, style: style, width: UInt8(width))
+        screen[cursor.row][cursor.column] = cell
         if width == 2 {
-            screen[cursor.row][cursor.column + 1] = Cell(style: style, width: 0)
+            screen[cursor.row][cursor.column + 1] = Cell(style: cell.style, width: 0)
         }
         if cursor.column + width == columns {
             cursor.column = columns - 1
@@ -565,7 +570,14 @@ package struct Terminal: Sendable {
     }
 
     private mutating func widen(_ column: Int) {
-        guard screen[cursor.row][column].width == 1, cursor.column == column + 1 else {
+        guard screen[cursor.row][column].width == 1, columns > 1 else {
+            return
+        }
+        guard !isWrapPending else {
+            var cell = screen[cursor.row][column]
+            cell.width = 2
+            screen[cursor.row][column] = .padding
+            place(cell)
             return
         }
         if usesInsertMode {

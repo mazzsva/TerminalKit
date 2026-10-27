@@ -114,12 +114,51 @@ struct EmojiWidthTests {
         #expect(terminal.screen[1][0] == Terminal.Cell())
     }
 
-    @Test func keepsAFlagNarrowInTheLastColumn() {
-        var terminal = Terminal(columns: 3, rows: 2)
-        terminal.receive("ab\u{1F1FA}\u{1F1F8}")
-        #expect(terminal.screen[0].map(\.width) == [1, 1, 1])
-        #expect(terminal.character(of: terminal.screen[0][2]) == "\u{1F1FA}\u{1F1F8}")
-        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    @Test(arguments: ["\u{1F1FA}\u{1F1F8}", "\u{261D}\u{1F3FD}"])
+    func wrapsAnEmojiThatWidensInTheLastColumn(text: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abc" + text + "x")
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["a", "b", "c", " "])
+        #expect(terminal.screen[0][3] == .padding)
+        #expect(terminal.screen[0].isWrapped)
+        #expect(terminal.screen[1].map(\.width) == [2, 0, 1, 1])
+        #expect(terminal.character(of: terminal.screen[1][0]) == Character(text))
+        #expect(terminal.screen[1][2] == Terminal.Cell(scalar: "x"))
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 3))
+    }
+
+    @Test(arguments: ["\u{1F1FA}\u{1F1F8}", "\u{261D}\u{1F3FD}"])
+    func wrapsAnEmojiThatWidensInTheLastColumnOfAScrollRegion(text: String) {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("\u{1B}[1;2r\u{1B}[2;1Habc" + text + "x")
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["a", "b", "c", " "])
+        #expect(terminal.screen[0].isWrapped)
+        #expect(terminal.screen[1].map(\.width) == [2, 0, 1, 1])
+        #expect(terminal.character(of: terminal.screen[1][0]) == Character(text))
+        #expect(terminal.screen[1][2] == Terminal.Cell(scalar: "x"))
+        #expect(terminal.screen[2].allSatisfy { $0 == Terminal.Cell() })
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 3))
+    }
+
+    @Test(arguments: [("\u{1F1FA}", "\u{1F1F8}"), ("\u{261D}", "\u{1F3FD}")])
+    func overwritesTheLastColumnsWithAnEmojiThatWidensWithoutAutowrap(base: String, modifier: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abc" + base + "\u{1B}[?7l" + modifier)
+        #expect(terminal.screen[0].map(\.width) == [1, 1, 2, 0])
+        #expect(terminal.character(of: terminal.screen[0][2]) == Character(base + modifier))
+        #expect(terminal.screen[1][0] == Terminal.Cell())
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
+    }
+
+    @Test(arguments: ["\u{1F1FA}\u{1F1F8}", "\u{261D}\u{1F3FD}"])
+    func insertsAnEmojiThatWidensInTheLastColumnOnTheNextRow(text: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[2;1Hxy\u{1B}[Habc\u{1B}[4h" + text)
+        #expect(terminal.screen[0][3] == .padding)
+        #expect(terminal.screen[1].map(\.width) == [2, 0, 1, 1])
+        #expect(terminal.character(of: terminal.screen[1][0]) == Character(text))
+        #expect(terminal.screen[1].suffix(2).map(terminal.character(of:)) == ["x", "y"])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
     }
 
     @Test func printsAFlagInAOneColumnScreen() {
@@ -133,6 +172,14 @@ struct EmojiWidthTests {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{1B}[44m\u{1F1FA}\u{1B}[41m\u{1F1F8}")
         #expect(terminal.screen[0].prefix(2).map(\.style.background) == [.indexed(4), .indexed(4)])
+    }
+
+    @Test(arguments: [("\u{1F1FA}", "\u{1F1F8}"), ("\u{261D}", "\u{1F3FD}")])
+    func keepsTheStyleOfAnEmojiThatWidensInTheLastColumn(base: String, modifier: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[44mabc" + base + "\u{1B}[41m" + modifier)
+        #expect(terminal.screen[0][3] == .padding)
+        #expect(terminal.screen[1].prefix(2).map(\.style.background) == [.indexed(4), .indexed(4)])
     }
 
     @Test func clearsTheWideCharacterThatAFlagCovers() {
