@@ -428,7 +428,9 @@ package struct Terminal: Sendable {
 
     private mutating func print(_ scalar: Unicode.Scalar) {
         guard scalar.isASCII || scalar.width > 0 else {
-            combine(scalar)
+            if !combine(scalar), scalar.properties.generalCategory == .spacingMark {
+                place(scalar)
+            }
             return
         }
         if !scalar.isASCII, scalar.properties.isEmoji, combine(scalar) {
@@ -439,7 +441,7 @@ package struct Terminal: Sendable {
 
     private mutating func place(_ scalar: Unicode.Scalar) {
         lastCharacter = scalar
-        let width = columns > 1 && !scalar.isASCII ? scalar.width : 1
+        let width = columns > 1 && !scalar.isASCII ? max(scalar.width, 1) : 1
         if isWrapPending || cursor.column + width > columns {
             if usesAutowrap {
                 let row = cursor.row
@@ -489,11 +491,15 @@ package struct Terminal: Sendable {
     }
 
     private mutating func repeatCharacter(_ scalar: Unicode.Scalar, count: Int) {
+        var count = count
+        while scalar.width == 0, count > 1, combine(scalar) {
+            count -= 1
+        }
         print(scalar)
-        let width = columns > 1 ? scalar.width : 1
+        let width = columns > 1 ? max(scalar.width, 1) : 1
         let rowCount = columns / width
         guard usesAutowrap else {
-            for _ in 0 ..< min(count - 1, rowCount + 2) {
+            for _ in 0 ..< min(count - 1, rowCount + Self.maximumScalarsPerCell + 2) {
                 print(scalar)
             }
             return
@@ -524,7 +530,6 @@ package struct Terminal: Sendable {
         }
     }
 
-    @discardableResult
     private mutating func combine(_ scalar: Unicode.Scalar) -> Bool {
         var column = isWrapPending ? cursor.column : cursor.column - 1
         if column > 0, screen[cursor.row][column].width == 0 {
@@ -534,7 +539,9 @@ package struct Terminal: Sendable {
             return false
         }
         var text = String(graphemes.character(of: screen[cursor.row][column]))
-        guard text.unicodeScalars.count < Self.maximumScalarsPerCell else {
+        guard text.unicodeScalars.count < Self.maximumScalarsPerCell,
+            scalar.properties.generalCategory != .spacingMark || text.unicodeScalars.first?.width != 0
+        else {
             return false
         }
         text.unicodeScalars.append(scalar)
