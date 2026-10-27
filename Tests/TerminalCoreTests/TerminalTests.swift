@@ -724,6 +724,41 @@ struct TerminalTests {
         #expect(terminal.title == "vim")
     }
 
+    @Test func restoresTheTitleFromTheStack() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive(
+            "\u{1B}]2;zsh\u{7}\u{1B}[22;2t\u{1B}[22;1t\u{1B}]2;f.txt (~) - VIM\u{7}"
+                + "\u{1B}]2;Thanks for flying Vim\u{7}\u{1B}[23;2t\u{1B}[23;1t")
+        #expect(terminal.title == "zsh")
+        terminal.receive("\u{1B}]2;later\u{7}\u{1B}[23;2t")
+        #expect(terminal.title == "later")
+    }
+
+    @Test func keepsTenTitlesOnTheStack() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        for index in 0 ... 10 {
+            terminal.receive("\u{1B}]2;\(index)\u{7}\u{1B}[22t")
+        }
+        terminal.receive("\u{1B}]2;vim\u{7}\u{1B}[23t")
+        #expect(terminal.title == "10")
+        terminal.receive(String(repeating: "\u{1B}[23t", count: 10))
+        #expect(terminal.title == "1")
+    }
+
+    @Test func ignoresOtherWindowOperations() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}]2;zsh\u{7}\u{1B}[22t\u{1B}]2;vim\u{7}\u{1B}[23;1t\u{1B}[18t\u{1B}[24t")
+        #expect(terminal.title == "vim")
+        terminal.receive("\u{1B}[23t")
+        #expect(terminal.title == "zsh")
+    }
+
+    @Test func clearsTheTitleStackAfterAReset() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}]2;zsh\u{7}\u{1B}[22;0t\u{1B}]2;vim\u{7}\u{1B}c\u{1B}[23;0t")
+        #expect(terminal.title == "vim")
+    }
+
     @Test func growsTheScreen() {
         var terminal = Terminal(columns: 2, rows: 2)
         terminal.receive("ab\r\ncd")
