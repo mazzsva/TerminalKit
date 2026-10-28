@@ -938,6 +938,8 @@ package struct Terminal: Sendable {
         case (2026, true) where synchronizedSnapshot.isEmpty:
             var snapshot = self
             snapshot.scrollback = []
+            snapshot.graphemes = Graphemes()
+            snapshot.links = Links()
             synchronizedSnapshot = [snapshot]
             synchronizedOutputCount += 1
         case (2026, false):
