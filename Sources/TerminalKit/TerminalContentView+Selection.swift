@@ -55,6 +55,8 @@ extension TerminalContentView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        autoscrollTask?.cancel()
+        autoscrollTask = nil
         guard !isOpeningLink else {
             return
         }
@@ -63,7 +65,17 @@ extension TerminalContentView {
             return
         }
         autoscroll(with: event)
-        extendSelection(to: convert(event.locationInWindow, from: nil))
+        let location = convert(event.locationInWindow, from: nil)
+        extendSelection(to: location)
+        if !visibleRect.contains(location) {
+            autoscrollTask = Task { [weak self, autoscrollClock] in
+                try? await autoscrollClock.sleep(for: .milliseconds(50))
+                guard let self, !Task.isCancelled, pressedMouseButtons() & 1 != 0 else {
+                    return
+                }
+                mouseDragged(with: event)
+            }
+        }
     }
 
     private func extendSelection(to location: CGPoint) {

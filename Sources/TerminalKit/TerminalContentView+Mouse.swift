@@ -3,6 +3,8 @@ import TerminalCore
 
 extension TerminalContentView {
     override func mouseUp(with event: NSEvent) {
+        autoscrollTask?.cancel()
+        autoscrollTask = nil
         guard !isOpeningLink else {
             isOpeningLink = false
             return
