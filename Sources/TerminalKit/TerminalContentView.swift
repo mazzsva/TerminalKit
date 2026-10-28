@@ -498,6 +498,7 @@ final class TerminalContentView: NSView {
         let index = fonts.index(for: style)
         let color = style.isFaint ? foreground.withAlphaComponent(0.5) : foreground
         let top = Self.padding + CGFloat(row) * cellSize.height
+        let baseline = top + font.ascender
         context.setFillColor(color.cgColor)
         context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
         defer { context.textMatrix = .identity }
@@ -529,7 +530,6 @@ final class TerminalContentView: NSView {
             }
             let entry = fonts.glyphs.entry(for: character, font: font, index: index)
             let x = Self.padding + CGFloat(column) * cellSize.width
-            let baseline = top + entry.ascent
             for run in entry.runs {
                 if let current = batchFont, !CFEqual(current, run.font) {
                     flush()
@@ -540,7 +540,6 @@ final class TerminalContentView: NSView {
             }
         }
         flush()
-        let baseline = top + font.ascender
         let thickness = max(font.underlineThickness, 1)
         let left = Self.padding + CGFloat(columns.lowerBound) * cellSize.width
         let width = CGFloat(columns.count) * cellSize.width
