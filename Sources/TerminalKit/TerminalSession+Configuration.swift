@@ -38,7 +38,12 @@ extension TerminalSession.Configuration {
     }
 
     @usableFromInline
-    static func terminalEnvironment(inheriting environment: [String: String]) -> [String: String] {
+    static func terminalEnvironment(
+        inheriting environment: [String: String],
+        locale: Locale = Locale(
+            languageCode: Locale.preferredLocales.first?.language.languageCode,
+            languageRegion: Locale.current.region)
+    ) -> [String: String] {
         var environment = environment
         for name in [
             "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID", "TMUX", "TMUX_PANE", "STY", "LC_TERMINAL",
@@ -50,7 +55,9 @@ extension TerminalSession.Configuration {
         environment["TERM"] = "xterm-256color"
         environment["COLORTERM"] = "truecolor"
         if environment["LANG"] == nil {
-            environment["LANG"] = "en_US.UTF-8"
+            let name = locale.identifier + ".UTF-8"
+            environment["LANG"] =
+                FileManager.default.fileExists(atPath: "/usr/share/locale/" + name) ? name : "en_US.UTF-8"
         }
         if environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == nil {
             environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] = "1"

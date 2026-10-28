@@ -15,7 +15,8 @@ struct TerminalSessionTests {
     }
 
     @Test func describesTheTerminalToTheLoginShell() {
-        let environment = TerminalSession.Configuration.loginShell(inheriting: ["TERM": "dumb", "PATH": "/bin"])
+        let environment = TerminalSession.Configuration
+            .loginShell(inheriting: ["TERM": "dumb", "LANG": "en_US.UTF-8", "PATH": "/bin"])
             .environment
         #expect(
             environment == [
@@ -29,7 +30,6 @@ struct TerminalSessionTests {
         let inherited = ProcessInfo.processInfo.environment
         #expect(environment["TERM"] == "xterm-256color")
         #expect(environment["COLORTERM"] == "truecolor")
-        #expect(environment["LANG"] == inherited["LANG"] ?? "en_US.UTF-8")
         #expect(
             environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == inherited["CLAUDE_CODE_FORCE_STRIKETHROUGH"] ?? "1")
         #expect(environment["PATH"] == inherited["PATH"])
@@ -38,8 +38,21 @@ struct TerminalSessionTests {
     }
 
     @Test func keepsTheLanguageOfTheUser() {
-        let environment = TerminalSession.Configuration.loginShell(inheriting: ["LANG": "pt_BR.UTF-8"]).environment
+        let environment = TerminalSession.Configuration.terminalEnvironment(
+            inheriting: ["LANG": "pt_BR.UTF-8"], locale: Locale(identifier: "de_DE"))
         #expect(environment["LANG"] == "pt_BR.UTF-8")
+    }
+
+    @Test func setsTheLanguageFromTheLocale() {
+        let environment = TerminalSession.Configuration.terminalEnvironment(
+            inheriting: [:], locale: Locale(identifier: "de_CH"))
+        #expect(environment["LANG"] == "de_CH.UTF-8")
+    }
+
+    @Test func setsTheEnglishLanguageForALocaleThatIsNotInstalled() {
+        let environment = TerminalSession.Configuration.terminalEnvironment(
+            inheriting: [:], locale: Locale(identifier: "en_BR"))
+        #expect(environment["LANG"] == "en_US.UTF-8")
     }
 
     @Test func keepsTheStrikethroughSettingOfTheUser() {
@@ -57,7 +70,7 @@ struct TerminalSessionTests {
                     "LC_TERMINAL": "iTerm2", "LC_TERMINAL_VERSION": "3.5.0", "ITERM_SESSION_ID": "w0t0p0:1",
                     "ITERM_PROFILE": "Default", "KITTY_WINDOW_ID": "1", "KITTY_PID": "1", "COLORFGBG": "15;0",
                     "COLUMNS": "20", "LINES": "5", "TERMINFO": "/tmp/terminfo", "CLAUDECODE": "1",
-                    "CLAUDE_CODE_CHILD_SESSION": "1",
+                    "CLAUDE_CODE_CHILD_SESSION": "1", "LANG": "en_US.UTF-8",
                 ]
             )
             .environment
