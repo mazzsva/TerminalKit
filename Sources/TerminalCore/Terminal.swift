@@ -557,7 +557,7 @@ package struct Terminal: Sendable {
             compactGraphemes()
         }
         let cell = graphemes.cell(screen[cursor.row][column], with: character)
-        guard graphemes.character(of: cell) == character else {
+        guard graphemes.character(of: cell).unicodeScalars.elementsEqual(character.unicodeScalars) else {
             return false
         }
         screen[cursor.row][column] = cell

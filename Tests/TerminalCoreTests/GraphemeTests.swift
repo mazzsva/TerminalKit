@@ -122,6 +122,36 @@ struct GraphemeTests {
         #expect(text(terminal.scrollback, in: terminal) == ["a\u{301}"])
     }
 
+    @Test func keepsTheScalarsOfCanonicallyEquivalentCharacters() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive("e\u{323}\u{301} e\u{301}\u{323} e\u{323}\u{301}")
+        #expect(Array(terminal.character(of: terminal.screen[0][0]).unicodeScalars) == ["e", "\u{323}", "\u{301}"])
+        #expect(Array(terminal.character(of: terminal.screen[0][2]).unicodeScalars) == ["e", "\u{301}", "\u{323}"])
+        #expect(Array(terminal.character(of: terminal.screen[0][4]).unicodeScalars) == ["e", "\u{323}", "\u{301}"])
+    }
+
+    @Test func keepsTheScalarsOfCanonicallyEquivalentCharactersThroughACompaction() {
+        var graphemes = Terminal.Graphemes(capacity: 8)
+        let pair: [Character] = ["e\u{323}\u{301}", "e\u{301}\u{323}"]
+        for character in ["a\u{301}", "b\u{301}", "c\u{301}"] + pair {
+            _ = graphemes.cell(Terminal.Cell(), with: character)
+        }
+        for used in [[false, false, false, true, true], [true, false, true]] {
+            _ = graphemes.compact(keeping: used)
+            for character in pair {
+                let cell = graphemes.cell(Terminal.Cell(), with: character)
+                #expect(Array(graphemes.character(of: cell).unicodeScalars) == Array(character.unicodeScalars))
+            }
+            _ = graphemes.cell(Terminal.Cell(), with: "c\u{301}")
+        }
+    }
+
+    @Test func compactsTheTableForACanonicallyEquivalentCharacter() {
+        var graphemes = Terminal.Graphemes(capacity: 1)
+        _ = graphemes.cell(Terminal.Cell(), with: "e\u{323}\u{301}")
+        #expect(graphemes.needsCompaction(for: "e\u{301}\u{323}"))
+    }
+
     @Test(arguments: 0 ..< 40)
     func matchesATerminalWithALargeTable(seed: Int) {
         var generator = SeededGenerator(seed: UInt64(seed))
