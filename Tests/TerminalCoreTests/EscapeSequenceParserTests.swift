@@ -109,8 +109,9 @@ struct EscapeSequenceParserTests {
     }
 
     @Test func limitsOperatingSystemCommands() {
-        let title = String(repeating: "A", count: 5_000)
-        #expect(parse("\u{1B}]\(title)\u{7}") == [.operatingSystemCommand(String(title.prefix(4_096)))])
+        let title = String(repeating: "A", count: 4_096)
+        #expect(parse("\u{1B}]\(title)\u{7}") == [.operatingSystemCommand(title)])
+        #expect(parse("\u{1B}]\(title)A\u{7}B") == [.print("B")])
     }
 
     @Test func cancelsOperatingSystemCommands() {

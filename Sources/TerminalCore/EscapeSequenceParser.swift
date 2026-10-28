@@ -74,7 +74,7 @@ struct EscapeSequenceParser: Sendable {
         case .ignoredControlSequence:
             return ignoredControlSequence(scalar)
         case .operatingSystemCommand:
-            if string.count < Self.maximumStringLength {
+            if string.count <= Self.maximumStringLength {
                 string.append(scalar)
             }
             return nil
@@ -189,8 +189,11 @@ struct EscapeSequenceParser: Sendable {
         string = []
     }
 
-    private mutating func finishString() -> Action {
+    private mutating func finishString() -> Action? {
         state = .ground
+        guard string.count <= Self.maximumStringLength else {
+            return nil
+        }
         return .operatingSystemCommand(String(String.UnicodeScalarView(string)))
     }
 
