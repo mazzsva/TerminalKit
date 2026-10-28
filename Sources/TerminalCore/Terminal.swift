@@ -427,7 +427,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func print(_ scalar: Unicode.Scalar) {
-        guard scalar.width > 0 else {
+        guard scalar.isASCII || scalar.width > 0 else {
             combine(scalar)
             return
         }
@@ -439,7 +439,7 @@ package struct Terminal: Sendable {
 
     private mutating func place(_ scalar: Unicode.Scalar) {
         lastCharacter = scalar
-        let width = columns > 1 ? scalar.width : 1
+        let width = columns > 1 && !scalar.isASCII ? scalar.width : 1
         if isWrapPending || cursor.column + width > columns {
             if usesAutowrap {
                 let row = cursor.row
