@@ -58,6 +58,7 @@ package struct Terminal: Sendable {
     package private(set) var synchronizedOutputCount = 0
     package var reportedColors: [RGB] = []
     package private(set) var usesSGRMouseEncoding = false
+    package private(set) var modifyOtherKeys = 0
 
     package var isAlternateScreenActive: Bool {
         normalScreen != nil
@@ -349,6 +350,14 @@ package struct Terminal: Sendable {
         }
         if sequence.privateMarker != nil, sequence.final == "u" {
             setKeyboardFlags(sequence)
+            return
+        }
+        if sequence.privateMarker == ">",
+            sequence.final == "m" && [nil, 4].contains(sequence.parameters.first)
+                || sequence.final == "n" && sequence.parameters.first == 4
+        {
+            let level = sequence.final == "m" ? sequence.parameter(at: 1, default: 0) : 0
+            modifyOtherKeys = level <= 2 ? level : 0
             return
         }
         guard
@@ -853,6 +862,7 @@ package struct Terminal: Sendable {
         style = Style()
         usesLineDrawing = false
         savedCursor = SavedCursor()
+        modifyOtherKeys = 0
     }
 
     private mutating func moveForward(tabStops count: Int) {

@@ -307,10 +307,11 @@ final class TerminalContentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        let disambiguatedInput =
-            markedText.isEmpty && session.liveTerminal.usesDisambiguatedKeys
-            ? event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey) : nil
-        let keyInput = disambiguatedInput ?? (markedText.isEmpty ? event.lineDeletionInput : nil)
+        let modifiedInput =
+            session.liveTerminal.usesDisambiguatedKeys
+            ? event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey)
+            : event.otherKeyInput(level: session.liveTerminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
+        let keyInput = markedText.isEmpty ? modifiedInput ?? event.lineDeletionInput : nil
         guard !event.modifierFlags.contains(.command) || keyInput != nil else {
             super.keyDown(with: event)
             return

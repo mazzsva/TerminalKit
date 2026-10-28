@@ -80,6 +80,39 @@ extension NSEvent {
         return Array("\u{1B}[\(number)\(modifiers > 1 ? ";\(modifiers)" : "")u".utf8)
     }
 
+    func otherKeyInput(level: Int, usesOptionAsMetaKey: Bool) -> [UInt8]? {
+        guard level > 0, modifierFlags.isDisjoint(with: [.command, .numericPad]),
+            let key = charactersIgnoringModifiers?.unicodeScalars.first
+        else {
+            return nil
+        }
+        let usesMeta = usesOptionAsMetaKey && modifierFlags.contains(.option)
+        let modifiers = terminalModifiers - (modifierFlags.contains(.option) && !usesMeta ? 3 : 1)
+        let isControl = modifierFlags.contains(.control)
+        let number: UInt32? =
+            switch NSEvent.SpecialKey(rawValue: Int(key.value)) {
+            case .carriageReturn, .tab: key.value
+            case .backTab: level > 1 && modifiers & 6 != 0 ? 9 : nil
+            case .delete: level > 1 && modifiers & 3 != 0 ? (isControl ? 8 : 127) : nil
+            case .escape: level > 1 || usesMeta ? 27 : nil
+            case _
+            where key.value < 0x20 || (0xF700 ... 0xF8FF).contains(key.value)
+                || isControl && key.value >= 0x7F && characters?.unicodeScalars.first?.value ?? 0 < 0x20:
+                nil
+            case _ where level > 1: modifiers & 6 != 0 ? key.value : nil
+            default:
+                isControl
+                    && (key.value < 0x40
+                        ? modifiers == 7 || !" 2345678/".unicodeScalars.contains(key) : key.value >= 0x7F)
+                    ? key.value : nil
+            }
+        guard let number else {
+            return nil
+        }
+        let parameter = (level > 1 ? modifiers : modifiers & (usesMeta && [9, 13].contains(number) ? 1 : 5)) + 1
+        return parameter > 1 ? Array("\u{1B}[27;\(parameter);\(number)~".utf8) : nil
+    }
+
     func terminalInput(applicationCursorKeys: Bool = false) -> [UInt8]? {
         terminalInput(characters: characters, applicationCursorKeys: applicationCursorKeys)
     }
