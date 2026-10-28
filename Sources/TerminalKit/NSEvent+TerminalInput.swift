@@ -2,7 +2,7 @@ import AppKit
 
 extension NSEvent {
     var wordMovementInput: [UInt8]? {
-        guard modifierFlags.intersection([.option, .command]) == .option,
+        guard modifierFlags.intersection([.shift, .control, .option, .command]) == .option,
             let key = charactersIgnoringModifiers?.unicodeScalars.first
         else {
             return nil
