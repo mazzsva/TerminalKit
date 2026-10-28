@@ -194,6 +194,39 @@ struct TerminalTests {
         #expect(lines(terminal) == ["a "])
     }
 
+    @Test func keepsSpacingMarksThatDoNotCombine() {
+        var terminal = Terminal(columns: 6, rows: 1)
+        terminal.receive("\u{1019}\u{103C}\u{1014}\u{103A}\u{1019}\u{102C}\u{1038}")
+        #expect(
+            terminal.screen[0].map(terminal.character(of:)) == [
+                "\u{1019}\u{103C}", "\u{1014}\u{103A}", "\u{1019}", "\u{102C}", "\u{1038}", " ",
+            ])
+        #expect(terminal.screen[0].map(\.width) == [1, 1, 1, 1, 1, 1])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 5))
+    }
+
+    @Test func combinesAMarkWithASpacingMarkInItsOwnCell() {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("\u{1015}\u{1031}\u{102B}\u{103A}")
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["\u{1015}\u{1031}", "\u{102B}\u{103A}", " "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
+    @Test(arguments: ["\u{915}\u{93E}", "\u{B95}\u{BC6}\u{BBE}"])
+    func combinesSpacingMarksThatJoin(character: String) {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive(character + "x")
+        #expect(terminal.screen[0].map(terminal.character(of:)) == [Character(character), "x", " "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
+    @Test func keepsASpacingMarkWithoutAPreviousCharacter() {
+        var terminal = Terminal(columns: 3, rows: 1)
+        terminal.receive("\u{93E}x")
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["\u{93E}", "x", " "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+    }
+
     @Test func drawsLinesWithTheGraphicsCharacters() {
         var terminal = Terminal(columns: 5, rows: 3)
         terminal.receive("\u{1B}(0lqqqk\r\nx a x\r\nmqqqj\u{1B}(B")
@@ -282,6 +315,24 @@ struct TerminalTests {
         #expect(lines(terminal) == ["ab  ", "  c "])
     }
 
+    @Test func repeatsASpacingMarkLikePrintingIt() {
+        for columns in [1, 4] {
+            for start in ["", "\u{1B}[?7l", "\u{1B}[4h"] {
+                for move in ["", "\u{1B}[1;3H", "\u{1B}[1;4H"] {
+                    for count in [1, 15, 16, 17, 40, 1_000] {
+                        var repeated = Terminal(columns: columns, rows: 2)
+                        repeated.receive("\(start)ak中\r\u{93E}\(move)")
+                        var printed = repeated
+                        repeated.receive("\u{1B}[\(count)b")
+                        printed.receive(String(repeating: "\u{93E}", count: count))
+                        #expect(repeated.screen == printed.screen)
+                        #expect(repeated.cursor == printed.cursor)
+                    }
+                }
+            }
+        }
+    }
+
     @Test func repeatsThePrecedingCharacter() {
         var terminal = Terminal(columns: 6, rows: 2)
         terminal.receive("a\u{1B}[3b中\u{1B}[b")
@@ -290,7 +341,8 @@ struct TerminalTests {
 
     @Test(arguments: [
         (4, 3, "a"), (5, 2, "中"), (1, 3, "中"), (7, 1, "x"), (3, 4, "é"), (2, 2, "b"), (6, 3, "\u{1B}(0q"),
-        (1, 3, "a"), (4, 3, "中"), (6, 2, "\u{1F44D}"), (5, 3, "\u{1F44D}"), (3, 2, "\u{A9}"),
+        (1, 3, "a"), (4, 3, "中"), (6, 2, "\u{1F44D}"), (5, 3, "\u{1F44D}"), (3, 2, "\u{A9}"), (4, 3, "\u{102C}"),
+        (1, 3, "\u{102C}"), (6, 2, "\u{1100}"),
     ])
     func repeatsLikePrintingTheCharacter(columns: Int, rows: Int, character: String) {
         for start in ["", "\u{1B}[2;3H", "\u{1B}[2;3r\u{1B}[1;2H", "\u{1B}[?7l", "\u{1B}[4h\u{1B}[1;2H"] {
@@ -304,7 +356,7 @@ struct TerminalTests {
                 #expect(lines(repeated) == lines(printed))
                 #expect(repeated.screen.map(\.isWrapped) == printed.screen.map(\.isWrapped))
                 #expect(repeated.cursor == printed.cursor)
-                let width = columns > 1 ? character.unicodeScalars.last!.width : 1
+                let width = columns > 1 ? max(character.unicodeScalars.last!.width, 1) : 1
                 if count <= (rows + 1) * max(columns / width, 1) {
                     #expect(repeated.scrollback == printed.scrollback)
                     #expect(repeated.screen == printed.screen)
@@ -411,7 +463,7 @@ struct TerminalTests {
         }
     }
 
-    @Test(arguments: ["a", "中", "\u{1F44D}"])
+    @Test(arguments: ["a", "中", "\u{1F44D}", "\u{93E}"])
     func repeatsQuicklyAfterAnyCharacter(character: String) {
         for start in ["", "\u{1B}[?7l", "\u{1B}[4h"] {
             var terminal = Terminal(columns: 201, rows: 80)

@@ -257,6 +257,17 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: cell, of: wide) == pixels(in: cell, of: narrow))
     }
 
+    @Test(arguments: ["\\341\\200\\270", "\\341\\200\\254", "\\340\\244\\276", "\\340\\244\\276\\340\\244\\201"])
+    func drawsASpacingMarkInItsCell(character: String) async throws {
+        let mark = try await drawnView(running: "printf '\(character)x\\n'")
+        let spaced = try await drawnView(running: "printf ' x\\n'")
+        let first = CGRect(x: 4, y: 4, width: mark.cellSize.width, height: mark.cellSize.height)
+        let second = first.offsetBy(dx: mark.cellSize.width, dy: 0)
+        let edge = first.divided(atDistance: 1, from: .minXEdge).slice
+        #expect(try pixels(in: edge, of: mark) != pixels(in: edge, of: spaced))
+        #expect(try pixels(in: second, of: mark) == pixels(in: second, of: spaced))
+    }
+
     @Test func drawsEachCharacterInItsCellWithAProportionalFont() async throws {
         let narrow = try await drawnView(running: "printf 'iiiiW\\n'")
         let spaced = try await drawnView(running: "printf '    W\\n'")

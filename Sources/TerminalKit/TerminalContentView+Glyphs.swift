@@ -45,8 +45,10 @@ final class GlyphCache {
     }
 
     private func makeEntry(for character: Character, font: NSFont) -> Entry {
+        let isMark = character.unicodeScalars.first?.properties.generalCategory == .spacingMark
         let line = CTLineCreateWithAttributedString(
-            NSAttributedString(string: String(character), attributes: [.font: font]))
+            NSAttributedString(string: (isMark ? "\u{A0}" : "") + String(character), attributes: [.font: font]))
+        let offset = isMark ? CTLineGetImageBounds(line, nil).minX : 0
         var ascent: CGFloat = 0
         CTLineGetTypographicBounds(line, &ascent, nil, nil)
         let runs = (CTLineGetGlyphRuns(line) as? [CTRun] ?? [])
@@ -58,7 +60,8 @@ final class GlyphCache {
                 CTRunGetPositions(run, CFRange(), &positions)
                 let attributes = CTRunGetAttributes(run) as? [NSAttributedString.Key: Any]
                 let runFont = attributes?[.font] as? NSFont ?? font
-                return Run(font: runFont, glyphs: glyphs, positions: positions)
+                return Run(
+                    font: runFont, glyphs: glyphs, positions: positions.map { CGPoint(x: $0.x - offset, y: $0.y) })
             }
         return Entry(ascent: ascent, runs: runs)
     }
