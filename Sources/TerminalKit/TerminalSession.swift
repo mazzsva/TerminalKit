@@ -184,7 +184,7 @@ public final class TerminalSession {
     }
 }
 
-extension TerminalSession: Identifiable, Hashable {
+extension TerminalSession: nonisolated Identifiable, nonisolated Hashable {
     public nonisolated static func == (lhs: TerminalSession, rhs: TerminalSession) -> Bool {
         lhs === rhs
     }
