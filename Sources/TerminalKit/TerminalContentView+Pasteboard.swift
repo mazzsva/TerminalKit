@@ -99,7 +99,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     }
 
     func paste(from pasteboard: NSPasteboard) {
-        guard let text = pasteboard.string(forType: .string) else {
+        guard let text = Self.droppedText(from: pasteboard) else {
             return
         }
         paste(text: text)
@@ -136,7 +136,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
         case #selector(copy(_:)):
             hasSelectedText || markedText.isEmpty && session.liveTerminal.usesDisambiguatedKeys
         case #selector(paste(_:)):
-            NSPasteboard.general.availableType(from: [.string]) != nil
+            NSPasteboard.general.availableType(from: [.fileURL, .string]) != nil
         case #selector(performTextFinderAction(_:)):
             (enclosingScrollView as? TerminalScrollView)?.validateMenuItem(menuItem) ?? false
         default:

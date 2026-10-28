@@ -35,6 +35,29 @@ struct TerminalPasteTests {
         let bytes = try await pastedBytes("ab", mode: "\\033[?2004h\\033[?2004l", count: 2)
         #expect(bytes == "61  62")
     }
+
+    @Test func pastesACopiedFileAsItsPath() async throws {
+        let item = NSPasteboardItem()
+        item.setString(URL(filePath: "/tmp/My Shot.png").absoluteString, forType: .fileURL)
+        item.setString("My Shot.png", forType: .string)
+        #expect(try await pastedLines([item]).contains("</tmp/My\\ Shot.png >"))
+    }
+
+    @Test func pastesACopiedFileWithoutAName() async throws {
+        #expect(try await pastedLines([URL(filePath: "/tmp/My Shot.png") as NSURL]).contains("</tmp/My\\ Shot.png >"))
+    }
+}
+
+@MainActor
+private func pastedLines(_ objects: [any NSPasteboardWriting]) async throws -> [String] {
+    let (view, session) = try startedView(running: "IFS= read -r a; printf '<%s>\\n' \"$a\"")
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+    defer { pasteboard.releaseGlobally() }
+    pasteboard.clearContents()
+    pasteboard.writeObjects(objects)
+    view.paste(from: pasteboard)
+    session.send("\r")
+    return await session.linesAfterExit()
 }
 
 @MainActor
