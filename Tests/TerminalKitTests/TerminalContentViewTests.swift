@@ -371,6 +371,32 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: edge, of: view).allSatisfy { isClose($0, to: selected) || isClose($0, to: fill) })
     }
 
+    @Test(arguments: [false, true], [1, 2] as [CGFloat])
+    func drawsAVerticalLineWithoutASeamBetweenRows(isSelected: Bool, scale: CGFloat) async throws {
+        let view = try await drawnView(
+            running: isSelected ? "printf '│\\r\\n│\\n'" : "printf '\\033[44m│\\r\\n│\\033[m\\n'")
+        let window = ScaledWindow(contentView: view)
+        window.scale = scale
+        view.appearance = NSAppearance(named: .aqua)
+        if isSelected {
+            view.selection = TerminalContentView.Selection(
+                anchor: .init(line: 0, column: 0), head: .init(line: 1, column: 1))
+        }
+        let strip = CGRect(x: 0, y: 4 + view.cellSize.height, width: view.bounds.width, height: view.cellSize.height)
+        let representation = try #require(view.bitmapImageRepForCachingDisplay(in: strip))
+        view.cacheDisplay(in: strip, to: representation)
+        let background = try #require(
+            color(in: representation, at: CGPoint(x: 4, y: view.cellSize.height / 2))?.usingColorSpace(.sRGB))
+        func ink(y: CGFloat) -> CGFloat {
+            stride(from: 4 + view.cellSize.width / 4, to: 4 + view.cellSize.width * 3 / 4, by: 1 / scale)
+                .compactMap { color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB) }
+                .map { abs($0.brightnessComponent - background.brightnessComponent) }
+                .max() ?? 0
+        }
+        #expect(ink(y: 0) >= ink(y: view.cellSize.height / 2))
+        #expect(ink(y: view.cellSize.height / 2) > 0.2)
+    }
+
     @Test(
         arguments: [
             ("█", [CGRect(x: 0, y: 0, width: 1, height: 1)]), ("▀", [CGRect(x: 0, y: 0, width: 1, height: 0.5)]),

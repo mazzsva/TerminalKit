@@ -363,12 +363,12 @@ final class TerminalContentView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.foreground]
         let graphemes = terminal.graphemes
         let lineCount = terminal.scrollback.count + terminal.rows
-        let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height), 0)
+        let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height) - 1, 0)
         let lastRow = min(Int((dirtyRect.maxY - Self.padding) / cellSize.height), lineCount - 1)
-        for row in firstRow ..< max(lastRow + 1, firstRow) {
+        let rows = firstRow ..< max(lastRow + 1, firstRow)
+        for row in rows {
             let line = line(at: row, in: terminal)
-            let runs = Self.runs(in: line)
-            for (columns, style) in runs {
+            for (columns, style) in Self.runs(in: line) {
                 if let background = colors.colors(for: style).background {
                     background.setFill()
                     backingAlignedRect(rect(row: row, columns: columns), options: .alignAllEdgesNearest).fill()
@@ -383,7 +383,10 @@ final class TerminalContentView: NSView {
                 selectionColor.setFill()
                 backingAlignedRect(rect(row: row, columns: columns), options: .alignAllEdgesNearest).fill()
             }
-            for (columns, style) in runs {
+        }
+        for row in rows {
+            let line = line(at: row, in: terminal)
+            for (columns, style) in Self.runs(in: line) {
                 drawText(
                     line,
                     columns: columns,
