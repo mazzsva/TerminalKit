@@ -33,7 +33,7 @@ extension Terminal {
     package struct Graphemes: Sendable {
         let capacity: Int
         private var characters: [Character] = []
-        private var indices: [Character: UInt32] = [:]
+        private var indices: [[Unicode.Scalar]: UInt32] = [:]
         private var additionsSinceCompaction = 0
         private var compactionInterval: Int
 
@@ -59,7 +59,7 @@ extension Terminal {
 
         func needsCompaction(for character: Character) -> Bool {
             characters.count >= capacity && additionsSinceCompaction >= compactionInterval
-                && character.unicodeScalars.count > 1 && indices[character] == nil
+                && character.unicodeScalars.count > 1 && indices[Array(character.unicodeScalars)] == nil
         }
 
         mutating func cell(_ cell: Cell, with character: Character) -> Cell {
@@ -93,11 +93,11 @@ extension Terminal {
             if kept.count < characters.count - kept.count {
                 indices.removeAll(keepingCapacity: true)
                 for (index, character) in kept.enumerated() {
-                    indices[character] = UInt32(index)
+                    indices[Array(character.unicodeScalars)] = UInt32(index)
                 }
             } else {
                 for (index, character) in characters.enumerated() where !used[index] {
-                    indices[character] = nil
+                    indices[Array(character.unicodeScalars)] = nil
                 }
                 indices = indices.mapValues { newIndices[Int($0)] }
             }
@@ -119,7 +119,7 @@ extension Terminal {
         }
 
         private mutating func index(of character: Character) -> UInt32? {
-            if let index = indices[character] {
+            if let index = indices[Array(character.unicodeScalars)] {
                 return index
             }
             additionsSinceCompaction += 1
@@ -128,7 +128,7 @@ extension Terminal {
             }
             let index = UInt32(characters.count)
             characters.append(character)
-            indices[character] = index
+            indices[Array(character.unicodeScalars)] = index
             return index
         }
     }
