@@ -316,7 +316,7 @@ final class TerminalContentView: NSView {
             return
         }
         scrollToBottom()
-        if let input = keyInput ?? event.wordMovementInput {
+        if let input = keyInput {
             session.send(input)
             return
         }
@@ -324,7 +324,7 @@ final class TerminalContentView: NSView {
             session.send(input)
             return
         }
-        if usesOptionAsMetaKey, event.modifierFlags.contains(.option),
+        if markedText.isEmpty, usesOptionAsMetaKey, event.modifierFlags.contains(.option),
             let input = event.metaInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
         {
             session.send(input)
@@ -340,8 +340,8 @@ final class TerminalContentView: NSView {
     }
 
     override func doCommand(by selector: Selector) {
-        if let input = keyDownEvent?
-            .terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
+        if let input = keyDownEvent?.wordMovementInput
+            ?? keyDownEvent?.terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
         {
             session.send(input)
             keyDownEvent = nil

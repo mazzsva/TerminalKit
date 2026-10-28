@@ -683,6 +683,43 @@ struct TerminalContentViewTests {
         #expect(await !session.linesAfterExit().contains { $0.contains("got 00") })
     }
 
+    @Test func leavesOptionKeysToTheMarkedText() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 1 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        view.usesOptionAsMetaKey = true
+        object_setClass(view.inputContext, ComposingInputContext.self)
+        try session.start()
+        await session.waitForText("ready")
+        view.setMarkedText(
+            "か",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.keyDown(with: try keyDown(NSLeftArrowFunctionKey, modifierFlags: .option))
+        view.keyDown(with: try keyDown(NSRightArrowFunctionKey, modifierFlags: .option))
+        view.keyDown(with: try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option))
+        view.unmarkText()
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("78"))
+    }
+
+    @Test func sendsTheOptionArrowsThatTheInputSystemReturns() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.setMarkedText(
+            "か",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.keyDown(with: try keyDown(NSLeftArrowFunctionKey, modifierFlags: .option))
+        view.keyDown(with: try keyDown(NSRightArrowFunctionKey, modifierFlags: .option))
+        view.unmarkText()
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("1b  62  1b  66  78"))
+    }
+
     @Test func sendsAKeyWithTwoCommandsOnce() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 7 | od -An -tx1")
         let view = TerminalContentView(session: session)
@@ -891,6 +928,12 @@ private func isClose(_ color: NSColor?, to components: [CGFloat]) -> Bool {
 private final class StandardScaleWindow: NSWindow {
     override var backingScaleFactor: CGFloat {
         1
+    }
+}
+
+private final class ComposingInputContext: NSTextInputContext {
+    override func handleEvent(_ event: NSEvent) -> Bool {
+        client.hasMarkedText() || super.handleEvent(event)
     }
 }
 
