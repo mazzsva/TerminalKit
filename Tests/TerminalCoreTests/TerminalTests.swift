@@ -1358,7 +1358,10 @@ struct TerminalTests {
         #expect(terminal.character(of: terminal.screen[0][0]) == "x")
     }
 
-    @Test(arguments: ["\u{1B}[2:2H", "\u{1B}[4:1h", "\u{1B}[2:1J", "\u{1B}[1:2P"])
+    @Test(arguments: [
+        "\u{1B}[2:2H", "\u{1B}[4:1h", "\u{1B}[2:1J", "\u{1B}[1:2P",
+        "\u{1B}[2\(String(repeating: ";1", count: 31)):1H",
+    ])
     func ignoresColonsInOtherControlSequences(sequence: String) {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("ab\u{1B}[H" + sequence + "x")
