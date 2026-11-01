@@ -1081,10 +1081,38 @@ struct TerminalTests {
         #expect(lines(terminal) == ["    "])
     }
 
-    @Test func ignoresASecondSwitch() {
+    @Test(arguments: [47, 1047, 1049])
+    func clearsTheAlternateScreenOnEach1049(mode: Int) {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("\u{1B}[?\(mode)hxy\r\nz\u{1B}[A\u{1B}[44m\u{1B}[?1049h")
+        #expect(lines(terminal) == ["  ", "  "])
+        #expect(terminal.screen.flatMap { $0.map(\.style.background) } == Array(repeating: .indexed(4), count: 4))
+    }
+
+    @Test(arguments: [47, 1047])
+    func keepsTheAlternateScreenOnASecondSwitch(mode: Int) {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("ab\u{1B}[?1049hx\u{1B}[?1049h\u{1B}[?1049l")
-        #expect(lines(terminal) == ["ab  "])
+        terminal.receive("\u{1B}[?1049hx\u{1B}[?\(mode)hy")
+        #expect(lines(terminal) == ["xy  "])
+    }
+
+    @Test func savesTheCursorOnASecond1049() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?1049h\u{1B}[3G\u{1B}[?1049h\u{1B}[H\u{1B}8x")
+        #expect(lines(terminal) == ["  x "])
+    }
+
+    @Test func resetsThePendingWrapOn1049() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("abcd\u{1B}[?1049hx")
+        #expect(lines(terminal) == ["   x"])
+    }
+
+    @Test(arguments: [47, 1047, 1049])
+    func restoresTheNormalCursorAfterASecondSwitch(mode: Int) {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("ab\u{1B}7\u{1B}[?\(mode)hx\u{1B}[?1049h\u{1B}[?1049lc")
+        #expect(lines(terminal) == ["abc "])
     }
 
     @Test func resizesTheNormalScreenOnTheAlternateScreen() {

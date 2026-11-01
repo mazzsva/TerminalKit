@@ -942,6 +942,7 @@ package struct Terminal: Sendable {
         case (1049, true):
             saveCursor()
             enterAlternateScreen()
+            eraseInDisplay(2)
         case (1049, false):
             exitAlternateScreen()
             restoreCursor()
