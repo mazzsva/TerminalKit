@@ -44,6 +44,8 @@ struct ContentView: View {
 }
 ```
 
+Send input with `send(_:)` only after `start()`. Input sent before `start()` is dropped.
+
 ## Engineering decisions
 
 **Built for Claude Code.** Each protocol traces to the official Claude Code docs: the kitty keyboard protocol for Shift-Return, synchronized output, mouse hover, color queries for the automatic theme, and hyperlinks.
