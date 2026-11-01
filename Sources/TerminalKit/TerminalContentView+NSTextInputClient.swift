@@ -3,6 +3,7 @@ import AppKit
 extension TerminalContentView: NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
         markedText = ""
+        scrollToBottom()
         session.send(Array(text(of: string).utf8))
     }
 
