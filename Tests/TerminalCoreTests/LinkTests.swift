@@ -137,7 +137,7 @@ struct LinkTests {
     }
 
     @Test func keepsTheCellSmall() {
-        #expect(MemoryLayout<Terminal.Cell>.stride == 16)
+        #expect(MemoryLayout<Terminal.Cell>.stride == 20)
     }
 }
 

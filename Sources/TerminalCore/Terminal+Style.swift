@@ -8,12 +8,14 @@ extension Terminal {
     package struct Style: Equatable, Sendable {
         package var foreground = Color.default
         package var background = Color.default
+        package var underlineColor = Color.default
         package var link: UInt16 = 0
         private var flags: UInt8 = 0
 
         package init(
             foreground: Color = .default,
             background: Color = .default,
+            underlineColor: Color = .default,
             link: UInt16 = 0,
             isBold: Bool = false,
             isFaint: Bool = false,
@@ -25,6 +27,7 @@ extension Terminal {
         ) {
             self.foreground = foreground
             self.background = background
+            self.underlineColor = underlineColor
             self.link = link
             self.isBold = isBold
             self.isFaint = isFaint
@@ -125,7 +128,9 @@ extension Terminal {
                 case 49:
                     background = .default
                 case 58:
-                    _ = Self.color(from: &parameters)
+                    underlineColor = Self.color(from: &parameters) ?? underlineColor
+                case 59:
+                    underlineColor = .default
                 case 90 ... 97:
                     foreground = .indexed(UInt8(parameter - 82))
                 case 100 ... 107:
@@ -157,9 +162,9 @@ extension Terminal {
                 [24]
             case (4, 1 ... 5, 2):
                 [4]
-            case (38, 5, 3), (48, 5, 3), (38, 2, 5), (48, 2, 5):
+            case (38, 5, 3), (48, 5, 3), (58, 5, 3), (38, 2, 5), (48, 2, 5), (58, 2, 5):
                 group
-            case (38, 2, 6), (48, 2, 6):
+            case (38, 2, 6), (48, 2, 6), (58, 2, 6):
                 Array(group.prefix(2) + group.suffix(3))
             case (4, _, _), (38, _, _), (48, _, _), (58, _, _):
                 []

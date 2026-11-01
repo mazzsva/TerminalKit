@@ -233,6 +233,17 @@ struct TerminalContentViewTests {
         #expect(characterWindow.firstResponder === character && spaceWindow.firstResponder === space)
     }
 
+    @Test func drawsTheUnderlineUnderTheCursorInTheCursorTextColor() async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[4;58;2;0;200;0mX\\033[m\\b'")
+        let font = view.fonts.regular
+        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let representation = try representation(of: view)
+        let underline = try stride(from: view.cursorRect.minX, to: view.cursorRect.maxX, by: 1)
+            .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
+        #expect(underline.allSatisfy { $0.greenComponent - max($0.redComponent, $0.blueComponent) < 0.1 })
+        #expect(window.firstResponder === view)
+    }
+
     @Test func coversAWideCharacterWithTheCursor() async throws {
         let view = try await drawnView(running: "printf '中\\b\\b'")
         #expect(view.cursorRect.width == 2 * view.cellSize.width)
@@ -338,6 +349,92 @@ struct TerminalContentViewTests {
         let underline = stride(from: 4 + view.cellSize.width / 4, to: 4 + view.cellSize.width * 3.75, by: 1)
             .map { color(in: representation, at: CGPoint(x: $0, y: y)) }
         #expect(underline.allSatisfy { $0 != background })
+    }
+
+    @Test(arguments: ["", "2;", "7;", "9;"], [1, 2] as [CGFloat])
+    func drawsTheUnderlineColor(parameters: String, scale: CGFloat) async throws {
+        let plain = try await drawnView(running: "printf '\\033[\(parameters)4mab\\033[m\\r'")
+        let view = try await drawnView(running: "printf '\\033[\(parameters)4;58;2;0;200;0mab\\033[m\\r'")
+        var palette = TerminalPalette.standard
+        palette.background = .clear
+        plain.palette = palette
+        view.palette = palette
+        let windows = [ScaledWindow(contentView: plain), ScaledWindow(contentView: view)]
+        for window in windows {
+            window.scale = scale
+        }
+        let font = view.fonts.regular
+        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let representation = try representation(of: view)
+        let underline = try stride(from: 4, to: 3 + 2 * view.cellSize.width, by: 1 / scale)
+            .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
+        #expect(underline.allSatisfy { $0.greenComponent - max($0.redComponent, $0.blueComponent) > 0.1 })
+        let text = CGRect(x: 4, y: 4, width: 2 * view.cellSize.width, height: font.ascender)
+        #expect(try pixels(in: text, of: view) == pixels(in: text, of: plain))
+    }
+
+    @Test(arguments: ["", "7;"], [1, 2] as [CGFloat])
+    func drawsTheUnderlineInTheTextColor(parameters: String, scale: CGFloat) async throws {
+        let view = try await drawnView(running: "printf '\\033[\(parameters)4;31mab\\033[m\\r'")
+        let window = ScaledWindow(contentView: view)
+        window.scale = scale
+        let font = view.fonts.regular
+        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let representation = try representation(of: view)
+        let underline = try stride(from: 4, to: 3 + 2 * view.cellSize.width, by: 1 / scale)
+            .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
+        #expect(
+            underline.allSatisfy {
+                ($0.redComponent - max($0.greenComponent, $0.blueComponent) > 0.1) == parameters.isEmpty
+            })
+    }
+
+    @Test(arguments: [1, 2] as [CGFloat])
+    func drawsTheUnderlineColorInReverseVideo(scale: CGFloat) async throws {
+        let plain = try await drawnView(running: "printf '\\033[?5h\\033[4;30mab\\033[m\\r'")
+        let view = try await drawnView(running: "printf '\\033[?5h\\033[4;30;58;5;0mab\\033[m\\r'")
+        let windows = [ScaledWindow(contentView: plain), ScaledWindow(contentView: view)]
+        for window in windows {
+            window.scale = scale
+        }
+        let font = view.fonts.regular
+        let thickness = max(font.underlineThickness, 1)
+        let underline = CGRect(
+            x: 4, y: 4 + font.ascender - font.underlinePosition, width: 2 * view.cellSize.width, height: thickness)
+        #expect(view.session.terminal.usesReverseVideo)
+        #expect(try pixels(in: underline, of: view) == pixels(in: underline, of: plain))
+    }
+
+    @Test(arguments: [1, 2] as [CGFloat])
+    func drawsNoUnderlineForTheUnderlineColorAlone(scale: CGFloat) async throws {
+        let plain = try await drawnView(running: "printf 'ab\\r'")
+        let view = try await drawnView(running: "printf '\\033[58;2;0;200;0mab\\033[m\\r'")
+        let windows = [ScaledWindow(contentView: plain), ScaledWindow(contentView: view)]
+        for window in windows {
+            window.scale = scale
+        }
+        let font = view.fonts.regular
+        let thickness = max(font.underlineThickness, 1)
+        let underline = CGRect(
+            x: 4, y: 4 + font.ascender - font.underlinePosition, width: 2 * view.cellSize.width, height: thickness)
+        #expect(try pixels(in: underline, of: view) == pixels(in: underline, of: plain))
+    }
+
+    @Test(arguments: ["", "58;2;0;200;0;"], [1, 2] as [CGFloat])
+    func drawsAFaintUnderline(parameters: String, scale: CGFloat) async throws {
+        let plain = try await drawnView(running: "printf '\\033[\(parameters)4mab\\033[m\\r'")
+        let view = try await drawnView(running: "printf '\\033[2;\(parameters)4mab\\033[m\\r'")
+        let windows = [ScaledWindow(contentView: plain), ScaledWindow(contentView: view)]
+        for window in windows {
+            window.scale = scale
+        }
+        let font = view.fonts.regular
+        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let representations = try [representation(of: plain), representation(of: view)]
+        for x in stride(from: 4, to: 3 + 2 * view.cellSize.width, by: 1 / scale) {
+            let point = CGPoint(x: x, y: y)
+            #expect(color(in: representations[0], at: point) != color(in: representations[1], at: point))
+        }
     }
 
     @Test func drawsTheBackgroundColor() async throws {
