@@ -622,7 +622,7 @@ package struct Terminal: Sendable {
             style.link = 0
             return
         }
-        if links.needsCompaction(forKey: key, uri: uri) {
+        if links.needsCompaction(forKey: key) {
             compactLinks()
         }
         style.link = links.link(forKey: key, uri: uri)

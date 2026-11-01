@@ -68,7 +68,7 @@ struct LinkTests {
         var links = Terminal.Links(capacity: 80)
         var compactions = 0
         for index in 0 ..< 2_000 {
-            if links.needsCompaction(forKey: "\(index)", uri: "\(index)") {
+            if links.needsCompaction(forKey: "\(index)") {
                 _ = links.compact(keeping: Array(repeating: true, count: links.count))
                 compactions += 1
             }
@@ -80,7 +80,7 @@ struct LinkTests {
         for index in 0 ..< 64 {
             _ = links.link(forKey: "new \(index)", uri: "new")
         }
-        #expect(links.needsCompaction(forKey: "next", uri: "next"))
+        #expect(links.needsCompaction(forKey: "next"))
     }
 
     @Test func keepsTheLinkOfTheSavedCursorThroughACompaction() {
@@ -111,6 +111,29 @@ struct LinkTests {
         terminal.links = Terminal.Links(byteCapacity: 10)
         terminal.receive("\u{1B}]8;;12345\u{7}a\u{1B}]8;;67890\u{7}b\u{1B}]8;;x\u{7}c")
         #expect(uris(terminal.screen[0].prefix(3), in: terminal) == ["12345", "67890", nil])
+    }
+
+    @Test func countsTheLinkIdentifiersInTheByteLimit() {
+        var terminal = Terminal(columns: 80, rows: 24)
+        terminal.links = Terminal.Links(byteCapacity: 10_000)
+        let id = String(repeating: "\u{10FFFD}", count: 250)
+        var linked = 0
+        for index in 0 ..< 100 {
+            terminal.receive("\u{1B}[2K\r\u{1B}]8;id=\(index)\(id);x\u{7}a\u{1B}]8;;\u{7}")
+            linked += terminal.screen[0][0].style.link == 0 ? 0 : 1
+        }
+        #expect(terminal.links.count <= terminal.links.byteCapacity / id.utf8.count)
+        #expect(linked > terminal.links.byteCapacity / id.utf8.count)
+    }
+
+    @Test func keepsTheLinkIdentifierBytesThroughACompaction() {
+        var terminal = Terminal(columns: 80, rows: 24)
+        terminal.links = Terminal.Links(byteCapacity: 10_000)
+        let id = String(repeating: "\u{10FFFD}", count: 250)
+        for index in 0 ..< 200 {
+            terminal.receive("\u{1B}]8;id=\(index)\(id);x\u{7}a\u{1B}]8;;\u{7}")
+        }
+        #expect(terminal.links.count <= terminal.links.byteCapacity / id.utf8.count)
     }
 
     @Test(arguments: ["\u{7}", "\u{1B}\\"])
