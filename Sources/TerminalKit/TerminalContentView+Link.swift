@@ -21,7 +21,7 @@ extension TerminalContentView {
     private static let schemes: Set<String> = ["http", "https", "mailto", "ftp", "file"]
     private static let launchingExtensions: Set<String> = [
         "app", "command", "tool", "terminal", "workflow", "action", "pkg", "mpkg", "scpt", "scptd", "applescript",
-        "jar", "url", "mobileconfig", "prefpane", "saver",
+        "jar", "url", "mobileconfig", "prefpane", "saver", "term", "configprofile", "ipa", "tcl",
     ]
     private static let pairs: [Character: Character] = [
         ")": "(", "]": "[", "}": "{", "）": "（", "」": "「", "』": "『", "】": "【", "〕": "〔", "］": "［", "｝": "｛",
