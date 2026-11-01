@@ -244,9 +244,25 @@ struct TerminalContentViewTests {
         #expect(window.firstResponder === view)
     }
 
-    @Test func coversAWideCharacterWithTheCursor() async throws {
-        let view = try await drawnView(running: "printf '中\\b\\b'")
-        #expect(view.cursorRect.width == 2 * view.cellSize.width)
+    @Test(arguments: [("中\\b\\b", 0), ("中\\b", 0), ("%78s中", 78)])
+    func coversAWideCharacterWithTheCursor(text: String, column: Int) async throws {
+        let view = try await drawnView(running: "printf '\(text)'")
+        #expect(view.cursorRect == view.rect(row: 0, columns: column ..< column + 2))
+    }
+
+    @Test(arguments: [1, 2] as [CGFloat])
+    func drawsTheWideCharacterUnderTheCursor(scale: CGFloat) async throws {
+        let view = try await drawnView(running: "printf '中\\b'")
+        let window = ScaledKeyWindow(contentView: view)
+        window.scale = scale
+        view.palette.cursor = .red
+        for column in 0 ..< 2 {
+            let cell = view.rect(row: 0, columns: column ..< column + 1).insetBy(dx: 1, dy: 1)
+            let pixels = try pixels(in: cell, of: view).map { try #require($0?.usingColorSpace(.sRGB)) }
+            #expect(pixels.contains { $0.redComponent - $0.greenComponent > 0.3 })
+            #expect(pixels.contains { $0.redComponent - $0.greenComponent < 0.3 })
+        }
+        #expect(window.firstResponder === view)
     }
 
     @Test func hidesTheCursor() async throws {
@@ -1100,6 +1116,14 @@ private func isClose(_ color: NSColor?, to components: [CGFloat]) -> Bool {
 }
 
 private final class ScaledWindow: NSWindow {
+    var scale: CGFloat = 1
+
+    override var backingScaleFactor: CGFloat {
+        scale
+    }
+}
+
+private final class ScaledKeyWindow: KeyWindow {
     var scale: CGFloat = 1
 
     override var backingScaleFactor: CGFloat {

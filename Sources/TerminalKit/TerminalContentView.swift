@@ -607,8 +607,11 @@ final class TerminalContentView: NSView {
 
     private var cursorColumns: Range<Int> {
         let cursor = session.terminal.cursor
-        let width = max(Int(session.terminal.screen[cursor.row][cursor.column].width), 1)
-        return cursor.column ..< cursor.column + width
+        let width = Int(session.terminal.screen[cursor.row][cursor.column].width)
+        if width == 0, cursor.column > 0 {
+            return cursor.column - 1 ..< cursor.column + 1
+        }
+        return cursor.column ..< cursor.column + max(width, 1)
     }
 
     func fit(to size: CGSize) {
