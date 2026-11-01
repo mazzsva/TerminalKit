@@ -255,6 +255,11 @@ package final class PseudoTerminal: Sendable {
         }
         var size = winsize(columns: columns, rows: rows)
         _ = ioctl(secondary, TIOCSWINSZ, &size)
+        var attributes = termios()
+        if tcgetattr(secondary, &attributes) == 0 {
+            attributes.c_iflag |= tcflag_t(IUTF8)
+            _ = tcsetattr(secondary, TCSANOW, &attributes)
+        }
         _ = fcntl(primary, F_SETFL, fcntl(primary, F_GETFL) | O_NONBLOCK)
         return (primary, secondary)
     }
