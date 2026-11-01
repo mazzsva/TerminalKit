@@ -5,7 +5,7 @@ extension Unicode.Scalar {
         guard !isASCII else {
             return 1
         }
-        let width = Int(character_width(value))
+        let width = Int(terminalkit_character_width(value))
         guard width < 0 else {
             return width
         }

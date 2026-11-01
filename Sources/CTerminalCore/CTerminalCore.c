@@ -8,7 +8,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-int spawn_in_terminal(
+int terminalkit_spawn_in_terminal(
     pid_t *pid,
     int terminal,
     const char *path,

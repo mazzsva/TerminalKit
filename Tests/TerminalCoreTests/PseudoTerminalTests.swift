@@ -33,6 +33,11 @@ struct PseudoTerminalTests {
         #expect(failures.withLock { $0 } == 0)
     }
 
+    @Test func exportsAPrefixedName() {
+        #expect(dlsym(dlopen(nil, RTLD_NOW), "spawn_in_terminal") == nil)
+        #expect(dlsym(dlopen(nil, RTLD_NOW), "terminalkit_spawn_in_terminal") != nil)
+    }
+
     @Test func reportsTheExitStatus() async throws {
         #expect(try await termination("exit 3") == .exit(3))
     }

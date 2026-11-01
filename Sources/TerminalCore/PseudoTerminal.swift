@@ -299,7 +299,7 @@ package final class PseudoTerminal: Sendable {
         }
 
         var processIdentifier: pid_t = 0
-        let result = spawn_in_terminal(
+        let result = terminalkit_spawn_in_terminal(
             &processIdentifier,
             terminal,
             path,

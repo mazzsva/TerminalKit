@@ -1,3 +1,4 @@
+import Darwin
 import Testing
 
 @testable import TerminalCore
@@ -31,5 +32,10 @@ struct CharacterWidthTests {
     @Test(arguments: ["\u{FEFF}", "\u{897}", "\u{1ACF}"])
     func measuresUnknownZeroWidthCharacters(character: Unicode.Scalar) {
         #expect(character.width == 0)
+    }
+
+    @Test func exportsAPrefixedName() {
+        #expect(dlsym(dlopen(nil, RTLD_NOW), "character_width") == nil)
+        #expect(dlsym(dlopen(nil, RTLD_NOW), "terminalkit_character_width") != nil)
     }
 }
