@@ -304,6 +304,17 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: cells, of: first) == pixels(in: cells, of: spaced))
     }
 
+    @Test(
+        arguments: [("\u{585A}", "\u{FA10}"), ("\u{03B1}\u{0301}", "\u{1F71}"), ("\u{1F44D}", "\u{1F44D}\u{1F3FD}")]
+            as [(Character, Character)])
+    func keysTheGlyphsByTheExactScalarsOfACharacter(drawn: Character, character: Character) {
+        let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        let cache = GlyphCache()
+        _ = cache.entry(for: drawn, font: font, index: 0)
+        let glyphs = cache.entry(for: character, font: font, index: 0).runs.map(\.glyphs)
+        #expect(glyphs == GlyphCache().entry(for: character, font: font, index: 0).runs.map(\.glyphs))
+    }
+
     @Test(arguments: ["⏺", "⏸"], [1, 2] as [CGFloat])
     func drawsTheGlyphsOfTheFallbackFontOnTheBaseline(character: Character, scale: CGFloat) async throws {
         let view = try await drawnView(running: "printf 'a \(character)\\n'")
