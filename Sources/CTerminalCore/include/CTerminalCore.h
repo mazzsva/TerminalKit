@@ -1,7 +1,7 @@
 #include <spawn.h>
 #include <stdint.h>
 
-int spawn_in_terminal(
+int terminalkit_spawn_in_terminal(
     pid_t *pid,
     int terminal,
     const char *path,
@@ -11,4 +11,4 @@ int spawn_in_terminal(
     char *const environment[]
 );
 
-int character_width(uint32_t scalar);
+int terminalkit_character_width(uint32_t scalar);

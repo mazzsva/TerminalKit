@@ -11,7 +11,7 @@ static void create_utf8_locale(void) {
     utf8_locale = newlocale(LC_CTYPE_MASK, "UTF-8", NULL);
 }
 
-int character_width(uint32_t scalar) {
+int terminalkit_character_width(uint32_t scalar) {
     pthread_once(&utf8_locale_once, create_utf8_locale);
     return wcwidth_l((wchar_t)scalar, utf8_locale);
 }
