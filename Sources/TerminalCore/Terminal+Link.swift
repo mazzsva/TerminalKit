@@ -26,8 +26,8 @@ extension Terminal {
             compactionInterval = 64
         }
 
-        func needsCompaction(forKey key: String, uri: String) -> Bool {
-            isFull(adding: uri) && additionsSinceCompaction >= compactionInterval && indices[key] == nil
+        func needsCompaction(forKey key: String) -> Bool {
+            isFull(adding: key) && additionsSinceCompaction >= compactionInterval && indices[key] == nil
         }
 
         mutating func link(forKey key: String, uri: String) -> UInt16 {
@@ -35,14 +35,14 @@ extension Terminal {
                 return index
             }
             additionsSinceCompaction += 1
-            guard !isFull(adding: uri) else {
+            guard !isFull(adding: key) else {
                 return 0
             }
             let index = UInt16(uris.count)
             keys.append(key)
             uris.append(uri)
             indices[key] = index
-            byteCount += uri.utf8.count
+            byteCount += key.utf8.count
             return index
         }
 
@@ -68,7 +68,7 @@ extension Terminal {
             keys = keptKeys
             uris = keptURIs
             indices = Dictionary(uniqueKeysWithValues: keptKeys.enumerated().dropFirst().map { ($1, UInt16($0)) })
-            byteCount = keptURIs.reduce(0) { $0 + $1.utf8.count }
+            byteCount = keptKeys.reduce(0) { $0 + $1.utf8.count }
             additionsSinceCompaction = 0
             return newIndices
         }
@@ -90,8 +90,8 @@ extension Terminal {
             return (id.isEmpty ? uri : "\(id)\u{0}\(uri)", uri)
         }
 
-        private func isFull(adding uri: String) -> Bool {
-            uris.count >= capacity || byteCount + uri.utf8.count > byteCapacity
+        private func isFull(adding key: String) -> Bool {
+            uris.count >= capacity || byteCount + key.utf8.count > byteCapacity
         }
     }
 }
