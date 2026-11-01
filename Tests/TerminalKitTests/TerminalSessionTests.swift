@@ -92,6 +92,20 @@ struct TerminalSessionTests {
         #expect(!configuration.isLoginShell)
     }
 
+    @Test func quotesTheBackslashesForFish() {
+        let fish = URL(filePath: "/opt/homebrew/bin/fish")
+        let configuration = TerminalSession.Configuration.loginShell(
+            running: ["printf", "a\\b", "dir\\", "it's"], shellURL: fish)
+        #expect(configuration.executableURL == fish)
+        #expect(configuration.arguments == ["-l", "-i", "-c", "exec -- 'printf' 'a\\\\b' 'dir\\\\' 'it'\\''s'"])
+    }
+
+    @Test func keepsTheBackslashesForZsh() {
+        let configuration = TerminalSession.Configuration.loginShell(
+            running: ["printf", "a\\b", "dir\\"], shellURL: URL(filePath: "/bin/zsh"))
+        #expect(configuration.arguments == ["-l", "-i", "-c", "exec -- 'printf' 'a\\b' 'dir\\'"])
+    }
+
     @Test func startsIdle() {
         #expect(TerminalSession(running: "exit").state == .idle)
     }
