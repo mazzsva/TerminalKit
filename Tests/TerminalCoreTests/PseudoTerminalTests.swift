@@ -177,6 +177,17 @@ struct PseudoTerminalTests {
         #expect(output.hasSuffix("got:abc"))
     }
 
+    @Test func setsUTF8Input() async throws {
+        #expect(try await output("stty -a").split(whereSeparator: \.isWhitespace).contains("iutf8"))
+    }
+
+    @Test func erasesAWholeCharacter() async throws {
+        let output = try await output("read line; printf 'got:%s.' \"$line\"") { pseudoTerminal in
+            pseudoTerminal.write(Array("\u{E9}\u{7F}\r".utf8))
+        }
+        #expect(output.hasSuffix("got:."))
+    }
+
     @Test func sendsInputThatFillsTheTerminal() async throws {
         let output = try await output("stty -echo; wc -l") { pseudoTerminal in
             pseudoTerminal.write(Array((String(repeating: "abcdefghi\n", count: 2_000) + "\u{4}").utf8))
