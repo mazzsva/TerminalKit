@@ -31,8 +31,16 @@ extension TerminalSession.Configuration {
     }
 
     public static func loginShell(running command: [String]) -> Self {
-        var configuration = loginShell(inheriting: ProcessInfo.processInfo.environment)
-        let words = command.map { "'" + $0.replacingOccurrences(of: "'", with: "'\\''", options: .literal) + "'" }
+        loginShell(running: command, shellURL: shellURL)
+    }
+
+    static func loginShell(running command: [String], shellURL: URL) -> Self {
+        var configuration = loginShell(inheriting: ProcessInfo.processInfo.environment, shellURL: shellURL)
+        let fish = shellURL.lastPathComponent == "fish"
+        let words = command.map {
+            let word = fish ? $0.replacingOccurrences(of: "\\", with: "\\\\", options: .literal) : $0
+            return "'" + word.replacingOccurrences(of: "'", with: "'\\''", options: .literal) + "'"
+        }
         configuration.arguments += ["-i", "-c", "exec -- " + words.joined(separator: " ")]
         return configuration
     }
@@ -65,7 +73,7 @@ extension TerminalSession.Configuration {
         return environment
     }
 
-    static func loginShell(inheriting environment: [String: String]) -> Self {
+    static func loginShell(inheriting environment: [String: String], shellURL: URL = shellURL) -> Self {
         Self(
             executableURL: shellURL,
             arguments: ["-l"],
