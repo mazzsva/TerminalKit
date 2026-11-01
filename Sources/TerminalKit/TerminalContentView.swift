@@ -126,11 +126,12 @@ final class TerminalContentView: NSView {
         func colors(for style: Terminal.Style) -> (foreground: NSColor, background: NSColor?) {
             let foreground = color(style.foreground) ?? self.foreground
             let background = color(style.background)
-            return style.isInverse ? (background ?? self.background, foreground) : (foreground, background)
+            return style.isInverse
+                ? (background ?? self.background.withAlphaComponent(1), foreground) : (foreground, background)
         }
 
         init(_ palette: TerminalPalette, isReversed: Bool = false) {
-            foreground = NSColor(isReversed ? palette.background : palette.foreground)
+            foreground = isReversed ? NSColor(palette.background).withAlphaComponent(1) : NSColor(palette.foreground)
             background = NSColor(isReversed ? palette.foreground : palette.background)
             let cursor = NSColor(palette.cursor)
             self.cursor =
@@ -462,7 +463,7 @@ final class TerminalContentView: NSView {
             columns: cursorColumns,
             row: terminal.scrollback.count + terminal.cursor.row,
             style: style,
-            foreground: colors.colors(for: style).background ?? colors.background,
+            foreground: colors.colors(for: style).background ?? colors.background.withAlphaComponent(1),
             graphemes: graphemes
         )
     }
