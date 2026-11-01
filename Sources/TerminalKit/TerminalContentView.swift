@@ -401,6 +401,7 @@ final class TerminalContentView: NSView {
                     row: row,
                     style: style,
                     foreground: colors.colors(for: style).foreground,
+                    underline: colors.color(style.underlineColor),
                     graphemes: graphemes
                 )
             }
@@ -500,6 +501,7 @@ final class TerminalContentView: NSView {
         row: Int,
         style: Terminal.Style,
         foreground: NSColor,
+        underline: NSColor? = nil,
         graphemes: Terminal.Graphemes
     ) {
         guard !style.isHidden, let context = NSGraphicsContext.current?.cgContext else {
@@ -554,12 +556,15 @@ final class TerminalContentView: NSView {
         let thickness = max(font.underlineThickness, 1)
         let left = Self.padding + CGFloat(columns.lowerBound) * cellSize.width
         let width = CGFloat(columns.count) * cellSize.width
-        if style.isUnderlined {
-            context.fill(CGRect(x: left, y: baseline - font.underlinePosition, width: width, height: thickness))
-        }
         if style.isStrikethrough {
             context.fill(
                 CGRect(x: left, y: baseline - font.xHeight / 2 - thickness / 2, width: width, height: thickness))
+        }
+        if style.isUnderlined {
+            if let underline {
+                context.setFillColor((style.isFaint ? underline.withAlphaComponent(0.5) : underline).cgColor)
+            }
+            context.fill(CGRect(x: left, y: baseline - font.underlinePosition, width: width, height: thickness))
         }
     }
 
