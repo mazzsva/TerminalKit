@@ -315,11 +315,7 @@ final class TerminalContentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        let modifiedInput =
-            session.liveTerminal.usesDisambiguatedKeys
-            ? event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey)
-            : event.otherKeyInput(level: session.liveTerminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
-        let keyInput = markedText.isEmpty ? modifiedInput ?? event.lineDeletionInput : nil
+        let keyInput = markedText.isEmpty ? modifiedInput(event) ?? event.lineDeletionInput : nil
         guard !event.modifierFlags.contains(.command) || keyInput != nil else {
             super.keyDown(with: event)
             return
@@ -344,13 +340,20 @@ final class TerminalContentView: NSView {
         keyDownEvent = nil
     }
 
+    private func modifiedInput(_ event: NSEvent) -> [UInt8]? {
+        session.liveTerminal.usesDisambiguatedKeys
+            ? event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey)
+            : event.otherKeyInput(level: session.liveTerminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
+    }
+
     func scrollToBottom() {
         scroll(CGPoint(x: 0, y: bounds.maxY))
     }
 
     override func doCommand(by selector: Selector) {
-        if let input = keyDownEvent?.wordMovementInput
-            ?? keyDownEvent?.terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
+        if let event = keyDownEvent,
+            let input = (markedText.isEmpty ? modifiedInput(event) : nil) ?? event.wordMovementInput
+                ?? event.terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
         {
             session.send(input)
             keyDownEvent = nil
