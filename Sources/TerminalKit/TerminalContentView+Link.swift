@@ -55,6 +55,7 @@ extension TerminalContentView {
         let launches =
             launchingExtensions.contains(resolved.pathExtension.lowercased())
             || values?.contentType?.conforms(to: .internetLocation) == true || values?.isApplication == true
+            || values?.contentType?.conforms(to: .aliasFile) == true
             || !isDirectory.boolValue && FileManager.default.isExecutableFile(atPath: path)
         return launches ? .reveal(url) : .open(url)
     }

@@ -52,7 +52,7 @@ struct ContentView: View {
 
 **A value-type emulator.** The full terminal state is one Swift struct. Tests feed it bytes and compare values. During synchronized output, the view draws a frozen copy, so the screen never shows a frame that is half drawn.
 
-**Safe links.** A Command-click opens web, mail, FTP, and file links, both hyperlinks and plain URLs. A file link to an app or an executable, even through a symbolic link, shows it in the Finder and never launches it.
+**Safe links.** A Command-click opens web, mail, FTP, and file links, both hyperlinks and plain URLs. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
 
 **The right size from the first frame.** The process starts only after the first layout of the view, so a full-screen program never draws its first frame at the wrong width and then redraws.
 

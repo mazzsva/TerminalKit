@@ -87,7 +87,7 @@ struct TerminalLinkSafetyTests {
         #expect(window.contentView === view)
     }
 
-    @Test func revealsAnAppOrAProgramBehindASymbolicLink() throws {
+    @Test func revealsAnAppOrAProgramBehindASymbolicLinkOrAnAlias() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let app = directory.appending(path: "Tool.app/Contents")
@@ -96,6 +96,14 @@ struct TerminalLinkSafetyTests {
         try Data("#!/bin/sh\n".utf8).write(to: program)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755], ofItemAtPath: program.path(percentEncoded: false))
+        let text = directory.appending(path: "text")
+        try Data("text".utf8).write(to: text)
+        let letter = directory.appending(path: "letter.txt")
+        try URL.writeBookmarkData(try text.bookmarkData(options: .suitableForBookmarkFile), to: letter)
+        #expect(TerminalContentView.action(for: letter) == .reveal(letter))
+        let shortcut = directory.appending(path: "shortcut")
+        try FileManager.default.createSymbolicLink(at: shortcut, withDestinationURL: letter)
+        #expect(TerminalContentView.action(for: shortcut) == .reveal(shortcut))
         for (name, target) in [("notes", directory.appending(path: "Tool.app")), ("readme", program)] {
             let link = directory.appending(path: name)
             try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
