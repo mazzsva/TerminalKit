@@ -13,7 +13,7 @@ final class GlyphCache {
     }
 
     private struct Key: Hashable {
-        let character: Character
+        let scalars: [Unicode.Scalar]
         let font: Int
     }
 
@@ -31,7 +31,7 @@ final class GlyphCache {
             asciiEntries[index * 128 + Int(ascii)] = entry
             return entry
         }
-        let key = Key(character: character, font: index)
+        let key = Key(scalars: Array(character.unicodeScalars), font: index)
         if let entry = entries[key] {
             return entry
         }
