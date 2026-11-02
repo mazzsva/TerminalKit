@@ -1049,6 +1049,47 @@ struct TerminalContentViewTests {
         #expect(try image(of: view) == cursorImage)
     }
 
+    @Test(arguments: [1, 2] as [CGFloat])
+    func drawsTheEndOfTheMarkedTextAtTheRightEdge(scale: CGFloat) async throws {
+        let view = try await drawnView(running: "printf '\\033[49G'")
+        let window = ScaledWindow(contentView: view)
+        window.scale = scale
+        let edge = CGRect(x: view.bounds.width - 2, y: 0, width: 2, height: view.bounds.height)
+        let padding = try pixels(in: edge, of: view)
+        #expect(view.bounds.contains(view.cursorRect))
+        mark(9, in: view)
+        let nine = try image(of: view)
+        mark(10, in: view)
+        #expect(try image(of: view) != nine)
+        #expect(try pixels(in: edge, of: view) == padding)
+        #expect(try pixels(in: edge.offsetBy(dx: -TerminalContentView.padding, dy: 0), of: view) != padding)
+    }
+
+    @Test(arguments: [1, 2] as [CGFloat])
+    func coversTheTextUnderTheMarkedTextAtTheRightEdge(scale: CGFloat) async throws {
+        let full = try await drawnView(running: "printf '\\n%060d\\033[49G'")
+        let empty = try await drawnView(running: "printf '\\n\\033[49G'")
+        let windows = [ScaledWindow(contentView: full), ScaledWindow(contentView: empty)]
+        for (window, view) in zip(windows, [full, empty]) {
+            window.scale = scale
+            mark(10, in: view)
+        }
+        let composition = full.rect(row: 1, columns: 36 ..< 48)
+        #expect(try pixels(in: composition, of: full) == pixels(in: composition, of: empty))
+    }
+
+    @Test(arguments: [1, 2] as [CGFloat])
+    func drawsTheMarkedTextAtTheCursorInTheFirstColumn(scale: CGFloat) async throws {
+        let view = try await drawnView(running: "exit")
+        let window = ScaledWindow(contentView: view)
+        window.scale = scale
+        let start = view.rect(row: 0, columns: 0 ..< 4)
+        mark(9, in: view)
+        let nine = try pixels(in: start, of: view)
+        mark(40, in: view)
+        #expect(try pixels(in: start, of: view) == nine)
+    }
+
     @Test func placesTheInputWindowAtTheCursor() {
         let view = TerminalContentView(session: readingSession())
         let window = NSWindow(
@@ -1088,6 +1129,15 @@ private func focusedView(running script: String) async throws -> (view: Terminal
     try session.start()
     await session.waitForExit()
     return (view, window)
+}
+
+@MainActor
+private func mark(_ count: Int, in view: TerminalContentView) {
+    view.setMarkedText(
+        String(repeating: "か", count: count),
+        selectedRange: NSRange(location: count, length: 0),
+        replacementRange: NSRange(location: NSNotFound, length: 0)
+    )
 }
 
 @MainActor
