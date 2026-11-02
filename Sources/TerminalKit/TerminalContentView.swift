@@ -460,9 +460,14 @@ final class TerminalContentView: NSView {
                 string: markedText,
                 attributes: attributes.merging([.underlineStyle: NSUnderlineStyle.single.rawValue]) { $1 }
             )
+            let size = text.size()
+            let origin = CGPoint(
+                x: max(Self.padding, min(cursor.minX, bounds.width - Self.padding - size.width)),
+                y: cursor.minY
+            )
             colors.background.setFill()
-            CGRect(origin: cursor.origin, size: text.size()).fill()
-            text.draw(at: cursor.origin)
+            CGRect(origin: origin, size: size).fill()
+            text.draw(at: origin)
             return
         }
         guard terminal.isCursorVisible else {
