@@ -249,8 +249,14 @@ final class TerminalContentView: NSView {
         if window == nil {
             releaseSize()
         }
-        if let window, window.firstResponder === window || window.firstResponder is TerminalContentView {
+        if let window, window.firstResponder === window {
             window.makeFirstResponder(self)
+        } else if window?.firstResponder is TerminalContentView {
+            Task { [weak self] in
+                if let window = self?.window, window.firstResponder === window {
+                    window.makeFirstResponder(self)
+                }
+            }
         }
         windowKeyStateDidChange()
         bellTask?.cancel()
