@@ -94,7 +94,7 @@ final class TerminalContentView: NSView {
 
     private var colors = Colors(.standard)
     private(set) var fonts = Fonts(defaultFont)
-    private var keyDownEvent: NSEvent?
+    private(set) var keyDownEvent: NSEvent?
     private var bellTask: Task<Void, Never>?
     private var flagsMonitor: Any?
     private var lastBellDate: Date?
@@ -339,23 +339,19 @@ final class TerminalContentView: NSView {
             return
         }
         scrollToBottom()
-        if let input = keyInput {
-            session.send(input)
-            return
-        }
-        if markedText.isEmpty, let input = event.controlInput {
-            session.send(input)
-            return
-        }
-        if markedText.isEmpty, usesOptionAsMetaKey, event.modifierFlags.contains(.option),
-            let input = event.metaInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
-        {
+        if markedText.isEmpty, let input = keyInput ?? encodedInput(event) {
             session.send(input)
             return
         }
         keyDownEvent = event
         interpretKeyEvents([event])
         keyDownEvent = nil
+    }
+
+    func encodedInput(_ event: NSEvent) -> [UInt8]? {
+        modifiedInput(event) ?? event.controlInput
+            ?? (usesOptionAsMetaKey && event.modifierFlags.contains(.option)
+                ? event.metaInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys) : nil)
     }
 
     private func modifiedInput(_ event: NSEvent) -> [UInt8]? {
@@ -389,7 +385,7 @@ final class TerminalContentView: NSView {
 
     override func doCommand(by selector: Selector) {
         if let event = keyDownEvent,
-            let input = (markedText.isEmpty ? modifiedInput(event) : nil) ?? event.wordMovementInput
+            let input = (markedText.isEmpty ? encodedInput(event) : nil) ?? event.wordMovementInput
                 ?? event.terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
         {
             session.send(input)
