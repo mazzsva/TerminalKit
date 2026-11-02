@@ -21,7 +21,7 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "PATH": "/bin",
+                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1", "PATH": "/bin",
             ])
     }
 
@@ -32,6 +32,7 @@ struct TerminalSessionTests {
         #expect(environment["COLORTERM"] == "truecolor")
         #expect(
             environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == inherited["CLAUDE_CODE_FORCE_STRIKETHROUGH"] ?? "1")
+        #expect(environment["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] == inherited["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] ?? "1")
         #expect(environment["PATH"] == inherited["PATH"])
         #expect(environment["TERM_PROGRAM"] == nil)
         #expect(environment["TERM_SESSION_ID"] == nil)
@@ -55,10 +56,10 @@ struct TerminalSessionTests {
         #expect(environment["LANG"] == "en_US.UTF-8")
     }
 
-    @Test func keepsTheStrikethroughSettingOfTheUser() {
-        let environment = TerminalSession.Configuration.loginShell(inheriting: ["CLAUDE_CODE_FORCE_STRIKETHROUGH": "0"])
-            .environment
-        #expect(environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == "0")
+    @Test(arguments: ["CLAUDE_CODE_FORCE_STRIKETHROUGH", "CLAUDE_CODE_FORCE_SYNC_OUTPUT"])
+    func keepsTheClaudeCodeSettingOfTheUser(name: String) {
+        let environment = TerminalSession.Configuration.loginShell(inheriting: [name: "0"]).environment
+        #expect(environment[name] == "0")
     }
 
     @Test func removesTheIdentityOfTheParentTerminal() {
@@ -77,7 +78,7 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1",
+                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1",
             ])
     }
 
