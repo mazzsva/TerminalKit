@@ -245,6 +245,13 @@ struct TerminalTests {
         #expect(lines(terminal) == ["AZ^q"])
     }
 
+    @Test(arguments: ["A", "1"])
+    func endsTheGraphicsCharactersWithAnyOtherCharacterSet(final: String) {
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive("\u{1B}(0q\u{1B}(\(final)q")
+        #expect(lines(terminal) == ["─q"])
+    }
+
     @Test func wrapsAtTheEndOfALine() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("abcdef")
