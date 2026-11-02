@@ -318,10 +318,10 @@ struct TerminalTests {
     @Test func repeatsASpacingMarkLikePrintingIt() {
         for columns in [1, 4] {
             for start in ["", "\u{1B}[?7l", "\u{1B}[4h"] {
-                for move in ["", "\u{1B}[1;3H", "\u{1B}[1;4H"] {
+                for marks in 1 ... 3 {
                     for count in [1, 15, 16, 17, 40, 1_000] {
                         var repeated = Terminal(columns: columns, rows: 2)
-                        repeated.receive("\(start)ak中\r\u{93E}\(move)")
+                        repeated.receive("\(start)ak中\r" + String(repeating: "\u{93E}", count: marks))
                         var printed = repeated
                         repeated.receive("\u{1B}[\(count)b")
                         printed.receive(String(repeating: "\u{93E}", count: count))
@@ -427,9 +427,10 @@ struct TerminalTests {
             "\u{1B}[1;3H\u{A9}\u{200D}",
         ]
         let suffixes = [
-            "\u{200D}", "\u{1B}7", "\u{1B}8", "\r", "\u{1B}[1;2H", "\u{1B}[H", "\u{1B}[?7l", "\u{1B}[?7h", "\u{1B}[4h",
-            "\u{1B}[4l", "\u{1B}[2;3r", "\u{1B}[41m", "\u{1B}[3C", "\u{1B}[2D", "\n", "\u{FE0F}",
+            "\u{1B}7", "\u{1B}8", "\r", "\u{1B}[1;2H", "\u{1B}[H", "\u{1B}[?7l", "\u{1B}[?7h", "\u{1B}[4h", "\u{1B}[4l",
+            "\u{1B}[2;3r", "\u{1B}[41m", "\u{1B}[3C", "\u{1B}[2D", "\n",
         ]
+        let marks = ["", "\u{200D}", "\u{FE0F}"]
         let characters = ["a", "\u{E9}", "中", "\u{1F44D}", "\u{A9}"]
         for _ in 0 ..< 3_000 {
             var repeated = Terminal(columns: random(1 ... 9), rows: random(1 ... 5))
@@ -437,7 +438,7 @@ struct TerminalTests {
             let prefix = (0 ..< random(0 ... 10)).map { _ in prefixes[random(0 ... prefixes.count - 1)] }.joined()
             let suffix = (0 ..< random(0 ... 5)).map { _ in suffixes[random(0 ... suffixes.count - 1)] }.joined()
             let count = random(0 ... 9) == 0 ? random(61 ... 400) : random(1 ... 60)
-            repeated.receive(prefix + "\r" + character + suffix)
+            repeated.receive(prefix + "\r" + suffix + character + marks[random(0 ... 2)])
             var printed = repeated
             repeated.receive("\u{1B}[\(count)b")
             printed.receive(String(repeating: character, count: count))
@@ -467,14 +468,14 @@ struct TerminalTests {
     func repeatsQuicklyAfterAnyCharacter(character: String) {
         for start in ["", "\u{1B}[?7l", "\u{1B}[4h"] {
             var terminal = Terminal(columns: 201, rows: 80)
-            terminal.receive(start + character + String(repeating: "\u{1B}[H\u{1B}[65535b", count: 500))
+            terminal.receive(start + String(repeating: "\u{1B}[H" + character + "\u{1B}[65535b", count: 500))
             #expect(terminal.character(of: terminal.screen[0][0]) == Character(character))
         }
     }
 
     @Test func repeatsAtMostAScreen() {
         var terminal = Terminal(columns: 80, rows: 24)
-        terminal.receive("a" + String(repeating: "\u{1B}[65535b", count: 200))
+        terminal.receive(String(repeating: "a\u{1B}[65535b", count: 200))
         #expect(terminal.removedScrollbackCount == 0)
         #expect(terminal.scrollback.count < 6_000)
     }
@@ -483,6 +484,16 @@ struct TerminalTests {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{1B}[3bx")
         #expect(lines(terminal) == ["x   "])
+    }
+
+    @Test(arguments: ["\r", "\u{1B}[1;4H", "\u{1B}[2b", "\u{1B}8", "\u{1B}]0;x\u{7}"])
+    func repeatsNothingAfterAControlFunction(control: String) {
+        var repeated = Terminal(columns: 8, rows: 2)
+        repeated.receive("a" + control)
+        let printed = repeated
+        repeated.receive("\u{1B}[3b")
+        #expect(repeated.screen == printed.screen)
+        #expect(repeated.cursor == printed.cursor)
     }
 
     @Test func erasesTheScrollback() {

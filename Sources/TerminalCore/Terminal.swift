@@ -321,6 +321,7 @@ package struct Terminal: Sendable {
             default:
                 break
             }
+            if case .print = action {} else { lastCharacter = nil }
         }
         return replies
     }
