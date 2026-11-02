@@ -450,6 +450,74 @@ struct TerminalKeyboardProtocolTests {
         #expect(await session.linesAfterExit().contains(bytes))
     }
 
+    @Test(
+        arguments: [
+            ("", "∫", "b", .option, 11, "ed  95  9c  1b  62  78"),
+            ("\\033[>1u", "∫", "b", .option, 11, "ed  95  9c  1b  5b  39  38  3b  33  75  78"),
+            ("", "2", "2", .control, 19, "ed  95  9c  00  78"),
+            ("\\033[>1u", "\u{1}", "a", .control, 0, "ed  95  9c  1b  5b  39  37  3b  35  75  78"),
+            ("", "\r", "\r", .option, 36, "ed  95  9c  1b  0d  78"),
+            ("", "a", "a", [], 0, "ed  95  9c  61  78"),
+        ] as [(String, String, String, NSEvent.ModifierFlags, UInt16, String)])
+    func sendsTheControlAndMetaKeysThatTheInputMethodCommitsAndPassesOn(
+        mode: String, characters: String, charactersIgnoringModifiers: String, modifierFlags: NSEvent.ModifierFlags,
+        keyCode: UInt16, bytes: String
+    ) async throws {
+        let count = bytes.split(separator: " ").count
+        let session = TerminalSession(
+            running: "printf '\(mode)'; stty raw -echo; echo ready; head -c \(count) | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        view.usesOptionAsMetaKey = true
+        object_setClass(view.inputContext, CommittingInputContext.self)
+        try session.start()
+        await session.waitForText("ready")
+        view.setMarkedText(
+            "한",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        let event = try keyDown(
+            characters, charactersIgnoringModifiers: charactersIgnoringModifiers, modifierFlags: modifierFlags,
+            keyCode: keyCode
+        )
+        view.keyDown(with: event)
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains(bytes))
+    }
+
+    @Test(
+        arguments: [
+            ("\\033[>1u", "\u{1B}", "\u{1B}", [], 53, false),
+            ("\\033[>1u", "\r", "\r", .shift, 36, false),
+            ("", "\r", "m", .control, 46, false),
+            ("", "\n", "j", .control, 38, true),
+            ("", "∫", "b", .option, 11, true),
+        ] as [(String, String, String, NSEvent.ModifierFlags, UInt16, Bool)])
+    func leavesTheKeyThatTheInputMethodCommitsAndConsumes(
+        mode: String, characters: String, charactersIgnoringModifiers: String, modifierFlags: NSEvent.ModifierFlags,
+        keyCode: UInt16, unmarks: Bool
+    ) async throws {
+        let session = TerminalSession(
+            running: "printf '\(mode)'; stty raw -echo; echo ready; head -c 4 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        view.usesOptionAsMetaKey = true
+        object_setClass(view.inputContext, unmarks ? UnmarkingInputContext.self : ConsumingInputContext.self)
+        try session.start()
+        await session.waitForText("ready")
+        view.setMarkedText(
+            "한",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        let event = try keyDown(
+            characters, charactersIgnoringModifiers: charactersIgnoringModifiers, modifierFlags: modifierFlags,
+            keyCode: keyCode
+        )
+        view.keyDown(with: event)
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("ed  95  9c  78"))
+    }
+
     @Test func sendsReturnForModifiedReturnWithoutTheKittyProtocol() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
         let view = TerminalContentView(session: session)
@@ -477,5 +545,26 @@ private final class CommittingInputContext: NSTextInputContext {
             client.insertText("한", replacementRange: NSRange(location: NSNotFound, length: 0))
         }
         return super.handleEvent(event)
+    }
+}
+
+private final class ConsumingInputContext: NSTextInputContext {
+    override func handleEvent(_ event: NSEvent) -> Bool {
+        guard client.hasMarkedText() else {
+            return super.handleEvent(event)
+        }
+        client.insertText("한", replacementRange: NSRange(location: NSNotFound, length: 0))
+        return true
+    }
+}
+
+private final class UnmarkingInputContext: NSTextInputContext {
+    override func handleEvent(_ event: NSEvent) -> Bool {
+        guard client.hasMarkedText() else {
+            return super.handleEvent(event)
+        }
+        client.unmarkText()
+        client.insertText("한", replacementRange: NSRange(location: NSNotFound, length: 0))
+        return true
     }
 }

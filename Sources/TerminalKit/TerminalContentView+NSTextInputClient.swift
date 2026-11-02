@@ -2,9 +2,11 @@ import AppKit
 
 extension TerminalContentView: NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
+        let characters = text(of: string)
+        let input = hasMarkedText() || characters != keyDownEvent?.characters ? nil : keyDownEvent.flatMap(encodedInput)
         markedText = ""
         scrollToBottom()
-        session.send(Array(text(of: string).utf8))
+        session.send(input ?? Array(characters.utf8))
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
