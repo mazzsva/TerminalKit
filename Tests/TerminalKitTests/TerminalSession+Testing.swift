@@ -44,7 +44,7 @@ extension NSWindow {
     }
 }
 
-final class KeyWindow: NSWindow {
+class KeyWindow: NSWindow {
     var isKey = true {
         didSet {
             NotificationCenter.default.post(
