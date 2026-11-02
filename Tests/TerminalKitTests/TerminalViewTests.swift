@@ -168,6 +168,66 @@ struct TerminalViewTests {
         #expect(firstLine() == line)
     }
 
+    @Test(
+        arguments: [
+            (NSHomeFunctionKey, [.command, .function], -.infinity, 0),
+            (NSEndFunctionKey, [.command, .function], .infinity, 0),
+            (NSPageUpFunctionKey, [.command, .function], -1, 0),
+            (NSPageDownFunctionKey, [.command, .function], 1, 0),
+            (NSPageUpFunctionKey, [.command, .option, .function], 0, -1),
+            (NSPageDownFunctionKey, [.command, .option, .function], 0, 1),
+        ] as [(Int, NSEvent.ModifierFlags, CGFloat, CGFloat)])
+    func scrollsTheScrollbackWithTheKeyboard(
+        key: Int, modifierFlags: NSEvent.ModifierFlags, pages: CGFloat, lines: CGFloat
+    ) async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 100; printf '\\033[>1u'")
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        view.scroll(CGPoint(x: 0, y: 600))
+        let visibleHeight = scrollView.contentView.bounds.height
+        let position = 600 + pages * (visibleHeight - view.cellSize.height) + lines * view.cellSize.height
+        view.keyDown(with: try keyDown(key, modifierFlags: modifierFlags))
+        #expect(scrollView.contentView.bounds.minY == min(max(position, 0), view.frame.height - visibleHeight))
+    }
+
+    @Test(
+        arguments: [
+            (NSPageUpFunctionKey, [.shift, .command, .function], ""),
+            (NSPageUpFunctionKey, [.control, .command, .function], ""),
+            (NSHomeFunctionKey, [.option, .command, .function], ""),
+            (NSEndFunctionKey, [.option, .command, .function], ""),
+            (NSPageUpFunctionKey, [.command, .function], "´"),
+        ] as [(Int, NSEvent.ModifierFlags, String)])
+    func keepsThePositionForOtherScrollKeys(
+        key: Int, modifierFlags: NSEvent.ModifierFlags, markedText: String
+    ) async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 100")
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        view.scroll(CGPoint(x: 0, y: 600))
+        view.setMarkedText(
+            markedText,
+            selectedRange: NSRange(location: markedText.utf16.count, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.keyDown(with: try keyDown(key, modifierFlags: modifierFlags))
+        #expect(scrollView.contentView.bounds.minY == 600)
+    }
+
+    @Test func sendsTheScrollKeysOnTheAlternateScreen() async throws {
+        let session = TerminalSession(
+            running: "seq 1 100; printf '\\033[?1049h\\033[>1u'; stty raw -echo; echo ready; head -c 6 | od -An -tx1")
+        let scrollView = TerminalScrollView(session: session)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        scrollView.layoutSubtreeIfNeeded()
+        try session.start()
+        await session.waitForText("ready")
+        scrollView.terminalView.keyDown(with: try keyDown(NSHomeFunctionKey, modifierFlags: [.command, .function]))
+        #expect(await session.linesAfterExit().contains("1b  5b  31  3b  39  48"))
+    }
+
     @Test func scrollsToTheBottomWhenYouType() async throws {
         let (scrollView, session) = try await scrollView(running: "seq 1 50; read line")
         scrollView.terminalView.scroll(.zero)

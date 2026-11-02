@@ -322,6 +322,9 @@ final class TerminalContentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if markedText.isEmpty, !session.liveTerminal.isAlternateScreenActive, scrollsView(for: event) {
+            return
+        }
         let keyInput = markedText.isEmpty ? modifiedInput(event) ?? event.lineDeletionInput : nil
         guard !event.modifierFlags.contains(.command) || keyInput != nil else {
             super.keyDown(with: event)
@@ -355,6 +358,25 @@ final class TerminalContentView: NSView {
 
     func scrollToBottom() {
         scroll(CGPoint(x: 0, y: bounds.maxY))
+    }
+
+    private func scrollsView(for event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
+        guard modifiers == .command || modifiers == [.command, .option], let clipView = superview as? NSClipView
+        else {
+            return false
+        }
+        let insets = clipView.contentInsets
+        let page = clipView.bounds.height - insets.top - insets.bottom - cellSize.height
+        let step = modifiers == .command ? page : cellSize.height
+        switch event.specialKey {
+        case .home where modifiers == .command: scroll(CGPoint(x: 0, y: -insets.top))
+        case .end where modifiers == .command: scrollToBottom()
+        case .pageUp: scroll(CGPoint(x: 0, y: clipView.bounds.minY - step))
+        case .pageDown: scroll(CGPoint(x: 0, y: clipView.bounds.minY + step))
+        default: return false
+        }
+        return true
     }
 
     override func doCommand(by selector: Selector) {

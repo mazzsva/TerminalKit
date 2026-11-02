@@ -47,6 +47,21 @@ struct TerminalInsetTests {
         #expect(view.convert(view.rect(row: 0, columns: 0 ..< 1), to: nil).maxY <= window.contentLayoutRect.maxY)
     }
 
+    @Test func scrollsBelowTheToolbarWithTheKeyboard() async throws {
+        let (scrollView, window) = toolbarWindow(running: "seq 1 200")
+        let view = scrollView.terminalView
+        let session = view.session
+        try session.start()
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        let insets = scrollView.contentView.contentInsets
+        let top = scrollView.contentView.bounds.minY + insets.top
+        view.keyDown(with: try keyDown(NSPageUpFunctionKey, modifierFlags: [.command, .function]))
+        #expect(scrollView.contentView.bounds.maxY - insets.bottom == top + view.cellSize.height)
+        view.keyDown(with: try keyDown(NSHomeFunctionKey, modifierFlags: [.command, .function]))
+        #expect(view.convert(view.rect(row: 0, columns: 0 ..< 1), to: nil).maxY <= window.contentLayoutRect.maxY)
+    }
+
     @Test func scrollsAboveTheBottomInsetWhenYouType() async throws {
         let session = TerminalSession(running: "seq 1 50; read line")
         let scrollView = TerminalScrollView(session: session)
@@ -82,6 +97,24 @@ struct TerminalInsetTests {
         await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         #expect(scrollView.contentView.bounds.minY == top)
+    }
+
+    @Test func scrollsAboveTheBottomInsetWithTheKeyboard() async throws {
+        let session = TerminalSession(running: "seq 1 100")
+        let scrollView = TerminalScrollView(session: session)
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 40, right: 0)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        scrollView.layoutSubtreeIfNeeded()
+        try session.start()
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        let top = scrollView.contentView.bounds.minY
+        view.keyDown(with: try keyDown(NSPageUpFunctionKey, modifierFlags: [.command, .function]))
+        #expect(scrollView.contentView.bounds.maxY - 40 == top + view.cellSize.height)
+        view.keyDown(with: try keyDown(NSEndFunctionKey, modifierFlags: [.command, .function]))
+        #expect(scrollView.contentView.bounds.maxY == view.frame.height + 40)
     }
 
     @Test func reportsNoMoveUnderTheToolbar() async throws {
