@@ -327,7 +327,14 @@ final class TerminalContentView: NSView {
         }
         let keyInput = markedText.isEmpty ? modifiedInput(event) ?? event.lineDeletionInput : nil
         guard !event.modifierFlags.contains(.command) || keyInput != nil else {
-            super.keyDown(with: event)
+            if markedText.isEmpty, !session.liveTerminal.isAlternateScreenActive,
+                event.modifierFlags.intersection([.shift, .control, .option, .command]) == .command,
+                event.charactersIgnoringModifiers == "k"
+            {
+                session.clearToStart()
+            } else {
+                super.keyDown(with: event)
+            }
             return
         }
         scrollToBottom()

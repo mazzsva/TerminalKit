@@ -126,6 +126,10 @@ public final class TerminalSession {
         send("\u{1B}[200~\(lines.replacing("\u{1B}", with: ""))\u{1B}[201~")
     }
 
+    func clearToStart() {
+        liveTerminal.clearToStart()
+    }
+
     func send(_ bytes: [UInt8]) {
         waitingInput? += bytes
         pseudoTerminal?.write(bytes)

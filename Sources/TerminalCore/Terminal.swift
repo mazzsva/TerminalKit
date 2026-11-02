@@ -321,6 +321,13 @@ package struct Terminal: Sendable {
         synchronizedSnapshot = []
     }
 
+    package mutating func clearToStart() {
+        keepInScrollback(screen.prefix(cursor.row))
+        scrollUp(cursor.row, in: 0 ..< rows)
+        cursor.row = 0
+        eraseInDisplay(3)
+    }
+
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
         guard sequence.subparameters.isEmpty || sequence.final == "m" else {
             return

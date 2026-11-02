@@ -297,6 +297,53 @@ struct TerminalKeyboardProtocolTests {
         #expect(lines.contains("32  37  3b  39  75  78"))
     }
 
+    @Test func clearsToStartWithCommandK() async throws {
+        let session = TerminalSession(
+            running: "printf 'a\\nb\\nc'; stty raw -echo; printf '\\nready'; head -c 1 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown("k", modifierFlags: [.command, .option]))
+        view.keyDown(with: try keyDown("k", modifierFlags: [.command, .control]))
+        view.setMarkedText(
+            "´",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.keyDown(with: try keyDown("k", modifierFlags: .command))
+        view.unmarkText()
+        #expect(session.lines.first == "a")
+        view.keyDown(with: try keyDown("k", modifierFlags: .command))
+        #expect(session.lines.first == "ready")
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains { $0.hasSuffix(" 78") })
+    }
+
+    @Test func keepsTheAlternateScreenWithCommandK() async throws {
+        let session = TerminalSession(
+            running: "printf 'a\\n\\033[?1049hb\\nc'; stty raw -echo; echo ready; head -c 1 >/dev/null")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown("k", modifierFlags: .command))
+        #expect(session.lines.prefix(3) == ["", "b", "cready"])
+        session.send("x")
+        await session.waitForExit()
+    }
+
+    @Test func sendsCommandKWithTheKittyProtocol() async throws {
+        let session = TerminalSession(
+            running: "printf 'text\\n\\033[>1u'; stty raw -echo; echo ready; head -c 9 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown("k", modifierFlags: .command))
+        session.send("xxxxxxxxx")
+        let lines = await session.linesAfterExit()
+        #expect(lines.first == "text")
+        #expect(lines.contains("1b  5b  31  30  37  3b  39  75  78"))
+    }
+
     @Test func sendsCommandCWithoutASelection() async throws {
         let session = TerminalSession(
             running: "printf 'text\\033[>1u'; stty raw -echo; echo ready; head -c 8 | od -An -tx1")

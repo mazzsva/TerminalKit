@@ -493,6 +493,23 @@ struct TerminalTests {
         #expect(lines(terminal) == ["b ", "c "])
     }
 
+    @Test func clearsToStart() {
+        var terminal = Terminal(columns: 2, rows: 3)
+        terminal.receive("a\r\nb\r\nc\r\nd\u{1B}[2H")
+        terminal.clearToStart()
+        #expect(terminal.scrollback.isEmpty)
+        #expect(terminal.removedScrollbackCount == 2)
+        #expect(lines(terminal) == ["c ", "d ", "  "])
+    }
+
+    @Test func movesTheCursorLineToTheTopWhenClearingToStart() {
+        var terminal = Terminal(columns: 2, rows: 3)
+        terminal.receive("a\r\nb\r\nc\u{1B}[1;2r\u{1B}[3;2H")
+        terminal.clearToStart()
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+        #expect(lines(terminal) == ["c ", "  ", "  "])
+    }
+
     @Test func keepsTheRemovedScrollbackCountAfterAReset() {
         var terminal = Terminal(columns: 20, rows: 2)
         terminal.receive("1\r\n2\r\n3\r\n4\u{1B}[3J5\r\n6\r\n7\u{1B}c")
