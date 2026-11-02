@@ -41,7 +41,7 @@ public final class TerminalSession {
     @ObservationIgnored private var isSized = false
     @ObservationIgnored private var waitingInput: [UInt8]?
 
-    @ObservationIgnored private var pseudoTerminal: PseudoTerminal?
+    @ObservationIgnored private(set) var pseudoTerminal: PseudoTerminal?
     @ObservationIgnored private var synchronizedOutputTimer: Task<Void, Never>?
     @ObservationIgnored private var timedSynchronizedOutputCount = 0
 
@@ -165,7 +165,7 @@ public final class TerminalSession {
         liveTerminal.reportedColors = colors
         let report = liveTerminal.receive([])
         if !report.isEmpty {
-            pseudoTerminal?.write(report)
+            pseudoTerminal?.write(report, isReply: true)
         }
     }
 
@@ -180,7 +180,7 @@ public final class TerminalSession {
             currentDirectory = liveTerminal.currentDirectory
         }
         if !replies.isEmpty {
-            pseudoTerminal?.write(replies)
+            pseudoTerminal?.write(replies, isReply: true)
         }
         let count = liveTerminal.synchronizedOutputCount
         if liveTerminal.isSynchronizingOutput, count != timedSynchronizedOutputCount {

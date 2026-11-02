@@ -13,6 +13,7 @@ package final class PseudoTerminal: Sendable {
     private static let maximumOpenRetries = 10
     private static let redriveOpenError: Int32 = -6
     private static let killDelay = DispatchTimeInterval.seconds(2)
+    private static let maximumUnsentInputForReplies = 4 << 20
 
     package let processIdentifier: pid_t
     package let output: Output
@@ -94,6 +95,12 @@ package final class PseudoTerminal: Sendable {
         }
     }
 
+    package var unsentInputCount: Int {
+        queue.sync {
+            input.withLock { $0.bytes.count - $0.offset }
+        }
+    }
+
     package func hangUp() {
         queue.async { [weak self] in
             self?.cancelSources()
@@ -101,12 +108,16 @@ package final class PseudoTerminal: Sendable {
         killLater()
     }
 
-    package func write(_ bytes: [UInt8]) {
+    package func write(_ bytes: [UInt8], isReply: Bool = false) {
         queue.async { [weak self] in
             guard let self else {
                 return
             }
-            input.withLock { $0.bytes += bytes }
+            input.withLock { input in
+                if !isReply || input.bytes.count - input.offset < Self.maximumUnsentInputForReplies {
+                    input.bytes += bytes
+                }
+            }
             writeInput()
         }
     }
