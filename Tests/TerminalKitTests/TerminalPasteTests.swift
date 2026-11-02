@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import Foundation
 import Testing
 
@@ -34,6 +35,21 @@ struct TerminalPasteTests {
     @Test func pastesWithoutBracketsAfterTheModeEnds() async throws {
         let bytes = try await pastedBytes("ab", mode: "\\033[?2004h\\033[?2004l", count: 2)
         #expect(bytes == "61  62")
+    }
+
+    @Test func pastesALargeTextWhole() async throws {
+        let text = String(repeating: "abcdefgh", count: 1 << 17)
+        let input = "\u{1B}[200~\(text)\u{1B}[201~"
+        let session = TerminalSession(
+            running: """
+                printf '\\033[?2004h'; stty raw -echo; echo ready; head -c \(input.utf8.count) | shasum -a 256
+                """
+        )
+        try session.start()
+        await session.waitForText("ready")
+        session.paste(text)
+        let hash = SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
+        #expect(await session.linesAfterExit().contains { $0.hasPrefix(hash) })
     }
 
     @Test func pastesACopiedFileAsItsPath() async throws {

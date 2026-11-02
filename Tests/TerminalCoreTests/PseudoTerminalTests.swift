@@ -133,6 +133,38 @@ struct PseudoTerminalTests {
         #expect(output.contains(SHA256.hash(data: input).map { String(format: "%02x", $0) }.joined()))
     }
 
+    @Test func keepsTheTypedInputPastTheReplyLimit() async throws {
+        let pseudoTerminal = try PseudoTerminal(
+            executableURL: URL(filePath: "/bin/sh"),
+            arguments: ["-c", "stty raw -echo; echo ready; exec /bin/sleep 100"],
+            environment: ["PATH": "/usr/bin:/bin"],
+            columns: 80,
+            rows: 24
+        )
+        var iterator = pseudoTerminal.output.makeAsyncIterator()
+        var output = ""
+        while !output.contains("ready"), let bytes = await iterator.next() {
+            output += String(decoding: bytes, as: UTF8.self)
+        }
+        let bytes = [UInt8](repeating: 0x61, count: 100)
+        pseudoTerminal.write([UInt8](repeating: 0x61, count: 3 << 20))
+        let first = pseudoTerminal.unsentInputCount
+        pseudoTerminal.write(bytes, isReply: true)
+        let second = pseudoTerminal.unsentInputCount
+        pseudoTerminal.write([UInt8](repeating: 0x61, count: 2 << 20))
+        let third = pseudoTerminal.unsentInputCount
+        pseudoTerminal.write(bytes, isReply: true)
+        let fourth = pseudoTerminal.unsentInputCount
+        pseudoTerminal.write(bytes)
+        let fifth = pseudoTerminal.unsentInputCount
+        #expect(kill(pseudoTerminal.processIdentifier, SIGKILL) == 0)
+        while await iterator.next() != nil {}
+        #expect(second > first + 50)
+        #expect(third > second + (1 << 20))
+        #expect(fourth < third + 50)
+        #expect(fifth > fourth + 50)
+    }
+
     @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
     func givesTheProcessAControllingTerminal(shell: String) async throws {
         let output = try await output("exec 3</dev/tty && echo yes", shell: shell)

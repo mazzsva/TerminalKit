@@ -186,6 +186,22 @@ struct TerminalSessionTests {
         #expect(session.lines.contains("1b  5b  31  3b  31  52"))
     }
 
+    @Test func dropsTheRepliesThatTheProcessDoesNotRead() async throws {
+        let session = TerminalSession(
+            running: """
+                stty raw -echo; q=$(printf '\\033[c%.0s' $(seq 1000)); i=0
+                while :; do printf %s "$q"; i=$((i + 1)); [ $i = 1000 ] && echo "flooded $$"; done
+                """
+        )
+        try session.start()
+        await session.waitForText("flooded")
+        let line = try #require(session.lines.first { $0.hasPrefix("flooded") })
+        let processIdentifier = try #require(pid_t(line.dropFirst("flooded ".count)))
+        #expect(try #require(session.pseudoTerminal).unsentInputCount < 5 << 20)
+        #expect(kill(processIdentifier, SIGKILL) == 0)
+        await session.waitForExit()
+    }
+
     @Test func startsTheProcessWithTheSizeOfTheScreen() async throws {
         let session = TerminalSession(running: "stty size")
         session.resize(columns: 100, rows: 30)
