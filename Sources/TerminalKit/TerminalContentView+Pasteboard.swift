@@ -99,10 +99,18 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     }
 
     func paste(from pasteboard: NSPasteboard) {
-        guard let text = Self.droppedText(from: pasteboard) else {
+        guard let text = Self.droppedText(from: pasteboard) ?? (canPasteImage(from: pasteboard) ? "" : nil) else {
             return
         }
         paste(text: text)
+    }
+
+    func canPaste(from pasteboard: NSPasteboard) -> Bool {
+        pasteboard.availableType(from: [.fileURL, .string]) != nil || canPasteImage(from: pasteboard)
+    }
+
+    func canPasteImage(from pasteboard: NSPasteboard) -> Bool {
+        session.liveTerminal.usesBracketedPaste && pasteboard.availableType(from: [.tiff, .png]) != nil
     }
 
     func paste(text: String) {
@@ -136,7 +144,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
         case #selector(copy(_:)):
             hasSelectedText || markedText.isEmpty && session.liveTerminal.usesDisambiguatedKeys
         case #selector(paste(_:)):
-            NSPasteboard.general.availableType(from: [.fileURL, .string]) != nil
+            canPaste(from: .general)
         case #selector(performTextFinderAction(_:)):
             (enclosingScrollView as? TerminalScrollView)?.validateMenuItem(menuItem) ?? false
         default:
