@@ -306,10 +306,8 @@ package struct Terminal: Sendable {
                 tabStops[cursor.column] = true
             case .escape(intermediates: "", final: "M"):
                 reverseLineFeed()
-            case .escape(intermediates: "(", final: "0"):
-                usesLineDrawing = true
-            case .escape(intermediates: "(", final: "B"):
-                usesLineDrawing = false
+            case .escape(intermediates: "(", let final):
+                usesLineDrawing = final == "0"
             case .escape(intermediates: "", final: "7"):
                 saveCursor()
             case .escape(intermediates: "", final: "8"):
