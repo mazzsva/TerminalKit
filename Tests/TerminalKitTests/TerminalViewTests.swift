@@ -56,14 +56,70 @@ struct TerminalViewTests {
         #expect(session.terminal.columns == Int((visibleSize.width - 8) / newView.cellSize.width))
     }
 
-    @Test func focusesTheNewSession() throws {
+    @Test func focusesTheNewSession() async throws {
         let hostingView = NSHostingView(rootView: TerminalView(session: TerminalSession(running: "exit")))
         let window = NSWindow(contentView: hostingView)
         hostingView.layoutSubtreeIfNeeded()
         hostingView.rootView = TerminalView(session: TerminalSession(running: "exit"))
         hostingView.layoutSubtreeIfNeeded()
         let view = try #require(contentView(in: hostingView))
+        while window.firstResponder !== view {
+            try Task.checkCancellation()
+            await Task.yield()
+        }
         #expect(window.firstResponder === view)
+    }
+
+    @Test func keepsTheFocusWhenAnotherPaneJoins() async {
+        let containerView = NSView()
+        let window = NSWindow(contentView: containerView)
+        let focused = TerminalScrollView(session: TerminalSession(running: "exit"))
+        containerView.addSubview(focused)
+        window.makeFirstResponder(focused.terminalView)
+        containerView.addSubview(TerminalScrollView(session: TerminalSession(running: "exit")))
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        #expect(window.firstResponder === focused.terminalView)
+    }
+
+    @Test func keepsTheFocusWhenAnotherPaneRestarts() async throws {
+        let left = TerminalSession(running: "exit")
+        let hostingView = NSHostingView(
+            rootView: HStack {
+                TerminalView(session: left)
+                TerminalView(session: TerminalSession(running: "exit"))
+            })
+        let window = NSWindow(contentView: hostingView)
+        hostingView.layoutSubtreeIfNeeded()
+        let view = try #require(contentView(in: hostingView))
+        window.makeFirstResponder(view)
+        hostingView.rootView = HStack {
+            TerminalView(session: left)
+            TerminalView(session: TerminalSession(running: "exit"))
+        }
+        hostingView.layoutSubtreeIfNeeded()
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        #expect(window.firstResponder === view)
+    }
+
+    @Test func keepsTheFocusWhenThePaneMovesIntoASplit() async {
+        let containerView = NSView()
+        let window = NSWindow(contentView: containerView)
+        let focused = TerminalScrollView(session: TerminalSession(running: "exit"))
+        containerView.addSubview(focused)
+        containerView.addSubview(TerminalScrollView(session: TerminalSession(running: "exit")))
+        window.makeFirstResponder(focused.terminalView)
+        let splitView = NSSplitView()
+        containerView.replaceSubview(focused, with: splitView)
+        splitView.addSubview(focused)
+        splitView.addSubview(TerminalScrollView(session: TerminalSession(running: "exit")))
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        #expect(window.firstResponder === focused.terminalView)
     }
 
     @Test func growsWithTheScrollback() async throws {
