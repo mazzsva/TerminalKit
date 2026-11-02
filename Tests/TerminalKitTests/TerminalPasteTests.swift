@@ -52,6 +52,36 @@ struct TerminalPasteTests {
         #expect(await session.linesAfterExit().contains { $0.hasPrefix(hash) })
     }
 
+    @Test func pastesAnImageAsAnEmptyBracketedPaste() async throws {
+        let (bytes, canPaste) = try await pastedImageBytes(mode: "\\033[?2004h", count: 13)
+        #expect(canPaste)
+        #expect(bytes == "1b  5b  32  30  30  7e  1b  5b  32  30  31  7e  78")
+    }
+
+    @Test func pastesNoImageWithoutBracketedPasteMode() async throws {
+        let (bytes, canPaste) = try await pastedImageBytes(mode: "\\033[?2004h\\033[?2004l", count: 1)
+        #expect(!canPaste)
+        #expect(bytes == "78")
+    }
+
+    @Test func pastesNothingWithoutAnImage() async throws {
+        let (bytes, canPaste) = try await pastedImageBytes(image: false, mode: "\\033[?2004h", count: 1)
+        #expect(!canPaste)
+        #expect(bytes == "78")
+    }
+
+    @Test func pastesTheTextOverAnImage() async throws {
+        let (bytes, canPaste) = try await pastedImageBytes(text: "a", mode: "\\033[?2004h", count: 14)
+        #expect(canPaste)
+        #expect(bytes == "1b  5b  32  30  30  7e  61  1b  5b  32  30  31  7e  78")
+    }
+
+    @Test func pastesTheTextWithoutAnImage() async throws {
+        let (bytes, canPaste) = try await pastedImageBytes(image: false, text: "a", mode: "", count: 2)
+        #expect(canPaste)
+        #expect(bytes == "61  78")
+    }
+
     @Test func pastesACopiedFileAsItsPath() async throws {
         let item = NSPasteboardItem()
         item.setString(URL(filePath: "/tmp/My Shot.png").absoluteString, forType: .fileURL)
@@ -86,6 +116,29 @@ private func pastedBytes(_ text: String, mode: String, count: Int) async throws 
     defer { pasteboard.releaseGlobally() }
     view.paste(from: pasteboard)
     return await session.linesAfterExit().first { !$0.isEmpty && $0 != "ready" }
+}
+
+@MainActor
+private func pastedImageBytes(
+    image: Bool = true, text: String? = nil, mode: String, count: Int
+) async throws -> (bytes: String?, canPaste: Bool) {
+    let (view, session) = try startedView(
+        running: "printf '\(mode)'; stty raw -echo; echo ready; head -c \(count) | od -An -tx1"
+    )
+    await session.waitForText("ready")
+    let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+    defer { pasteboard.releaseGlobally() }
+    pasteboard.clearContents()
+    if image {
+        pasteboard.setData(Data([0]), forType: .tiff)
+    }
+    if let text {
+        pasteboard.setString(text, forType: .string)
+    }
+    let canPaste = view.canPaste(from: pasteboard)
+    view.paste(from: pasteboard)
+    session.send("x")
+    return (await session.linesAfterExit().first { !$0.isEmpty && $0 != "ready" }, canPaste)
 }
 
 @MainActor
