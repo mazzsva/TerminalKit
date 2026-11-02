@@ -222,15 +222,20 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains("61"))
     }
 
-    @Test func drawsTheCharacterUnderTheCursor() async throws {
+    @Test(arguments: [TerminalPalette.standard.background, .clear], [1, 2] as [CGFloat])
+    func drawsTheCharacterUnderTheCursor(background: Color, scale: CGFloat) async throws {
+        let character = try await drawnView(running: "printf 'X\\b'")
+        let space = try await drawnView(running: "printf ' \\b'")
         var palette = TerminalPalette.standard
+        palette.background = background
         palette.cursor = .red
-        let (character, characterWindow) = try await focusedView(running: "printf 'X\\b'")
-        let (space, spaceWindow) = try await focusedView(running: "printf ' \\b'")
-        character.palette = palette
-        space.palette = palette
+        let windows = [ScaledKeyWindow(contentView: character), ScaledKeyWindow(contentView: space)]
+        for (window, view) in zip(windows, [character, space]) {
+            window.scale = scale
+            view.palette = palette
+        }
         #expect(try pixels(in: character.cursorRect, of: character) != pixels(in: space.cursorRect, of: space))
-        #expect(characterWindow.firstResponder === character && spaceWindow.firstResponder === space)
+        #expect(windows[0].firstResponder === character && windows[1].firstResponder === space)
     }
 
     @Test func drawsTheUnderlineUnderTheCursorInTheCursorTextColor() async throws {
@@ -667,6 +672,22 @@ struct TerminalContentViewTests {
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
         let representation = try representation(of: view)
         #expect(color(in: representation, at: center) != color(in: representation, at: CGPoint(x: 190, y: 90)))
+    }
+
+    @Test(arguments: ["\\033[7m", "\\033[?5h"], [1, 2] as [CGFloat])
+    func drawsInverseTextOnAClearBackground(sequence: String, scale: CGFloat) async throws {
+        let character = try await drawnView(running: "printf '\(sequence)X\\033[m\\r'")
+        let space = try await drawnView(running: "printf '\(sequence) \\033[m\\r'")
+        var palette = TerminalPalette.standard
+        palette.foreground = .white
+        palette.background = .clear
+        let windows = [ScaledWindow(contentView: character), ScaledWindow(contentView: space)]
+        for (window, view) in zip(windows, [character, space]) {
+            window.scale = scale
+            view.palette = palette
+        }
+        let cell = character.rect(row: 0, columns: 0 ..< 1)
+        #expect(try pixels(in: cell, of: character) != pixels(in: cell, of: space))
     }
 
     @Test func drawsInReverseVideo() async throws {
