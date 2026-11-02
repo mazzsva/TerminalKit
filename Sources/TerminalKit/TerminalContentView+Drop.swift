@@ -35,9 +35,9 @@ extension TerminalContentView {
         }
         let quoted = scalars.map { scalar in
             switch scalar {
-            case "\\", "'":
-                "\\" + String(scalar)
-            case _ where scalar.properties.generalCategory == .control:
+            case "\\":
+                "\\\\"
+            case _ where scalar == "'" || scalar.properties.generalCategory == .control:
                 String(scalar).utf8.map { String(format: "\\x%02x", $0) }.joined()
             default:
                 String(scalar)
