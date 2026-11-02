@@ -42,6 +42,35 @@ struct EmojiWidthTests {
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
+    @Test func placesASkinToneAfterACursorMoveAsItsOwnCharacter() {
+        var terminal = Terminal(columns: 20, rows: 2)
+        terminal.receive("abcdefgh\u{1B}[1;1H\u{1F44D}\u{1B}[1;3H\u{1F3FD}")
+        #expect(terminal.screen[0].prefix(5).map(\.width) == [2, 0, 2, 0, 1])
+        #expect(terminal.character(of: terminal.screen[0][0]) == "\u{1F44D}")
+        #expect(terminal.character(of: terminal.screen[0][2]) == "\u{1F3FD}")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 4))
+    }
+
+    @Test(
+        arguments: [
+            "\r\n\u{1F44D}\u{1B}[H\u{1F44D}\r\u{1F3FD}", "\r\n\u{1F44D}\u{1B}[H\u{1F44D}\n\u{1F3FD}",
+            "\u{1B}[1;7H\u{1F44D}\u{1B}[Ha\t\u{1F3FD}", "\u{1F44D}\u{1B}[2;1Hab\u{1B}M\u{1F3FD}",
+        ])
+    func placesASkinToneAfterALineOrTabMoveAsItsOwnCharacter(text: String) {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive(text)
+        let characters = terminal.screen.flatMap { $0.map(terminal.character(of:)) }
+        #expect(characters.contains("\u{1F3FD}"))
+        #expect(!characters.contains("\u{1F44D}\u{1F3FD}"))
+    }
+
+    @Test func joinsASkinToneAfterAnEmojiThatWraps() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive("123456789\u{1F44D}\u{1F3FD}")
+        #expect(terminal.character(of: terminal.screen[1][0]) == "\u{1F44D}\u{1F3FD}")
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
+    }
+
     @Test func repeatsTheEmojiThatASkinToneJoins() {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive("\u{1F44D}\u{1F3FD}\u{1B}[b")

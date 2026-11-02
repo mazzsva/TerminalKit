@@ -88,6 +88,7 @@ package struct Terminal: Sendable {
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
     private var isWrapPending = false
+    private var isAfterPrint = false
     private var style = Style()
     private var usesLineDrawing = false
     private var lastCharacter: Unicode.Scalar?
@@ -450,7 +451,7 @@ package struct Terminal: Sendable {
             }
             return
         }
-        if !scalar.isASCII, scalar.properties.isEmoji, combine(scalar) {
+        if !scalar.isASCII, scalar.properties.isEmoji, isAfterPrint, combine(scalar) {
             return
         }
         place(scalar)
@@ -499,6 +500,7 @@ package struct Terminal: Sendable {
         } else {
             cursor.column += width
         }
+        isAfterPrint = true
     }
 
     private mutating func clearWideCharacter(at column: Int) {
@@ -669,6 +671,7 @@ package struct Terminal: Sendable {
 
     private mutating func lineFeed() {
         isWrapPending = false
+        isAfterPrint = false
         if cursor.row == scrollRegion.upperBound - 1 {
             scrollRegionUp(1)
         } else if cursor.row < rows - 1 {
@@ -788,6 +791,7 @@ package struct Terminal: Sendable {
 
     private mutating func reverseLineFeed() {
         isWrapPending = false
+        isAfterPrint = false
         if cursor.row == scrollRegion.lowerBound {
             scrollDown(1, in: scrollRegion)
         } else if cursor.row > 0 {
@@ -805,11 +809,13 @@ package struct Terminal: Sendable {
 
     private mutating func carriageReturn() {
         isWrapPending = false
+        isAfterPrint = false
         cursor.column = 0
     }
 
     private mutating func moveCursor(row: Int, column: Int) {
         isWrapPending = false
+        isAfterPrint = false
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
     }
 
@@ -866,6 +872,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func moveForward(tabStops count: Int) {
+        isAfterPrint = false
         for _ in 0 ..< min(count, columns) {
             cursor.column = tabStops[(cursor.column + 1)...].firstIndex(of: true) ?? columns - 1
         }
