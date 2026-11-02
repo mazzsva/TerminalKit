@@ -17,6 +17,23 @@ struct SynchronizedOutputTests {
         #expect(terminal.displayed.cursor == Terminal.Position(row: 1, column: 2))
     }
 
+    @Test(arguments: [
+        ("S", "\u{1B}[5;1Hg", ["a", "c", "d", "e", "g", "f"]),
+        ("T", "\u{1B}[2;1Hg", ["a", "g", "b", "c", "d", "f"]),
+    ])
+    func drawsTheScrollFrameOfClaudeCode(command: String, text: String, expected: [String]) {
+        var terminal = Terminal(columns: 1, rows: 6)
+        terminal.receive("\u{1B}[?1049ha\r\nb\r\nc\r\nd\r\ne\r\nf")
+        terminal.receive("\u{1B}[?2026h\u{1B}[2;5r\u{1B}[1\(command)\u{1B}[r\u{1B}[H\(text)")
+        #expect(lines(terminal.displayed) == ["a", "b", "c", "d", "e", "f"])
+
+        terminal.receive("\u{1B}[?2026l")
+        #expect(lines(terminal.displayed) == expected)
+
+        terminal.receive("\u{1B}[H\u{1B}[6;1H\n")
+        #expect(lines(terminal).first == expected[1])
+    }
+
     @Test func showsTheNewScrollbackAboveTheScreenOfTheStart() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("a\r\nb\u{1B}[?2026h\r\nc\r\nd")
