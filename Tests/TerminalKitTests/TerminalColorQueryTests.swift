@@ -93,6 +93,38 @@ struct TerminalColorQueryTests {
         await session.waitForExit()
     }
 
+    @Test func reportsOnlyTheColorSchemeChangesOfAFixedPalette() async throws {
+        let session = TerminalSession(running: "stty raw -echo; printf '\\033[?2031ha'; head -c 10 | tr '\\033' E")
+        let view = TerminalContentView(session: session)
+        view.appearance = NSAppearance(named: .aqua)
+        session.sizingView = view
+        try session.start()
+        await session.waitForText("a")
+        var palette = TerminalPalette.standard
+        palette.background = Color(.sRGB, red: 0.9, green: 0.9, blue: 0.9)
+        view.palette = palette
+        view.appearance = NSAppearance(named: .darkAqua)
+        view.appearance = NSAppearance(named: .aqua)
+        palette.background = Color(.sRGB, red: 0.1, green: 0.1, blue: 0.1)
+        view.palette = palette
+        session.send("xxxxxxxxxx")
+        #expect(await session.linesAfterExit().contains("aE[?997;1nx"))
+    }
+
+    @Test func reportsEachColorSchemeChangeOfTheStandardPalette() async throws {
+        let session = TerminalSession(running: "stty raw -echo; printf '\\033[?2031ha'; head -c 19 | tr '\\033' E")
+        let view = TerminalContentView(session: session)
+        view.appearance = NSAppearance(named: .aqua)
+        session.sizingView = view
+        try session.start()
+        await session.waitForText("a")
+        view.appearance = NSAppearance(named: .darkAqua)
+        view.appearance = NSAppearance(named: .darkAqua)
+        view.appearance = NSAppearance(named: .aqua)
+        session.send(String(repeating: "x", count: 19))
+        #expect(await session.linesAfterExit().contains("aE[?997;1nE[?997;2nx"))
+    }
+
     @Test func ignoresTheColorQueriesWithoutAView() async throws {
         let session = TerminalSession(running: "stty raw -echo; printf '\\033]11;?\\033[c'; head -c 7 | tr '\\033' E")
         try session.start()

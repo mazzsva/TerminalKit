@@ -220,6 +220,7 @@ final class TerminalContentView: NSView {
             let reported = [colors.foreground, colors.background].compactMap(\.terminalRGB)
             reportedColors = reported.count == 2 ? reported : []
         }
+        session.updateReportedColors()
     }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
