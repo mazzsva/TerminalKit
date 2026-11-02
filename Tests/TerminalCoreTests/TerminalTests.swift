@@ -692,12 +692,19 @@ struct TerminalTests {
         ("B", 2, 4), ("B", 4, 4), ("B", 0, 4), ("B", 5, 5),
         ("F", 3, 1), ("F", 5, 1), ("F", 0, 0),
         ("E", 2, 4), ("E", 0, 4), ("E", 5, 5),
-        ("e", 2, 4), ("e", 0, 4), ("e", 5, 5),
     ])
     func stopsTheCursorAtTheMarginsOfTheScrollRegion(final: String, row: Int, stop: Int) {
         var terminal = Terminal(columns: 10, rows: 6)
         terminal.receive("\u{1B}[2;5r\u{1B}[\(row + 1);3H\u{1B}[10\(final)")
         #expect(terminal.cursor.row == stop)
+    }
+
+    @Test func movesTheCursorDownPastTheBottomMarginForVerticalPositionRelative() {
+        var terminal = Terminal(columns: 10, rows: 10)
+        terminal.receive("\u{1B}[4;7r\u{1B}[7;1H\u{1B}[2e")
+        #expect(terminal.cursor == Terminal.Position(row: 8, column: 0))
+        terminal.receive("\u{1B}[99e")
+        #expect(terminal.cursor == Terminal.Position(row: 9, column: 0))
     }
 
     @Test func movesTheCursorOneStepByDefault() {

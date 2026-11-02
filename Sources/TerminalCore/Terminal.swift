@@ -389,8 +389,10 @@ package struct Terminal: Sendable {
         switch sequence.final {
         case "A":
             moveCursor(row: max(cursor.row - count, topLimit), column: cursor.column)
-        case "B", "e":
+        case "B":
             moveCursor(row: min(cursor.row + count, bottomLimit), column: cursor.column)
+        case "e":
+            moveCursor(row: cursor.row + count, column: cursor.column)
         case "C", "a":
             moveCursor(row: cursor.row, column: cursor.column + count)
         case "D":
