@@ -71,7 +71,14 @@ struct TerminalSessionTests {
                     "LC_TERMINAL": "iTerm2", "LC_TERMINAL_VERSION": "3.5.0", "ITERM_SESSION_ID": "w0t0p0:1",
                     "ITERM_PROFILE": "Default", "KITTY_WINDOW_ID": "1", "KITTY_PID": "1", "COLORFGBG": "15;0",
                     "COLUMNS": "20", "LINES": "5", "TERMINFO": "/tmp/terminfo", "CLAUDECODE": "1",
-                    "CLAUDE_CODE_CHILD_SESSION": "1", "LANG": "en_US.UTF-8",
+                    "CLAUDE_CODE_CHILD_SESSION": "1", "CURSOR_TRACE_ID": "1", "TERMINAL_EMULATOR": "JetBrains-JediTerm",
+                    "ALACRITTY_LOG": "/tmp/Alacritty-1.log", "ALACRITTY_WINDOW_ID": "1", "WEZTERM_PANE": "0",
+                    "WT_SESSION": "1", "VTE_VERSION": "7600", "KONSOLE_VERSION": "230804",
+                    "GNOME_TERMINAL_SERVICE": ":1.1", "XTERM_VERSION": "XTerm(390)", "TERMINATOR_UUID": "urn:uuid:1",
+                    "TILIX_ID": "1", "ZED_TERM": "true", "ZELLIJ": "0", "CLAUDE_CODE_SSE_PORT": "1",
+                    "SSH_CONNECTION": "10.0.0.1 1 10.0.0.2 22", "SSH_CLIENT": "10.0.0.1 1 22",
+                    "SSH_TTY": "/dev/ttys000", "LANG": "en_US.UTF-8", "SSH_AUTH_SOCK": "/tmp/agent",
+                    "GIT_ASKPASS": "/tmp/askpass", "VSCODE_GIT_IPC_HANDLE": "/tmp/vscode-git.sock",
                 ]
             )
             .environment
@@ -79,6 +86,8 @@ struct TerminalSessionTests {
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
                 "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1",
+                "SSH_AUTH_SOCK": "/tmp/agent", "GIT_ASKPASS": "/tmp/askpass",
+                "VSCODE_GIT_IPC_HANDLE": "/tmp/vscode-git.sock",
             ])
     }
 
