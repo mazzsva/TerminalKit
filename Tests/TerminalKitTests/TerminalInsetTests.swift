@@ -99,6 +99,24 @@ struct TerminalInsetTests {
         #expect(scrollView.contentView.bounds.minY == top)
     }
 
+    @Test func keepsThePositionWhenScrolledBackAboveTheBottomInsetAndTheViewShrinks() async throws {
+        let session = TerminalSession(running: "seq 1 100")
+        let scrollView = TerminalScrollView(session: session)
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 40, right: 0)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        scrollView.layoutSubtreeIfNeeded()
+        try session.start()
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        view.scroll(CGPoint(x: 0, y: scrollView.contentView.bounds.minY - view.cellSize.height))
+        let top = scrollView.contentView.bounds.minY
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 200)
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.minY == top)
+    }
+
     @Test func scrollsAboveTheBottomInsetWithTheKeyboard() async throws {
         let session = TerminalSession(running: "seq 1 100")
         let scrollView = TerminalScrollView(session: session)

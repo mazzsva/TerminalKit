@@ -60,8 +60,20 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
         return view?.isDescendant(of: self) == true
     }
 
+    private var isAtBottom: Bool {
+        contentView.bounds.maxY >= terminalView.frame.height + contentView.contentInsets.bottom
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        let isAtBottom = isAtBottom
+        super.setFrameSize(newSize)
+        if isAtBottom {
+            terminalView.scrollToBottom()
+        }
+    }
+
     override func layout() {
-        let isAtBottom = contentView.bounds.maxY >= terminalView.frame.height + contentView.contentInsets.bottom
+        let isAtBottom = isAtBottom
         let removedLines = terminalView.session.terminal.removedScrollbackCount - removedScrollbackCount
         removedScrollbackCount = terminalView.session.terminal.removedScrollbackCount
         super.layout()
