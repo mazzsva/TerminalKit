@@ -168,6 +168,33 @@ struct TerminalViewTests {
         #expect(firstLine() == line)
     }
 
+    @Test(arguments: ["", "\\033[?1049h"])
+    func keepsTheBottomVisibleWhenTheWindowShrinks(mode: String) async throws {
+        let (scrollView, session) = try await scrollView(
+            running: "seq 1 50; printf '\(mode)ready'; read line; seq 51 100")
+        await session.waitForText("ready")
+        let window = NSWindow(contentView: scrollView)
+        scrollView.layoutSubtreeIfNeeded()
+        window.setContentSize(CGSize(width: 300, height: 200))
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
+    }
+
+    @Test func keepsThePositionWhenScrolledBackAndTheWindowShrinks() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 50")
+        await session.waitForExit()
+        let window = NSWindow(contentView: scrollView)
+        scrollView.layoutSubtreeIfNeeded()
+        scrollView.terminalView.scroll(CGPoint(x: 0, y: 100))
+        window.setContentSize(CGSize(width: 300, height: 200))
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentView.bounds.minY == 100)
+    }
+
     @Test(
         arguments: [
             (NSHomeFunctionKey, [.command, .function], -.infinity, 0),
