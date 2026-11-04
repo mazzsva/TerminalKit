@@ -421,6 +421,20 @@ struct TerminalContentViewTests {
             })
     }
 
+    @Test(arguments: ["4", "9"], [1, 2] as [CGFloat])
+    func alignsTheLineToThePixels(parameter: String, scale: CGFloat) async throws {
+        let view = try await drawnView(running: "printf '\\033[\(parameter);31m  \\033[;31m█\\n'")
+        let window = ScaledWindow(contentView: view)
+        window.scale = scale
+        let representation = try representation(of: view)
+        let background = color(in: representation, at: CGPoint(x: 190, y: 90))
+        let foreground = color(in: representation, at: CGPoint(x: 4 + 2.5 * view.cellSize.width, y: 10))
+        let column = CGRect(x: 4 + view.cellSize.width, y: 4, width: 1 / scale, height: view.cellSize.height)
+        let pixels = try pixels(in: column, of: view)
+        #expect(pixels.count { isClose($0, to: foreground) } == Int(scale))
+        #expect(pixels.allSatisfy { isClose($0, to: foreground) || isClose($0, to: background) })
+    }
+
     @Test(arguments: [1, 2] as [CGFloat])
     func drawsTheUnderlineColorInReverseVideo(scale: CGFloat) async throws {
         let plain = try await drawnView(running: "printf '\\033[?5h\\033[4;30mab\\033[m\\r'")

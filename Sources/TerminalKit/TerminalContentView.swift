@@ -599,13 +599,18 @@ final class TerminalContentView: NSView {
         let width = CGFloat(columns.count) * cellSize.width
         if style.isStrikethrough {
             context.fill(
-                CGRect(x: left, y: baseline - font.xHeight / 2 - thickness / 2, width: width, height: thickness))
+                backingAlignedRect(
+                    CGRect(x: left, y: baseline - font.xHeight / 2 - thickness / 2, width: width, height: thickness),
+                    options: .alignAllEdgesNearest))
         }
         if style.isUnderlined {
             if let underline {
                 context.setFillColor((style.isFaint ? underline.withAlphaComponent(0.5) : underline).cgColor)
             }
-            context.fill(CGRect(x: left, y: baseline - font.underlinePosition, width: width, height: thickness))
+            context.fill(
+                backingAlignedRect(
+                    CGRect(x: left, y: baseline - font.underlinePosition, width: width, height: thickness),
+                    options: .alignAllEdgesNearest))
         }
     }
 
