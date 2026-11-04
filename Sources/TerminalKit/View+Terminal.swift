@@ -9,7 +9,7 @@ extension View {
         environment(\.terminalPalette, palette)
     }
 
-    public func optionAsMetaKey(_ isEnabled: Bool = true) -> some View {
+    public func terminalOptionAsMetaKey(_ isEnabled: Bool = true) -> some View {
         environment(\.usesOptionAsMetaKey, isEnabled)
     }
 }
