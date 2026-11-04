@@ -364,12 +364,48 @@ struct TerminalViewTests {
         #expect(window.firstResponder === view)
     }
 
+    @Test func takesTheFocusFromSwiftUI() async throws {
+        let sessions = [TerminalSession(running: "exit"), TerminalSession(running: "exit")]
+        let hostingView = NSHostingView(rootView: FocusedPanes(sessions: sessions, focus: nil))
+        let window = NSWindow(contentView: hostingView)
+        hostingView.layoutSubtreeIfNeeded()
+        let views = try sessions.map { session in
+            try #require(contentViews(in: hostingView).first { $0.session === session })
+        }
+        for index in [1, 0] {
+            hostingView.rootView = FocusedPanes(sessions: sessions, focus: index)
+            hostingView.layoutSubtreeIfNeeded()
+            while window.firstResponder !== views[index] {
+                try Task.checkCancellation()
+                await Task.yield()
+            }
+        }
+    }
+
     @Test func keepsTheFocusOfAnotherView() {
         let textView = NSTextView()
         let window = NSWindow(contentView: textView)
         window.makeFirstResponder(textView)
         textView.addSubview(TerminalContentView(session: TerminalSession(running: "exit")))
         #expect(window.firstResponder === textView)
+    }
+}
+
+private struct FocusedPanes: View {
+    let sessions: [TerminalSession]
+    let focus: Int?
+    @FocusState private var focusedIndex: Int?
+
+    var body: some View {
+        HStack {
+            ForEach(sessions.indices, id: \.self) { index in
+                TerminalView(session: sessions[index])
+                    .focused($focusedIndex, equals: index)
+            }
+        }
+        .onChange(of: focus, initial: true) {
+            focusedIndex = focus
+        }
     }
 }
 
@@ -390,4 +426,9 @@ private func scrollView(running script: String) async throws -> (TerminalScrollV
 @MainActor
 private func contentView(in view: NSView) -> TerminalContentView? {
     view as? TerminalContentView ?? view.subviews.lazy.compactMap(contentView(in:)).first
+}
+
+@MainActor
+private func contentViews(in view: NSView) -> [TerminalContentView] {
+    (view as? TerminalContentView).map { [$0] } ?? view.subviews.flatMap(contentViews(in:))
 }
