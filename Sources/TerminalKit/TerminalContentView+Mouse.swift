@@ -11,6 +11,8 @@ extension TerminalContentView {
         }
         if reportsMouse(for: event) {
             reportMouse(event, button: 0, isRelease: true)
+        } else if event.modifierFlags.contains(.option), event.clickCount == 1, let clickLocation {
+            moveCursor(to: convert(event.locationInWindow, from: nil), from: clickLocation)
         }
     }
 

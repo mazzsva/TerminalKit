@@ -239,6 +239,53 @@ struct TerminalMouseTests {
         let reports = await session.linesAfterExit().joined().split(separator: "E").dropFirst().map { $0.prefix(4) }
         #expect(reports == ["[<64", "[<67", "[<64", "[<67"])
     }
+
+    @Test(arguments: [("", "E[D"), ("\\033[?1h", "EOD")])
+    func movesTheCursorWithOption(modes: String, key: String) async throws {
+        let (view, session) = try await viewTyping("printf '\(modes)$ echo hello'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 8.5, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 8.5, in: view, modifierFlags: .option))
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().contains("$ echo hello" + String(repeating: key, count: 4) + "done"))
+    }
+
+    @Test func movesTheCursorWithOptionAcrossAWrappedRow() async throws {
+        let (view, session) = try await viewTyping("printf %$(stty size | cut -d' ' -f2)s ''; printf hello")
+        let column = CGFloat(session.terminal.columns) - 0.5
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: column, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: column, in: view, modifierFlags: .option))
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().contains("hello" + String(repeating: "E[D", count: 6) + "done"))
+    }
+
+    @Test func movesTheCursorWithOptionAcrossTheMiddleOfACell() async throws {
+        let (view, session) = try await viewTyping("printf '$ echo hello'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 8.45, in: view, modifierFlags: .option))
+        view.mouseDragged(
+            with: try mouseEvent(.leftMouseDragged, row: 1, column: 8.55, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 8.55, in: view, modifierFlags: .option))
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().contains("$ echo hello" + String(repeating: "E[D", count: 4) + "done"))
+    }
+
+    @Test func movesNoCursorWithAnOptionDrag() async throws {
+        let (view, session) = try await viewTyping("printf '$ echo hello'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 8.5, in: view, modifierFlags: .option))
+        view.mouseDragged(
+            with: try mouseEvent(.leftMouseDragged, row: 1, column: 2.5, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 2.5, in: view, modifierFlags: .option))
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().contains("$ echo hellodone"))
+    }
+
+    @Test(arguments: [("", 0), ("\\033[?1049h", 1)])
+    func movesNoCursorWithOptionOnAnotherLineOrTheAlternateScreen(modes: String, row: Int) async throws {
+        let (view, session) = try await viewTyping("printf '\(modes)$ echo hello'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row, column: 2.5, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: row, column: 2.5, in: view, modifierFlags: .option))
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().contains("$ echo hellodone"))
+    }
 }
 
 @MainActor
@@ -249,6 +296,17 @@ private func viewReading(_ reader: String, modes: String) async throws -> (Termi
     view.fit(to: CGSize(width: 400, height: 300))
     try session.start()
     await session.waitForText("ready")
+    return (view, session)
+}
+
+@MainActor
+private func viewTyping(_ prompt: String) async throws -> (TerminalContentView, TerminalSession) {
+    let session = TerminalSession(
+        running: "stty raw -echo; printf 'ready\\r\\n'; \(prompt); head -n 1 | tr '\\033' E")
+    let view = TerminalContentView(session: session)
+    view.fit(to: CGSize(width: 400, height: 300))
+    try session.start()
+    await session.waitForText("hello")
     return (view, session)
 }
 

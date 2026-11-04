@@ -40,8 +40,10 @@ extension TerminalContentView {
             selectionClickCount = event.clickCount
             selectionOrigin = selectionUnit(at: location)
             selection = selectionOrigin
+            clickLocation = location
             return
         }
+        clickLocation = nil
         let point = selectionPoint(at: location)
         let terminal = session.terminal
         let start = max(
@@ -76,6 +78,31 @@ extension TerminalContentView {
                 mouseDragged(with: event)
             }
         }
+    }
+
+    func moveCursor(to location: CGPoint, from clickLocation: CGPoint) {
+        let terminal = session.terminal
+        let cursor = terminal.cursor
+        let row = terminal.scrollback.count + cursor.row
+        let cell = { (location: CGPoint) in
+            (
+                row: Int((location.y - Self.padding) / self.cellSize.height),
+                column: Int(floor((location.x - Self.padding) / self.cellSize.width))
+            )
+        }
+        let target = cell(location)
+        guard session.liveTerminal.mouseTracking == .off, !terminal.isAlternateScreenActive,
+            target == cell(clickLocation),
+            let (cells, index) = cells(atRow: target.row, column: target.column, in: terminal),
+            let cursorIndex = cells.firstIndex(where: {
+                $0.row == row && $0.column <= cursor.column && cursor.column < $0.column + Int($0.cell.width)
+            })
+        else {
+            return
+        }
+        let key =
+            (session.liveTerminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}[") + (index < cursorIndex ? "D" : "C")
+        session.send(Array(String(repeating: key, count: abs(index - cursorIndex)).utf8))
     }
 
     private func extendSelection(to location: CGPoint) {

@@ -46,6 +46,7 @@ final class TerminalContentView: NSView {
         }
     }
     var selectionOrigin: Selection?
+    var clickLocation: CGPoint?
     var selectionClickCount = 1
     var cachedAccessibilityText: AccessibilityText?
     var isAccessibilityNotificationScheduled = false
