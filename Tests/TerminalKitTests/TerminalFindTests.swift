@@ -131,6 +131,22 @@ struct TerminalFindTests {
         #expect(pixels(view.rect(row: 0, columns: 4 ..< 6)).allSatisfy { $0 > 0.5 })
     }
 
+    @Test func drawsTheFoundRightToLeftCharacterInItsVisualCell() async throws {
+        let word = try await findView(running: "printf '\\327\\220\\327\\221'")
+        let reference = try await findView(running: "printf ' \\327\\220'")
+        let images = try [(word.terminalView, 0), (reference.terminalView, 1)]
+            .map { view, location in
+                let image = NSImage(size: view.bounds.size, flipped: true) { _ in
+                    NSColor.yellow.setFill()
+                    view.bounds.fill()
+                    view.drawCharacters(in: NSRange(location: location, length: 1), forContentView: view)
+                    return true
+                }
+                return try #require(image.tiffRepresentation)
+            }
+        #expect(images[0] == images[1])
+    }
+
     @Test func tellsTheFinderWhenTheTextChanges() async throws {
         let session = TerminalSession(running: "printf a; read line; printf b")
         let scrollView = TerminalScrollView(session: session)

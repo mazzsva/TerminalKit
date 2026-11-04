@@ -62,10 +62,13 @@ extension TerminalContentView: NSTextFinderClient {
             let line = line(at: row)
             let lowerBound = row == start.row ? start.column : 0
             let upperBound = row == end.row ? end.column : line.count
+            let order = Self.visualOrder(of: line, graphemes: graphemes)
             for (columns, style) in Self.runs(in: line) {
                 let clipped = columns.clamped(to: lowerBound ..< upperBound)
                 if !clipped.isEmpty {
-                    drawText(line, columns: clipped, row: row, style: style, foreground: .black, graphemes: graphemes)
+                    drawText(
+                        line, columns: clipped, row: row, style: style, foreground: .black, graphemes: graphemes,
+                        order: order)
                 }
             }
         }
@@ -76,10 +79,11 @@ extension TerminalContentView: NSTextFinderClient {
             return []
         }
         return (start.row ... end.row)
-            .map { row in
+            .flatMap { row in
                 let lowerBound = row == start.row ? start.column : 0
                 let upperBound = row == end.row ? end.column : max(line(at: row).count, lowerBound + 1)
-                return rect(row: row, columns: lowerBound ..< max(upperBound, lowerBound + 1))
+                return rects(
+                    row: row, columns: lowerBound ..< max(upperBound, lowerBound + 1), order: visualOrder(ofRow: row))
             }
     }
 
