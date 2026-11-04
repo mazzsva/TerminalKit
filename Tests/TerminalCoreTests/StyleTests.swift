@@ -108,11 +108,6 @@ struct StyleTests {
         #expect(style.foreground == .indexed(1))
         style.apply([38, 9, 1])
         #expect(style.foreground == .indexed(1))
-        style.apply([58, 5, 1])
-        style.apply([58, 5])
-        style.apply([58, 2, 1, 2])
-        style.apply([58, 5, 256])
-        #expect(style.underlineColor == .indexed(1))
     }
 
     @Test func erasesWithTheBackgroundColor() {
@@ -135,25 +130,10 @@ struct StyleTests {
         #expect(style == Terminal.Style(isBold: true))
     }
 
-    @Test func setsTheUnderlineColor() {
-        var style = Terminal.Style()
-        style.apply([4, 31, 58, 5, 1])
-        #expect(style == Terminal.Style(foreground: .indexed(1), underlineColor: .indexed(1), isUnderlined: true))
-        style.apply([58, 2, 0, 1, 9])
-        #expect(
-            style
-                == Terminal.Style(
-                    foreground: .indexed(1), underlineColor: .rgb(red: 0, green: 1, blue: 9), isUnderlined: true))
-    }
-
-    @Test func resetsTheUnderlineColor() {
-        var style = Terminal.Style()
-        style.apply([4, 58, 5, 1])
-        style.apply([59])
-        #expect(style == Terminal.Style(isUnderlined: true))
-        style.apply([58, 5, 1])
-        style.apply([0])
-        #expect(style == Terminal.Style())
+    @Test func readsTheUnderlineColorValuesAsSeparateParameters() {
+        #expect(style("4;58;2;255;0;0") == Terminal.Style())
+        #expect(style("58;5;2") == Terminal.Style(isFaint: true))
+        #expect(style("4;58;5;2;59") == Terminal.Style(isFaint: true, isUnderlined: true))
     }
 
     @Test func setsTheTrueColorsWithColons() {
@@ -186,12 +166,9 @@ struct StyleTests {
                 == Terminal.Style(foreground: .rgb(red: 10, green: 20, blue: 30), isBold: true, isUnderlined: true))
     }
 
-    @Test func setsTheUnderlineColorWithColons() {
-        #expect(
-            style("58:2::255:0:0;1;58:5:1;4")
-                == Terminal.Style(underlineColor: .indexed(1), isBold: true, isUnderlined: true))
-        #expect(style("58:2::255:0:0") == Terminal.Style(underlineColor: .rgb(red: 255, green: 0, blue: 0)))
-        #expect(style("58:2:1:2:3") == Terminal.Style(underlineColor: .rgb(red: 1, green: 2, blue: 3)))
+    @Test func ignoresTheUnderlineColorWithColons() {
+        #expect(style("4;58:5:2") == Terminal.Style(isUnderlined: true))
+        #expect(style("58:2::255:0:0;1") == Terminal.Style(isBold: true))
     }
 
     @Test func ignoresUnknownSubparameters() {
