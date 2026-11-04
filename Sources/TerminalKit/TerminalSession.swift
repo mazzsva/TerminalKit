@@ -147,19 +147,10 @@ public final class TerminalSession {
         pseudoTerminal = nil
     }
 
-    func updateReportedColors() {
-        guard let colors = sizingView?.reportedColors, colors != terminal.reportedColors else {
-            return
-        }
-        terminal.reportedColors = colors
-        let report = terminal.receive([])
-        if !report.isEmpty {
-            pseudoTerminal?.write(report, isReply: true)
-        }
-    }
-
     private func receive(_ bytes: [UInt8]) {
-        updateReportedColors()
+        if let colors = sizingView?.reportedColors, colors != terminal.reportedColors {
+            terminal.reportedColors = colors
+        }
         let replies = terminal.receive(bytes)
         title = terminal.title
         if bellCount != terminal.bellCount {
