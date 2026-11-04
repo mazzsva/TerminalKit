@@ -31,10 +31,14 @@ final class TerminalContentView: NSView {
     }
     private(set) var reportedColors: [Terminal.RGB] = []
     var usesOptionAsMetaKey = false
-    var markedText = "" {
+    var markedString = NSAttributedString() {
         didSet {
             needsDisplay = true
         }
+    }
+    var markedSelection = NSRange(location: 0, length: 0)
+    var markedText: String {
+        markedString.string
     }
     var selection: Selection? {
         didSet {
@@ -485,10 +489,16 @@ final class TerminalContentView: NSView {
 
         let cursor = cursorRect
         guard markedText.isEmpty else {
-            let text = NSAttributedString(
+            let text = NSMutableAttributedString(
                 string: markedText,
                 attributes: attributes.merging([.underlineStyle: NSUnderlineStyle.single.rawValue]) { $1 }
             )
+            markedString.enumerateAttribute(.underlineStyle, in: NSRange(location: 0, length: text.length)) {
+                style, range, _ in
+                if let style {
+                    text.addAttribute(.underlineStyle, value: style, range: range)
+                }
+            }
             let size = text.size()
             let origin = CGPoint(
                 x: max(Self.padding, min(cursor.minX, bounds.width - Self.padding - size.width)),
