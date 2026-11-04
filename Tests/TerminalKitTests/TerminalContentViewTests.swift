@@ -307,13 +307,20 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: cell, of: word) == pixels(in: cell, of: open))
     }
 
-    @Test func underlinesTheVisualCellsOfRightToLeftText() async throws {
+    @Test(arguments: [1, 2] as [CGFloat])
+    func underlinesTheVisualCellsOfRightToLeftText(scale: CGFloat) async throws {
         let plain = try await drawnView(running: "printf '\\327\\220\\327\\221\\n'")
         let view = try await drawnView(running: "printf '\\033[4m\\327\\220\\033[m\\327\\221\\n'")
+        let windows = [ScaledWindow(contentView: plain), ScaledWindow(contentView: view)]
+        for window in windows {
+            window.scale = scale
+        }
         let font = view.fonts.regular
         let underline = CGRect(
             x: 4, y: 4 + font.ascender - font.underlinePosition, width: view.cellSize.width,
-            height: max(font.underlineThickness, 1))
+            height: max(font.underlineThickness, 1)
+        )
+        .insetBy(dx: 0, dy: -1)
         let next = underline.offsetBy(dx: view.cellSize.width, dy: 0)
         #expect(try pixels(in: underline, of: view) == pixels(in: underline, of: plain))
         #expect(try pixels(in: next, of: view) != pixels(in: next, of: plain))
