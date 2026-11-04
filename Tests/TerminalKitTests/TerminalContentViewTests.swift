@@ -911,7 +911,7 @@ struct TerminalContentViewTests {
     }
 
     @Test func leavesOptionKeysToTheMarkedText() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 1 | od -An -tx1")
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 4 | od -An -tx1")
         let view = TerminalContentView(session: session)
         view.usesOptionAsMetaKey = true
         object_setClass(view.inputContext, ComposingInputContext.self)
@@ -927,11 +927,11 @@ struct TerminalContentViewTests {
         view.keyDown(with: try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option))
         view.unmarkText()
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("78"))
+        #expect(await session.linesAfterExit().contains("e3  81  8b  78"))
     }
 
     @Test func sendsTheOptionArrowsThatTheInputSystemReturns() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 8 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -944,7 +944,7 @@ struct TerminalContentViewTests {
         view.keyDown(with: try keyDown(NSRightArrowFunctionKey, modifierFlags: .option))
         view.unmarkText()
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("1b  62  1b  66  78"))
+        #expect(await session.linesAfterExit().contains("1b  62  1b  66  e3  81  8b  78"))
     }
 
     @Test func sendsAKeyWithTwoCommandsOnce() async throws {
@@ -988,7 +988,7 @@ struct TerminalContentViewTests {
     }
 
     @Test func sendsControlUForCommandDelete() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -1003,7 +1003,7 @@ struct TerminalContentViewTests {
         view.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
         view.unmarkText()
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("15  15  78"))
+        #expect(await session.linesAfterExit().contains("15  15  c2  b4  78"))
     }
 
     @Test func passesCommandKeysToTheNextResponder() throws {
@@ -1036,19 +1036,22 @@ struct TerminalContentViewTests {
         #expect(!view.hasMarkedText())
     }
 
-    @Test func dropsTheMarkedTextWhenUnmarked() async throws {
-        let session = readingSession()
+    @Test func sendsTheMarkedTextWhenUnmarked() async throws {
+        let session = TerminalSession(running: "stty -echo; echo ready; read line; printf %s \"$line\" | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
+        await session.waitForText("ready")
+        view.unmarkText()
         view.setMarkedText(
-            "´",
-            selectedRange: NSRange(location: 1, length: 0),
+            "日本",
+            selectedRange: NSRange(location: 2, length: 0),
             replacementRange: NSRange(location: NSNotFound, length: 0)
         )
         view.unmarkText()
+        view.unmarkText()
         view.keyDown(with: try keyDown("\r"))
         #expect(!view.hasMarkedText())
-        #expect(await session.linesAfterExit().contains("got"))
+        #expect(await session.linesAfterExit().contains("e6  97  a5  e6  9c  ac"))
     }
 
     @Test func drawsTheMarkedText() throws {

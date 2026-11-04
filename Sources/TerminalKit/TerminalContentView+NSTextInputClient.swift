@@ -14,6 +14,9 @@ extension TerminalContentView: NSTextInputClient {
     }
 
     func unmarkText() {
+        if hasMarkedText() {
+            insertText(markedText, replacementRange: NSRange(location: NSNotFound, length: 0))
+        }
         markedText = ""
     }
 

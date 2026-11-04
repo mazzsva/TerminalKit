@@ -223,7 +223,7 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func sendsShiftReturnWithModifyOtherKeys() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>4;2m'; stty raw -echo; echo ready; head -c 32 | od -An -tx1")
+            running: "printf '\\033[>4;2m'; stty raw -echo; echo ready; head -c 34 | od -An -tx1")
         let view = TerminalContentView(session: session)
         view.usesOptionAsMetaKey = true
         try session.start()
@@ -241,7 +241,8 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("x"))
         let lines = await session.linesAfterExit()
         #expect(lines.contains("1b  5b  32  37  3b  32  3b  31  33  7e  1b  5b  32  37  3b  35"))
-        #expect(lines.contains("3b  39  37  7e  1b  5b  32  37  3b  33  3b  31  33  7e  0d  78"))
+        #expect(lines.contains("3b  39  37  7e  1b  5b  32  37  3b  33  3b  31  33  7e  0d  c2"))
+        #expect(lines.contains("b4  78"))
     }
 
     @Test func prefersTheKittyProtocolToModifyOtherKeys() async throws {
@@ -277,7 +278,7 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func sendsCommandKeysWithTheKittyProtocol() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 22 | od -An -tx1")
+            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 24 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -294,12 +295,12 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("x"))
         let lines = await session.linesAfterExit()
         #expect(lines.contains("1b  5b  39  39  3b  39  75  1b  5b  31  3b  39  44  1b  5b  31"))
-        #expect(lines.contains("32  37  3b  39  75  78"))
+        #expect(lines.contains("32  37  3b  39  75  c2  b4  78"))
     }
 
     @Test func clearsToStartWithCommandK() async throws {
         let session = TerminalSession(
-            running: "printf 'a\\nb\\nc'; stty raw -echo; printf '\\nready'; head -c 1 | od -An -tx1")
+            running: "printf 'a\\nb\\nc'; stty raw -echo; printf '\\nready'; head -c 3 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -316,7 +317,7 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("k", modifierFlags: .command))
         #expect(session.lines.first == "ready")
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains { $0.hasSuffix(" 78") })
+        #expect(await session.linesAfterExit().contains { $0.hasSuffix(" c2  b4  78") })
     }
 
     @Test func keepsTheAlternateScreenWithCommandK() async throws {
@@ -346,7 +347,7 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func sendsCommandCWithoutASelection() async throws {
         let session = TerminalSession(
-            running: "printf 'text\\033[>1u'; stty raw -echo; echo ready; head -c 8 | od -An -tx1")
+            running: "printf 'text\\033[>1u'; stty raw -echo; echo ready; head -c 10 | od -An -tx1")
         let view = TerminalContentView(session: session)
         let window = NSWindow(contentView: view)
         window.makeFirstResponder(view)
@@ -372,7 +373,7 @@ struct TerminalKeyboardProtocolTests {
         #expect(view.validateMenuItem(item))
         view.copy(nil)
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("1b  5b  39  39  3b  39  75  78"))
+        #expect(await session.linesAfterExit().contains("c2  b4  1b  5b  39  39  3b  39  75  78"))
     }
 
     @Test func sendsShiftReturnInTheLiveKeyboardMode() async throws {
@@ -405,7 +406,7 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func leavesShiftReturnToTheMarkedText() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 2 | od -An -tx1")
+            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 4 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -417,7 +418,7 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("\r", modifierFlags: .shift))
         view.unmarkText()
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("0d  78"))
+        #expect(await session.linesAfterExit().contains("0d  c2  b4  78"))
     }
 
     @Test(
@@ -563,7 +564,11 @@ private final class UnmarkingInputContext: NSTextInputContext {
         guard client.hasMarkedText() else {
             return super.handleEvent(event)
         }
-        client.unmarkText()
+        client.setMarkedText(
+            "",
+            selectedRange: NSRange(location: 0, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
         client.insertText("한", replacementRange: NSRange(location: NSNotFound, length: 0))
         return true
     }
