@@ -255,6 +255,55 @@ struct TerminalViewTests {
         #expect(await session.linesAfterExit().contains("1b  5b  31  3b  39  48"))
     }
 
+    @Test(
+        arguments: [
+            (NSHomeFunctionKey, -.infinity),
+            (NSEndFunctionKey, .infinity),
+            (NSPageUpFunctionKey, -1),
+            (NSPageDownFunctionKey, 1),
+        ] as [(Int, CGFloat)])
+    func scrollsTheScrollbackWithThePageKeys(key: Int, pages: CGFloat) async throws {
+        let (scrollView, session) = try await scrollView(
+            running: "seq 1 100; stty raw -echo; echo ready; head -c 1 | od -An -tx1")
+        await session.waitForText("ready")
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        view.scroll(CGPoint(x: 0, y: 600))
+        let visibleHeight = scrollView.contentView.bounds.height
+        let position = 600 + pages * (visibleHeight - view.cellSize.height)
+        view.keyDown(with: try keyDown(key, modifierFlags: .function))
+        #expect(scrollView.contentView.bounds.minY == min(max(position, 0), view.frame.height - visibleHeight))
+        session.send("x")
+        #expect(await session.linesAfterExit().contains("78"))
+    }
+
+    @Test(
+        arguments: [
+            (NSPageUpFunctionKey, [.shift, .function], "", "1b  5b  35  7e"),
+            (NSPageDownFunctionKey, [.shift, .function], "", "1b  5b  36  7e"),
+            (NSHomeFunctionKey, [.shift, .function], "", "1b  5b  48"),
+            (NSEndFunctionKey, [.shift, .function], "", "1b  5b  46"),
+            (NSPageUpFunctionKey, .function, "\\033[?1049h", "1b  5b  35  7e"),
+            (NSPageDownFunctionKey, .function, "\\033[?1049h", "1b  5b  36  7e"),
+            (NSHomeFunctionKey, .function, "\\033[?1049h", "1b  4f  48"),
+            (NSEndFunctionKey, .function, "\\033[?1049h", "1b  4f  46"),
+            (NSPageUpFunctionKey, .function, "\\033[>1u", "1b  5b  35  7e"),
+            (NSPageDownFunctionKey, .function, "\\033[>1u", "1b  5b  36  7e"),
+            (NSHomeFunctionKey, .function, "\\033[>1u", "1b  5b  48"),
+            (NSEndFunctionKey, .function, "\\033[>1u", "1b  5b  46"),
+            (NSPageUpFunctionKey, [.shift, .function], "\\033[>1u", "1b  5b  35  3b  32  7e"),
+        ] as [(Int, NSEvent.ModifierFlags, String, String)])
+    func sendsThePageKeysToTheProgram(
+        key: Int, modifierFlags: NSEvent.ModifierFlags, mode: String, bytes: String
+    ) async throws {
+        let count = bytes.split(separator: " ").count
+        let (scrollView, session) = try await scrollView(
+            running: "seq 1 100; printf '\(mode)'; stty raw -echo; echo ready; head -c \(count) | od -An -tx1")
+        await session.waitForText("ready")
+        scrollView.terminalView.keyDown(with: try keyDown(key, modifierFlags: modifierFlags))
+        #expect(await session.linesAfterExit().contains(bytes))
+    }
+
     @Test func scrollsToTheBottomWhenYouType() async throws {
         let (scrollView, session) = try await scrollView(running: "seq 1 50; read line")
         scrollView.terminalView.scroll(.zero)

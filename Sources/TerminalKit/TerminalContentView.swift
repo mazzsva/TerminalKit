@@ -368,16 +368,19 @@ final class TerminalContentView: NSView {
 
     private func scrollsView(for event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
-        guard modifiers == .command || modifiers == [.command, .option], let clipView = superview as? NSClipView
+        guard
+            modifiers == .command || modifiers == [.command, .option]
+                || modifiers.isEmpty && !session.liveTerminal.usesDisambiguatedKeys,
+            let clipView = superview as? NSClipView
         else {
             return false
         }
         let insets = clipView.contentInsets
         let page = clipView.bounds.height - insets.top - insets.bottom - cellSize.height
-        let step = modifiers == .command ? page : cellSize.height
+        let step = modifiers.contains(.option) ? cellSize.height : page
         switch event.specialKey {
-        case .home where modifiers == .command: scroll(CGPoint(x: 0, y: -insets.top))
-        case .end where modifiers == .command: scrollToBottom()
+        case .home where !modifiers.contains(.option): scroll(CGPoint(x: 0, y: -insets.top))
+        case .end where !modifiers.contains(.option): scrollToBottom()
         case .pageUp: scroll(CGPoint(x: 0, y: clipView.bounds.minY - step))
         case .pageDown: scroll(CGPoint(x: 0, y: clipView.bounds.minY + step))
         default: return false
@@ -388,6 +391,7 @@ final class TerminalContentView: NSView {
     override func doCommand(by selector: Selector) {
         if let event = keyDownEvent,
             let input = (markedText.isEmpty ? encodedInput(event) : nil) ?? event.wordMovementInput
+                ?? event.shiftedPageKeyInput
                 ?? event.terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
         {
             session.send(input)
