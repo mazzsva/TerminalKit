@@ -27,6 +27,7 @@ extension TerminalContentView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        insertedText = ""
         isOpeningLink = openLink(at: event)
         guard !isOpeningLink else {
             return

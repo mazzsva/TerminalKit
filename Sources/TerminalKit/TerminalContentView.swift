@@ -37,6 +37,7 @@ final class TerminalContentView: NSView {
         }
     }
     var markedSelection = NSRange(location: 0, length: 0)
+    var insertedText = ""
     var markedText: String {
         markedString.string
     }
@@ -344,6 +345,7 @@ final class TerminalContentView: NSView {
         }
         scrollToBottom()
         if markedText.isEmpty, let input = keyInput ?? encodedInput(event) {
+            insertedText = ""
             session.send(input)
             return
         }
@@ -392,6 +394,7 @@ final class TerminalContentView: NSView {
             let input = (markedText.isEmpty ? encodedInput(event) : nil) ?? event.wordMovementInput
                 ?? event.terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
         {
+            insertedText = ""
             session.send(input)
             keyDownEvent = nil
         }

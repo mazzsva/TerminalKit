@@ -114,6 +114,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     }
 
     func paste(text: String) {
+        insertedText = ""
         scrollToBottom()
         session.paste(text)
     }

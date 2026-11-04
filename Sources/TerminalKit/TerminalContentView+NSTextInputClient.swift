@@ -4,14 +4,18 @@ extension TerminalContentView: NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
         let characters = text(of: string)
         let input = hasMarkedText() || characters != keyDownEvent?.characters ? nil : keyDownEvent.flatMap(encodedInput)
+        let deletions = deletions(replacing: replacementRange)
+        insertedText = hasMarkedText() ? "" : characters
         markedString = NSAttributedString()
         scrollToBottom()
-        session.send(input ?? Array(characters.utf8))
+        session.send(deletions + (input ?? Array(characters.utf8)))
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         markedString = string as? NSAttributedString ?? NSAttributedString(string: text(of: string))
         markedSelection = selectedRange
+        session.send(deletions(replacing: replacementRange))
+        insertedText = ""
     }
 
     func unmarkText() {
@@ -22,7 +26,7 @@ extension TerminalContentView: NSTextInputClient {
     }
 
     func selectedRange() -> NSRange {
-        hasMarkedText() ? markedSelection : NSRange(location: 0, length: 0)
+        hasMarkedText() ? markedSelection : NSRange(location: insertedText.utf16.count, length: 0)
     }
 
     func markedRange() -> NSRange {
@@ -35,7 +39,11 @@ extension TerminalContentView: NSTextInputClient {
     }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
-        nil
+        guard let substring = Range(range, in: insertedText) else {
+            return nil
+        }
+        actualRange?.pointee = range
+        return NSAttributedString(string: String(insertedText[substring]))
     }
 
     func validAttributesForMarkedText() -> [NSAttributedString.Key] {
@@ -48,6 +56,12 @@ extension TerminalContentView: NSTextInputClient {
 
     func characterIndex(for point: NSPoint) -> Int {
         0
+    }
+
+    private func deletions(replacing range: NSRange) -> [UInt8] {
+        let replaced = Range(range, in: insertedText).map { insertedText[$0] }
+        let count = replaced?.endIndex == insertedText.endIndex ? replaced?.count ?? 0 : 0
+        return Array(repeating: 0x7F, count: count)
     }
 }
 
