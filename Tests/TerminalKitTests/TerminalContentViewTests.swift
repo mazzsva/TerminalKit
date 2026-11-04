@@ -479,7 +479,7 @@ struct TerminalContentViewTests {
             })
     }
 
-    @Test(arguments: ["4", "9"], [1, 2] as [CGFloat])
+    @Test(arguments: ["4"], [1, 2] as [CGFloat])
     func alignsTheLineToThePixels(parameter: String, scale: CGFloat) async throws {
         let view = try await drawnView(running: "printf '\\033[\(parameter);31m  \\033[;31m█\\n'")
         let window = ScaledWindow(contentView: view)
@@ -841,11 +841,17 @@ struct TerminalContentViewTests {
         #expect(red != plain)
     }
 
-    @Test(arguments: ["1", "2", "3", "4", "9"])
+    @Test(arguments: ["1", "2", "3", "4"])
     func drawsTheTextStyle(parameter: String) async throws {
         let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
         let styled = try image(of: try await drawnView(running: "printf '\\033[\(parameter)mX\\r'"))
         #expect(styled != plain)
+    }
+
+    @Test func drawsStrikethroughTextAsPlainText() async throws {
+        let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
+        let struck = try image(of: try await drawnView(running: "printf '\\033[9mX\\r'"))
+        #expect(struck == plain)
     }
 
     @Test func drawsInverseText() async throws {

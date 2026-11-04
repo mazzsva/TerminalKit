@@ -21,7 +21,7 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "PATH": "/bin",
+                "PATH": "/bin",
             ])
     }
 
@@ -30,8 +30,6 @@ struct TerminalSessionTests {
         let inherited = ProcessInfo.processInfo.environment
         #expect(environment["TERM"] == "xterm-256color")
         #expect(environment["COLORTERM"] == "truecolor")
-        #expect(
-            environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == inherited["CLAUDE_CODE_FORCE_STRIKETHROUGH"] ?? "1")
         #expect(environment["PATH"] == inherited["PATH"])
         #expect(environment["TERM_PROGRAM"] == nil)
         #expect(environment["TERM_SESSION_ID"] == nil)
@@ -53,13 +51,6 @@ struct TerminalSessionTests {
         let environment = TerminalSession.Configuration.terminalEnvironment(
             inheriting: [:], locale: Locale(identifier: "en_BR"))
         #expect(environment["LANG"] == "en_US.UTF-8")
-    }
-
-    @Test func keepsTheClaudeCodeSettingOfTheUser() {
-        let environment = TerminalSession.Configuration
-            .loginShell(inheriting: ["CLAUDE_CODE_FORCE_STRIKETHROUGH": "0"])
-            .environment
-        #expect(environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == "0")
     }
 
     @Test func removesTheIdentityOfTheParentTerminal() {
@@ -85,7 +76,6 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1",
                 "SSH_AUTH_SOCK": "/tmp/agent", "GIT_ASKPASS": "/tmp/askpass",
                 "VSCODE_GIT_IPC_HANDLE": "/tmp/vscode-git.sock",
             ])

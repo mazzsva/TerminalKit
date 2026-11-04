@@ -70,7 +70,6 @@ extension TerminalSession.Configuration {
             environment["LANG"] =
                 FileManager.default.fileExists(atPath: "/usr/share/locale/" + name) ? name : "en_US.UTF-8"
         }
-        environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] = environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] ?? "1"
         return environment
     }
 
