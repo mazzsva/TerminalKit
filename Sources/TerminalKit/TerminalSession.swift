@@ -20,7 +20,7 @@ public final class TerminalSession {
     public private(set) var state = State.idle
     public private(set) var title = ""
     public private(set) var bellCount = 0
-    public private(set) var currentDirectory: URL?
+    public private(set) var currentDirectoryURL: URL?
 
     private(set) var liveTerminal = Terminal(columns: 80, rows: 24) {
         didSet {
@@ -176,8 +176,8 @@ public final class TerminalSession {
         if bellCount != liveTerminal.bellCount {
             bellCount = liveTerminal.bellCount
         }
-        if currentDirectory != liveTerminal.currentDirectory {
-            currentDirectory = liveTerminal.currentDirectory
+        if currentDirectoryURL != liveTerminal.currentDirectory {
+            currentDirectoryURL = liveTerminal.currentDirectory
         }
         if !replies.isEmpty {
             pseudoTerminal?.write(replies, isReply: true)
