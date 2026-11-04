@@ -77,7 +77,7 @@ struct TerminalLinkSafetyTests {
         var opened = 0
         view.performLinkAction = { _ in opened += 1 }
         try session.start()
-        for await tracking in Observations({ session.liveTerminal.mouseTracking }) where tracking == .drags {
+        for await tracking in Observations({ session.terminal.mouseTracking }) where tracking == .drags {
             break
         }
         try drag(in: view, row: 0, from: 3, to: 9, modifierFlags: .command)

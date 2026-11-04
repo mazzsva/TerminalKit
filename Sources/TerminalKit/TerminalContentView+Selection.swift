@@ -37,7 +37,7 @@ extension TerminalContentView {
             return
         }
         let location = convert(event.locationInWindow, from: nil)
-        guard event.modifierFlags.contains(.shift), session.liveTerminal.mouseTracking == .off, let selection else {
+        guard event.modifierFlags.contains(.shift), session.terminal.mouseTracking == .off, let selection else {
             selectionClickCount = event.clickCount
             selectionOrigin = selectionUnit(at: location)
             selection = selectionOrigin
@@ -92,7 +92,7 @@ extension TerminalContentView {
             )
         }
         let target = cell(location)
-        guard session.liveTerminal.mouseTracking == .off, !terminal.isAlternateScreenActive,
+        guard session.terminal.mouseTracking == .off, !terminal.isAlternateScreenActive,
             target == cell(clickLocation),
             let (cells, index) = cells(atRow: target.row, column: target.column, in: terminal),
             let cursorIndex = cells.firstIndex(where: {
@@ -102,7 +102,7 @@ extension TerminalContentView {
             return
         }
         let key =
-            (session.liveTerminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}[") + (index < cursorIndex ? "D" : "C")
+            (session.terminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}[") + (index < cursorIndex ? "D" : "C")
         session.send(Array(String(repeating: key, count: abs(index - cursorIndex)).utf8))
     }
 

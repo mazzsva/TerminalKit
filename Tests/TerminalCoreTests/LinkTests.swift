@@ -152,13 +152,6 @@ struct LinkTests {
         #expect(uris(terminal.screen[0].prefix(1), in: terminal) == [nil])
     }
 
-    @Test func showsNewLinksInTheScrollbackDuringAnUpdate() {
-        var terminal = Terminal(columns: 10, rows: 1)
-        terminal.receive("\u{1B}[?2026h\u{1B}]8;;u\u{7}a\r\nb")
-        let displayed = terminal.displayed
-        #expect(uris(displayed.scrollback[0].prefix(1), in: displayed) == ["u"])
-    }
-
     @Test func keepsTheCellSmall() {
         #expect(MemoryLayout<Terminal.Cell>.stride == 20)
     }

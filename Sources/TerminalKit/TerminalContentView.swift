@@ -70,7 +70,7 @@ final class TerminalContentView: NSView {
             if isFocused, session.sizingView !== self {
                 session.sizingView = self
             }
-            if session.liveTerminal.usesFocusReporting {
+            if session.terminal.usesFocusReporting {
                 session.send(Array((isFocused ? "\u{1B}[I" : "\u{1B}[O").utf8))
             }
         }
@@ -348,12 +348,12 @@ final class TerminalContentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if markedText.isEmpty, !session.liveTerminal.isAlternateScreenActive, scrollsView(for: event) {
+        if markedText.isEmpty, !session.terminal.isAlternateScreenActive, scrollsView(for: event) {
             return
         }
         let keyInput = markedText.isEmpty ? modifiedInput(event) ?? event.lineDeletionInput : nil
         guard !event.modifierFlags.contains(.command) || keyInput != nil else {
-            if markedText.isEmpty, !session.liveTerminal.isAlternateScreenActive,
+            if markedText.isEmpty, !session.terminal.isAlternateScreenActive,
                 event.modifierFlags.intersection([.shift, .control, .option, .command]) == .command,
                 event.charactersIgnoringModifiers == "k"
             {
@@ -378,13 +378,13 @@ final class TerminalContentView: NSView {
     func encodedInput(_ event: NSEvent) -> [UInt8]? {
         modifiedInput(event) ?? event.controlInput
             ?? (usesOptionAsMetaKey && event.modifierFlags.contains(.option)
-                ? event.metaInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys) : nil)
+                ? event.metaInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys) : nil)
     }
 
     private func modifiedInput(_ event: NSEvent) -> [UInt8]? {
-        session.liveTerminal.usesDisambiguatedKeys
+        session.terminal.usesDisambiguatedKeys
             ? event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey)
-            : event.otherKeyInput(level: session.liveTerminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
+            : event.otherKeyInput(level: session.terminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
     }
 
     func scrollToBottom() {
@@ -395,7 +395,7 @@ final class TerminalContentView: NSView {
         let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
         guard
             modifiers == .command || modifiers == [.command, .option]
-                || modifiers.isEmpty && !session.liveTerminal.usesDisambiguatedKeys,
+                || modifiers.isEmpty && !session.terminal.usesDisambiguatedKeys,
             let clipView = superview as? NSClipView
         else {
             return false
@@ -417,7 +417,7 @@ final class TerminalContentView: NSView {
         if let event = keyDownEvent,
             let input = (markedText.isEmpty ? encodedInput(event) : nil) ?? event.wordMovementInput
                 ?? event.shiftedPageKeyInput
-                ?? event.terminalInput(applicationCursorKeys: session.liveTerminal.usesApplicationCursorKeys)
+                ?? event.terminalInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys)
         {
             insertedText = ""
             session.send(input)

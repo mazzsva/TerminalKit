@@ -54,11 +54,11 @@ macOS gives microphone access to the host app, not to the program in the termina
 
 ## Engineering decisions
 
-**Built for Claude Code.** Each protocol traces to the official Claude Code docs: the kitty keyboard protocol for Shift-Return, synchronized output, mouse hover, color queries for the automatic theme, and hyperlinks.
+**Built for Claude Code.** Each protocol traces to the official Claude Code docs: the kitty keyboard protocol for Shift-Return, mouse hover, color queries for the automatic theme, and hyperlinks.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 5,000 lines of Swift and C on POSIX and AppKit APIs.
 
-**A value-type emulator.** The full terminal state is one Swift struct. Tests feed it bytes and compare values. During synchronized output, the view draws a frozen copy, so the screen never shows a frame that is half drawn.
+**A value-type emulator.** The full terminal state is one Swift struct. Tests feed it bytes and compare values.
 
 **Safe links.** A Command-click opens web, mail, FTP, and file links, both hyperlinks and plain URLs. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
 
