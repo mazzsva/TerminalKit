@@ -105,6 +105,8 @@ final class TerminalContentView: NSView {
     private var bellTask: Task<Void, Never>?
     private var flagsMonitor: Any?
     private var lastBellDate: Date?
+    private var joinNumber = 0
+    private static var joinCount = 0
 
     private struct Colors {
         let foreground: NSColor
@@ -232,6 +234,16 @@ final class TerminalContentView: NSView {
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil, let window, window.firstResponder === self, let contentView = window.contentView {
+            Task {
+                if let view = Self.contentViews(in: contentView).filter({ !$0.isHiddenOrHasHiddenAncestor })
+                    .max(by: { $0.joinNumber < $1.joinNumber }),
+                    let window = view.window, window.firstResponder === window
+                {
+                    window.makeFirstResponder(view)
+                }
+            }
+        }
         NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: window)
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: window)
         NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: window)
@@ -275,6 +287,8 @@ final class TerminalContentView: NSView {
         flagsMonitor.map(NSEvent.removeMonitor)
         flagsMonitor = nil
         if window != nil {
+            Self.joinCount += 1
+            joinNumber = Self.joinCount
             bellTask = Task { [weak self, session] in
                 for await _ in Observations({ session.bellCount }).dropFirst() {
                     self?.bellDidRing()
@@ -285,6 +299,10 @@ final class TerminalContentView: NSView {
                 return event
             }
         }
+    }
+
+    private static func contentViews(in view: NSView) -> [TerminalContentView] {
+        (view as? TerminalContentView).map { [$0] } ?? view.subviews.flatMap(contentViews(in:))
     }
 
     static func ringsBell(at date: Date, lastBellDate: Date?) -> Bool {

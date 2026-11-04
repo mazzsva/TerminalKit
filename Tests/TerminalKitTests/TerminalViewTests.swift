@@ -122,6 +122,87 @@ struct TerminalViewTests {
         #expect(window.firstResponder === focused.terminalView)
     }
 
+    @Test func focusesTheLastPaneWhenTheFocusedPaneLeaves() async throws {
+        let containerView = NSView()
+        let window = NSWindow(contentView: containerView)
+        let focused = TerminalScrollView(session: TerminalSession(running: "exit"))
+        containerView.addSubview(focused)
+        containerView.addSubview(TerminalScrollView(session: TerminalSession(running: "exit")))
+        window.makeFirstResponder(focused.terminalView)
+        let session = TerminalSession(running: "read line; echo \"got $line\"")
+        let joined = TerminalScrollView(session: session)
+        joined.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        containerView.addSubview(joined)
+        joined.layoutSubtreeIfNeeded()
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        #expect(window.firstResponder === focused.terminalView)
+        focused.removeFromSuperview()
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        try #require(window.firstResponder === joined.terminalView)
+        try session.start()
+        window.firstResponder?.keyDown(with: try keyDown("a"))
+        window.firstResponder?.keyDown(with: try keyDown("\r"))
+        #expect(await session.linesAfterExit().contains("got a"))
+    }
+
+    @Test func focusesTheLastVisiblePaneWhenTheFocusedPaneLeaves() async {
+        let containerView = NSView()
+        let window = NSWindow(contentView: containerView)
+        let focused = TerminalScrollView(session: TerminalSession(running: "exit"))
+        containerView.addSubview(focused)
+        window.makeFirstResponder(focused.terminalView)
+        let visible = TerminalScrollView(session: TerminalSession(running: "exit"))
+        containerView.addSubview(visible)
+        let hidden = TerminalScrollView(session: TerminalSession(running: "exit"))
+        hidden.isHidden = true
+        containerView.addSubview(hidden)
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        #expect(window.firstResponder === focused.terminalView)
+        focused.removeFromSuperview()
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        #expect(window.firstResponder === visible.terminalView)
+    }
+
+    @Test func keepsTheFocusOfTheHostWhenTheFocusedPaneLeaves() async {
+        let containerView = NSView()
+        let window = NSWindow(contentView: containerView)
+        let sidebar = FocusableView()
+        containerView.addSubview(sidebar)
+        let focused = TerminalScrollView(session: TerminalSession(running: "exit"))
+        containerView.addSubview(focused)
+        window.makeFirstResponder(focused.terminalView)
+        containerView.addSubview(TerminalScrollView(session: TerminalSession(running: "exit")))
+        focused.removeFromSuperview()
+        #expect(window.makeFirstResponder(sidebar))
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        #expect(window.firstResponder === sidebar)
+    }
+
+    @Test func keepsTheFocusWhenAnotherPaneLeaves() async {
+        let containerView = NSView()
+        let window = NSWindow(contentView: containerView)
+        let focused = TerminalScrollView(session: TerminalSession(running: "exit"))
+        let other = TerminalScrollView(session: TerminalSession(running: "exit"))
+        containerView.addSubview(focused)
+        containerView.addSubview(other)
+        window.makeFirstResponder(focused.terminalView)
+        other.removeFromSuperview()
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        #expect(window.firstResponder === focused.terminalView)
+    }
+
     @Test func growsWithTheScrollback() async throws {
         let session = TerminalSession(running: "seq 1 50")
         let scrollView = TerminalScrollView(session: session)
@@ -448,6 +529,12 @@ struct TerminalViewTests {
         window.makeFirstResponder(textView)
         textView.addSubview(TerminalContentView(session: TerminalSession(running: "exit")))
         #expect(window.firstResponder === textView)
+    }
+}
+
+private final class FocusableView: NSView {
+    override var acceptsFirstResponder: Bool {
+        true
     }
 }
 
