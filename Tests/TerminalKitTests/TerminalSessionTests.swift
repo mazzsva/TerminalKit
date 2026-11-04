@@ -159,7 +159,7 @@ struct TerminalSessionTests {
         let session = TerminalSession(running: "printf '\\033]7;file:///tmp/a%%20b\\007'")
         try session.start()
         await session.waitForExit()
-        #expect(session.currentDirectory == URL(filePath: "/tmp/a b"))
+        #expect(session.currentDirectoryURL == URL(filePath: "/tmp/a b"))
     }
 
     @Test func keepsTheTitleForOtherOutput() async throws {
