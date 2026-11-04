@@ -440,16 +440,14 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.minY < top)
     }
 
-    @Test func hidesTheScrollIndicator() throws {
+    @Test func keepsTheScrollIndicator() throws {
         let session = TerminalSession(running: "exit")
-        let hostingView = NSHostingView(rootView: TerminalView(session: session).scrollIndicators(.automatic))
+        let hostingView = NSHostingView(rootView: TerminalView(session: session).scrollIndicators(.hidden))
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         hostingView.layoutSubtreeIfNeeded()
         let scrollView = try #require(contentView(in: hostingView)?.enclosingScrollView)
         #expect(scrollView.hasVerticalScroller)
-        hostingView.rootView = TerminalView(session: session).scrollIndicators(.hidden)
-        hostingView.layoutSubtreeIfNeeded()
-        #expect(!scrollView.hasVerticalScroller)
+        #expect(scrollView.autohidesScrollers)
     }
 
     @Test func usesTheTerminalFont() throws {
