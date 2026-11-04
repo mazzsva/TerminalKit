@@ -487,6 +487,22 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: edge, of: view).allSatisfy { isClose($0, to: fill) })
     }
 
+    @Test func drawsTheSelectionWithThePaletteColor() throws {
+        let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        let window = KeyWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        let green = Color(.sRGB, red: 0.4, green: 0.6, blue: 0.2)
+        let center = CGPoint(x: 4 + view.cellSize.width * 2.5, y: 4 + view.cellSize.height / 2)
+        view.palette.background = green
+        let fill = color(in: try representation(of: view), at: center)
+        view.palette = .standard
+        view.palette.selection = green
+        view.selection = TerminalContentView.Selection(
+            anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 8))
+        #expect(window.firstResponder === view)
+        #expect(isClose(color(in: try representation(of: view), at: center), to: fill))
+    }
+
     @Test func drawsTheSelectionWithoutASeamAtItsEdge() async throws {
         let view = try await drawnView(running: "printf '        \\033[44m        \\033[m'")
         view.selection = TerminalContentView.Selection(
