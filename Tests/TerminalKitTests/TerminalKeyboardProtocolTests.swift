@@ -13,7 +13,6 @@ struct TerminalKeyboardProtocolTests {
         #expect(try input(keyDown("\r", modifierFlags: .control)) == "\u{1B}[13;5u")
         #expect(try input(keyDown("\r", modifierFlags: [.control, .shift])) == "\u{1B}[13;6u")
         #expect(try input(keyDown("\r", modifierFlags: .capsLock)) == nil)
-        #expect(try input(keyDown("\r", modifierFlags: [.command, .shift])) == "\u{1B}[13;10u")
         #expect(try input(keyDown(NSEnterCharacter)) == nil)
         #expect(try input(keyDown(NSEnterCharacter, modifierFlags: .shift)) == "\u{1B}[13;2u")
     }
@@ -58,14 +57,15 @@ struct TerminalKeyboardProtocolTests {
         #expect(try input(keyDown("A", modifierFlags: .shift), usesOptionAsMetaKey: true) == nil)
     }
 
-    @Test func reportsCommandKeysWithTheSuperModifier() throws {
-        #expect(try input(keyDown("c", modifierFlags: .command)) == "\u{1B}[99;9u")
-        #expect(try input(keyDown("C", modifierFlags: [.command, .shift], keyCode: 8)) == "\u{1B}[99;10u")
-        #expect(try input(keyDown(NSLeftArrowFunctionKey, modifierFlags: .command)) == "\u{1B}[1;9D")
-        #expect(try input(keyDown(NSRightArrowFunctionKey, modifierFlags: .command)) == "\u{1B}[1;9C")
-        #expect(try input(keyDown(NSUpArrowFunctionKey, modifierFlags: [.command, .shift])) == "\u{1B}[1;10A")
-        #expect(try input(keyDown("\u{7F}", modifierFlags: .command)) == "\u{1B}[127;9u")
-        #expect(try input(keyDown("\r", modifierFlags: .command)) == "\u{1B}[13;9u")
+    @Test func ignoresCommandKeys() throws {
+        #expect(try input(keyDown("c", modifierFlags: .command)) == nil)
+        #expect(try input(keyDown("C", modifierFlags: [.command, .shift], keyCode: 8)) == nil)
+        #expect(try input(keyDown(NSLeftArrowFunctionKey, modifierFlags: .command)) == nil)
+        #expect(try input(keyDown(NSRightArrowFunctionKey, modifierFlags: .command)) == nil)
+        #expect(try input(keyDown(NSUpArrowFunctionKey, modifierFlags: [.command, .shift])) == nil)
+        #expect(try input(keyDown("\u{7F}", modifierFlags: .command)) == nil)
+        #expect(try input(keyDown("\r", modifierFlags: .command)) == nil)
+        #expect(try input(keyDown("\r", modifierFlags: [.command, .shift])) == nil)
     }
 
     @Test func reportsFunctionKeysWithTheControlSequenceIntroducer() throws {
@@ -276,26 +276,25 @@ struct TerminalKeyboardProtocolTests {
         #expect(lines.contains("37  3b  33  75  0d"))
     }
 
-    @Test func sendsCommandKeysWithTheKittyProtocol() async throws {
+    @Test func sendsCommandKeysAsWithoutTheKittyProtocol() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 24 | od -An -tx1")
+            running: "printf 'text\\n\\033[>1u'; stty raw -echo; printf ready; head -c 2 | od -An -tx1")
         let view = TerminalContentView(session: session)
+        let item = NSMenuItem(title: "Copy", action: #selector(view.copy(_:)), keyEquivalent: "c")
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
         try session.start()
         await session.waitForText("ready")
+        #expect(!view.validateMenuItem(item))
+        view.copySelection(to: pasteboard)
         view.keyDown(with: try keyDown("c", modifierFlags: .command))
-        view.keyDown(with: try keyDown(NSLeftArrowFunctionKey, modifierFlags: .command))
+        view.keyDown(with: try keyDown(NSHomeFunctionKey, modifierFlags: [.command, .function]))
+        view.keyDown(with: try keyDown("\r", modifierFlags: [.command, .shift]))
         view.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
-        view.setMarkedText(
-            "´",
-            selectedRange: NSRange(location: 1, length: 0),
-            replacementRange: NSRange(location: NSNotFound, length: 0)
-        )
-        view.keyDown(with: try keyDown("c", modifierFlags: .command))
-        view.unmarkText()
+        view.keyDown(with: try keyDown("k", modifierFlags: .command))
+        #expect(session.lines.first == "ready")
         view.keyDown(with: try keyDown("x"))
-        let lines = await session.linesAfterExit()
-        #expect(lines.contains("1b  5b  39  39  3b  39  75  1b  5b  31  3b  39  44  1b  5b  31"))
-        #expect(lines.contains("32  37  3b  39  75  c2  b4  78"))
+        #expect(await session.linesAfterExit().contains { $0.hasSuffix(" 15  78") })
     }
 
     @Test func clearsToStartWithCommandK() async throws {
@@ -330,50 +329,6 @@ struct TerminalKeyboardProtocolTests {
         #expect(session.lines.prefix(3) == ["", "b", "cready"])
         session.send("x")
         await session.waitForExit()
-    }
-
-    @Test func sendsCommandKWithTheKittyProtocol() async throws {
-        let session = TerminalSession(
-            running: "printf 'text\\n\\033[>1u'; stty raw -echo; echo ready; head -c 9 | od -An -tx1")
-        let view = TerminalContentView(session: session)
-        try session.start()
-        await session.waitForText("ready")
-        view.keyDown(with: try keyDown("k", modifierFlags: .command))
-        session.send("xxxxxxxxx")
-        let lines = await session.linesAfterExit()
-        #expect(lines.first == "text")
-        #expect(lines.contains("1b  5b  31  30  37  3b  39  75  78"))
-    }
-
-    @Test func sendsCommandCWithoutASelection() async throws {
-        let session = TerminalSession(
-            running: "printf 'text\\033[>1u'; stty raw -echo; echo ready; head -c 10 | od -An -tx1")
-        let view = TerminalContentView(session: session)
-        let window = NSWindow(contentView: view)
-        window.makeFirstResponder(view)
-        let item = NSMenuItem(title: "Copy", action: #selector(view.copy(_:)), keyEquivalent: "c")
-        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
-        defer { pasteboard.releaseGlobally() }
-        try session.start()
-        await session.waitForText("ready")
-        #expect(!view.performKeyEquivalent(with: try keyDown("c", modifierFlags: .command)))
-        view.setMarkedText(
-            "´",
-            selectedRange: NSRange(location: 1, length: 0),
-            replacementRange: NSRange(location: NSNotFound, length: 0)
-        )
-        #expect(!view.validateMenuItem(item))
-        view.copySelection(to: pasteboard)
-        view.unmarkText()
-        view.selection = TerminalContentView.Selection(
-            anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 4))
-        view.copySelection(to: pasteboard)
-        #expect(pasteboard.string(forType: .string) == "text")
-        view.selection = nil
-        #expect(view.validateMenuItem(item))
-        view.copy(nil)
-        view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("c2  b4  1b  5b  39  39  3b  39  75  78"))
     }
 
     @Test func leavesShiftReturnToTheMarkedText() async throws {
