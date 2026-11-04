@@ -1111,14 +1111,10 @@ package struct Terminal: Sendable {
                 unwrapLine(before: cursor.row)
             }
             eraseInLine(0)
-            for row in cursor.row + 1 ..< rows {
-                erase(0 ..< columns, row: row)
-            }
+            screen.replaceSubrange(cursor.row + 1 ..< rows, with: blankLines(rows - cursor.row - 1))
         case 1:
             unwrapLine(before: 0)
-            for row in 0 ..< cursor.row {
-                erase(0 ..< columns, row: row)
-            }
+            screen.replaceSubrange(0 ..< cursor.row, with: blankLines(cursor.row))
             eraseInLine(1)
         case 2:
             unwrapLine(before: 0)

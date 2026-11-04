@@ -798,6 +798,18 @@ struct TerminalTests {
         #expect(terminal.screen.map(\.isWrapped) == [false, false])
     }
 
+    @Test(arguments: [
+        ("\u{1B}[J", ["ab", "c ", "  "], [false, false, false, true, true, true], [true, false, false]),
+        ("\u{1B}[1J", ["  ", "  ", "ef"], [true, true, true, true, false, false], [false, false, false]),
+    ])
+    func erasesRowsWithTheBackgroundColor(sequence: String, screen: [String], erased: [Bool], wrapped: [Bool]) {
+        var terminal = Terminal(columns: 2, rows: 3)
+        terminal.receive("abcdef\u{1B}[2;2H\u{1B}[44m\(sequence)")
+        #expect(lines(terminal) == screen)
+        #expect(terminal.screen.flatMap { $0.map { $0.style.background == .indexed(4) } } == erased)
+        #expect(terminal.screen.map(\.isWrapped) == wrapped)
+    }
+
     @Test(arguments: ["0", "2"])
     func setsTheTitle(command: String) {
         var terminal = Terminal(columns: 4, rows: 2)
