@@ -1068,6 +1068,31 @@ struct TerminalContentViewTests {
         #expect(try image(of: view) == cursorImage)
     }
 
+    @Test func drawsTheClausesOfTheMarkedText() throws {
+        let view = TerminalContentView(session: readingSession())
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        let clauses = NSMutableAttributedString(
+            string: "日本語入力",
+            attributes: [.underlineStyle: NSUnderlineStyle.single.rawValue]
+        )
+        let selection = NSRange(location: 2, length: 3)
+        let replacement = NSRange(location: NSNotFound, length: 0)
+        view.setMarkedText(clauses, selectedRange: selection, replacementRange: replacement)
+        let first = NSAttributedString(string: "日本", attributes: [.font: view.font]).size().width
+        let total = NSAttributedString(string: "日本語入力", attributes: [.font: view.font]).size().width
+        let firstClause = CGRect(x: 0, y: 0, width: TerminalContentView.padding + first - 1, height: 100)
+        let secondClause = CGRect(x: TerminalContentView.padding + first, y: 0, width: total - first, height: 100)
+        let single = (try pixels(in: firstClause, of: view), try pixels(in: secondClause, of: view))
+        clauses.addAttribute(.underlineStyle, value: NSUnderlineStyle.thick.rawValue, range: selection)
+        view.setMarkedText(clauses, selectedRange: selection, replacementRange: replacement)
+        #expect(try pixels(in: firstClause, of: view) == single.0)
+        #expect(try pixels(in: secondClause, of: view) != single.1)
+        #expect(view.selectedRange() == selection)
+        #expect(view.validAttributesForMarkedText() == [.underlineStyle, .markedClauseSegment])
+        view.unmarkText()
+        #expect(view.selectedRange() == NSRange(location: 0, length: 0))
+    }
+
     @Test(arguments: [1, 2] as [CGFloat])
     func drawsTheEndOfTheMarkedTextAtTheRightEdge(scale: CGFloat) async throws {
         let view = try await drawnView(running: "printf '\\033[49G'")

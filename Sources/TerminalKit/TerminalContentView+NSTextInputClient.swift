@@ -4,24 +4,25 @@ extension TerminalContentView: NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
         let characters = text(of: string)
         let input = hasMarkedText() || characters != keyDownEvent?.characters ? nil : keyDownEvent.flatMap(encodedInput)
-        markedText = ""
+        markedString = NSAttributedString()
         scrollToBottom()
         session.send(input ?? Array(characters.utf8))
     }
 
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        markedText = text(of: string)
+        markedString = string as? NSAttributedString ?? NSAttributedString(string: text(of: string))
+        markedSelection = selectedRange
     }
 
     func unmarkText() {
         if hasMarkedText() {
             insertText(markedText, replacementRange: NSRange(location: NSNotFound, length: 0))
         }
-        markedText = ""
+        markedString = NSAttributedString()
     }
 
     func selectedRange() -> NSRange {
-        NSRange(location: 0, length: 0)
+        hasMarkedText() ? markedSelection : NSRange(location: 0, length: 0)
     }
 
     func markedRange() -> NSRange {
@@ -38,7 +39,7 @@ extension TerminalContentView: NSTextInputClient {
     }
 
     func validAttributesForMarkedText() -> [NSAttributedString.Key] {
-        []
+        [.underlineStyle, .markedClauseSegment]
     }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
