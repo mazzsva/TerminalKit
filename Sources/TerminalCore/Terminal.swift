@@ -322,12 +322,6 @@ package struct Terminal: Sendable {
             setCursorShape(sequence.parameter(at: 0, default: 0))
             return
         }
-        if sequence.intermediates == "$", sequence.final == "p",
-            sequence.privateMarker == nil || sequence.privateMarker == "?"
-        {
-            reportMode(sequence.parameter(at: 0, default: 0), isPrivate: sequence.privateMarker == "?")
-            return
-        }
         if sequence.privateMarker == nil, sequence.intermediates == "!", sequence.final == "p" {
             softReset()
             return
@@ -996,30 +990,6 @@ package struct Terminal: Sendable {
             keyboardFlagStacks[index].append(newFlags)
         default:
             break
-        }
-    }
-
-    private mutating func reportMode(_ mode: Int, isPrivate: Bool) {
-        let isEnabled = isPrivate ? isPrivateModeEnabled(mode) : mode == 4 ? usesInsertMode : nil
-        let status = isEnabled.map { $0 ? 1 : 2 } ?? 0
-        replies += "\u{1B}[\(isPrivate ? "?" : "")\(mode);\(status)$y".utf8
-    }
-
-    private func isPrivateModeEnabled(_ mode: Int) -> Bool? {
-        switch mode {
-        case 1: usesApplicationCursorKeys
-        case 5: usesReverseVideo
-        case 7: usesAutowrap
-        case 25: isCursorVisible
-        case 47, 1047, 1049: isAlternateScreenActive
-        case 1000: mouseTracking == .clicks
-        case 1002: mouseTracking == .drags
-        case 1003: mouseTracking == .anyMotion
-        case 1004: usesFocusReporting
-        case 1006: usesSGRMouseEncoding
-        case 2004: usesBracketedPaste
-        case 2031: usesColorSchemeReports
-        default: nil
         }
     }
 

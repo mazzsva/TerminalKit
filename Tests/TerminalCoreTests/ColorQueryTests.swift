@@ -69,7 +69,7 @@ struct ColorQueryTests {
     @Test func reportsEachColorSchemeChangeOnce() {
         var terminal = Terminal(columns: 1, rows: 1)
         terminal.reportedColors = colors(background: 0xFFFF)
-        #expect(terminal.receive("\u{1B}[?2031$p\u{1B}[?2031h\u{1B}[?2031$p") == "\u{1B}[?2031;2$y\u{1B}[?2031;1$y")
+        #expect(terminal.receive("\u{1B}[?2031h") == "")
         terminal.reportedColors = colors(background: 0xF0F0)
         #expect(terminal.receive("") == "")
         terminal.reportedColors = colors(background: 0x1E1E)
@@ -89,7 +89,7 @@ struct ColorQueryTests {
         terminal.reportedColors = colors(background: 0xFFFF)
         terminal.receive(sequence)
         terminal.reportedColors = colors(background: 0x1E1E)
-        #expect(terminal.receive("\u{1B}[?2031$p") == "\u{1B}[?2031;2$y")
+        #expect(terminal.receive("") == "")
     }
 
     @Test func reportsTheColorSchemeChangeToAClaudeCodeStandIn() {
