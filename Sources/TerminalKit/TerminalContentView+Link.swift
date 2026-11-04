@@ -22,6 +22,7 @@ extension TerminalContentView {
     private static let launchingExtensions: Set<String> = [
         "app", "command", "tool", "terminal", "workflow", "action", "pkg", "mpkg", "scpt", "scptd", "applescript",
         "jar", "url", "mobileconfig", "prefpane", "saver", "term", "configprofile", "ipa", "tcl",
+        "inputplugin", "cin", "provisionprofile",
     ]
     private static let pairs: [Character: Character] = [
         ")": "(", "]": "[", "}": "{", "）": "（", "」": "「", "』": "『", "】": "【", "〕": "〔", "］": "［", "｝": "｛",

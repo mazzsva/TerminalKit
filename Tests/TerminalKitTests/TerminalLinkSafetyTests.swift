@@ -113,7 +113,7 @@ struct TerminalLinkSafetyTests {
 
     @Test(arguments: [
         "webloc", "fileloc", "inetloc", "vncloc", "ftploc", "url", "mobileconfig", "prefpane", "saver", "term",
-        "configprofile", "ipa", "tcl",
+        "configprofile", "ipa", "tcl", "inputplugin", "cin", "provisionprofile",
     ])
     func revealsALocationOrProfileFile(pathExtension: String) throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
