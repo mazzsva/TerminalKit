@@ -14,6 +14,19 @@ extension NSEvent {
         }
     }
 
+    var shiftedPageKeyInput: [UInt8]? {
+        guard modifierFlags.intersection([.shift, .control, .option, .command]) == .shift else {
+            return nil
+        }
+        return switch specialKey {
+        case .pageUp: [0x1B, 0x5B, 0x35, 0x7E]
+        case .pageDown: [0x1B, 0x5B, 0x36, 0x7E]
+        case .home: [0x1B, 0x5B, 0x48]
+        case .end: [0x1B, 0x5B, 0x46]
+        default: nil
+        }
+    }
+
     var lineDeletionInput: [UInt8]? {
         modifierFlags.intersection([.control, .option, .command]) == .command && charactersIgnoringModifiers == "\u{7F}"
             ? [0x15] : nil
