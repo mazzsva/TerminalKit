@@ -635,6 +635,97 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: row, of: view).allSatisfy { isClose($0, to: red) })
     }
 
+    @Test(arguments: [1, 2] as [CGFloat], [0, 0.25] as [CGFloat])
+    func drawsTruecolorCellsAsOneFillPerCell(scale: CGFloat, offset: CGFloat) async throws {
+        let characters: [Character] = [" ", "▀", "▄", "█"]
+        let colors: [[Int]] = (0 ..< 48).map { index in [37, 91, 53, 29, 67, 13].map { index * $0 % 256 } }
+        let text: [String] = colors.indices.map { index in
+            let color = colors[index]
+            let style = "\\033[\(index % 5 == 0 ? 7 : 27);38;2;\(color[0]);\(color[1]);\(color[2]);48;2;"
+            let end = index % 12 == 11 ? "\\r\\n" : ""
+            return style + "\(color[3]);\(color[4]);\(color[5])m\(characters[index % 4])\(end)"
+        }
+        let view = try await drawnView(running: "printf '\(text.joined())\\033[m\\033[?25l'")
+        view.palette.background = .clear
+        let reference = FillView(frame: view.frame)
+        let containers = [NSView(), NSView()]
+        for (container, subview) in zip(containers, [view, reference]) {
+            let window = ScaledWindow(contentView: container)
+            window.scale = scale
+            container.addSubview(subview)
+            subview.setFrameOrigin(CGPoint(x: offset / scale, y: offset / scale))
+        }
+        let units: [Character: CGRect] = [
+            "▀": CGRect(x: 0, y: 0, width: 1, height: 0.5), "▄": CGRect(x: 0, y: 0.5, width: 1, height: 0.5),
+            "█": CGRect(x: 0, y: 0, width: 1, height: 1),
+        ]
+        for (index, color) in colors.enumerated() {
+            let components = color.map { CGFloat($0) / 255 }
+            let foreground = NSColor(srgbRed: components[0], green: components[1], blue: components[2], alpha: 1)
+            let background = NSColor(srgbRed: components[3], green: components[4], blue: components[5], alpha: 1)
+            let (ink, fill) = index % 5 == 0 ? (background, foreground) : (foreground, background)
+            let cell = view.backingAlignedRect(
+                view.rect(row: index / 12, columns: index % 12 ..< index % 12 + 1), options: .alignAllEdgesNearest)
+            reference.fills.append((cell, fill))
+            if let unit = units[characters[index % 4]] {
+                let transform = CGAffineTransform(translationX: cell.minX, y: cell.minY)
+                    .scaledBy(x: cell.width, y: cell.height)
+                reference.fills.append((unit.applying(transform), ink))
+            }
+        }
+        let (actual, expected) = (try representation(of: containers[0]), try representation(of: containers[1]))
+        let grid = view.frame
+        let height = containers[0].bounds.height
+        let rows = Int(((height - grid.maxY) * scale).rounded()) ..< Int(((height - grid.minY) * scale).rounded())
+        let columns = Int((grid.minX * scale).rounded()) ..< Int((grid.maxX * scale).rounded())
+        #expect(
+            rows.allSatisfy { y in
+                columns.allSatisfy { isClose(actual.colorAt(x: $0, y: y), to: expected.colorAt(x: $0, y: y)) }
+            })
+    }
+
+    @Test(arguments: ["\\033[41m  ", "\\033[31m██"], [1, 2] as [CGFloat])
+    func drawsARowBelowTheTopOfTheDirtyRect(cells: String, scale: CGFloat) async throws {
+        let session = TerminalSession(running: "seq 1 30; printf '\(cells)\\033[m'")
+        let view = TerminalContentView(session: session)
+        let window = ScaledWindow(contentView: NSView())
+        window.scale = scale
+        window.contentView?.addSubview(view)
+        view.fit(to: CGSize(width: 200, height: 100))
+        try session.start()
+        await session.waitForExit()
+        view.fit(to: CGSize(width: 200, height: 100))
+        let row = session.terminal.scrollback.count + session.terminal.rows - 1
+        let rect = view.rect(row: row - 2, columns: 0 ..< 1).union(view.rect(row: row, columns: 0 ..< 1))
+        let representation = try #require(view.bitmapImageRepForCachingDisplay(in: rect))
+        view.cacheDisplay(in: rect, to: representation)
+        let center = CGPoint(x: rect.width / 2, y: rect.height - view.cellSize.height / 2)
+        let color = try #require(color(in: representation, at: center)?.usingColorSpace(.sRGB))
+        #expect(abs(color.redComponent - 194 / 255) < 0.02)
+    }
+
+    @Test func fillsARowOfTruecolorCellsWithOneImage() async throws {
+        let cells = (0 ..< 48).map { "\\033[38;2;\($0 * 5);0;0;48;2;0;\($0 * 5);0m\(["▀", "▄", "█", " "][$0 % 4])" }
+        let view = try await drawnView(running: "printf '\(cells.joined())\\033[m\\r'")
+        let counts = try operatorCounts(in: view.dataWithPDF(inside: view.bounds))
+        #expect(counts.fills < 4)
+        #expect(counts.images == 1)
+    }
+
+    @Test func drawsASelectedBlockOverTheSelection() async throws {
+        let view = try await drawnView(running: "printf '\\033[38;2;194;54;33m█\\033[m\\r'")
+        view.selection = TerminalContentView.Selection(
+            anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 1))
+        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        #expect(isClose(color(in: try representation(of: view), at: center), to: red))
+    }
+
+    @Test func hidesAHiddenBlock() async throws {
+        let blank = try image(of: try await drawnView(running: "printf ' \\r'"))
+        let hidden = try image(of: try await drawnView(running: "printf '\\033[8;38;2;0;0;255m█\\r'"))
+        #expect(hidden == blank)
+    }
+
     @Test func drawsTheScrollback() async throws {
         let session = TerminalSession(running: "printf '\\033[41m  \\033[m'; seq 1 30")
         let view = TerminalContentView(session: session)
@@ -1199,6 +1290,28 @@ private func pixels(in rect: CGRect, of view: NSView) throws -> [NSColor?] {
         }
 }
 
+private func operatorCounts(in data: Data) throws -> (fills: Int, images: Int) {
+    let document = try #require(CGDataProvider(data: data as CFData).flatMap(CGPDFDocument.init))
+    let page = try #require(document.page(at: 1))
+    let table = try #require(CGPDFOperatorTableCreate())
+    defer { CGPDFOperatorTableRelease(table) }
+    CGPDFOperatorTableSetCallback(table, "f") { _, info in
+        info?.assumingMemoryBound(to: (fills: Int, images: Int).self).pointee.fills += 1
+    }
+    CGPDFOperatorTableSetCallback(table, "Do") { _, info in
+        info?.assumingMemoryBound(to: (fills: Int, images: Int).self).pointee.images += 1
+    }
+    var counts = (fills: 0, images: 0)
+    let stream = CGPDFContentStreamCreateWithPage(page)
+    defer { CGPDFContentStreamRelease(stream) }
+    withUnsafeMutablePointer(to: &counts) {
+        let scanner = CGPDFScannerCreate(stream, table, $0)
+        CGPDFScannerScan(scanner)
+        CGPDFScannerRelease(scanner)
+    }
+    return counts
+}
+
 private let red: [CGFloat] = [194 / 255, 54 / 255, 33 / 255]
 
 private func isClose(_ color: NSColor?, to other: NSColor?) -> Bool {
@@ -1221,6 +1334,21 @@ private final class ScaledWindow: NSWindow {
 
     override var backingScaleFactor: CGFloat {
         scale
+    }
+}
+
+private final class FillView: NSView {
+    var fills: [(rect: CGRect, color: NSColor)] = []
+
+    override var isFlipped: Bool {
+        true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        for (rect, color) in fills {
+            color.setFill()
+            backingAlignedRect(rect, options: .alignAllEdgesNearest).fill()
+        }
     }
 }
 

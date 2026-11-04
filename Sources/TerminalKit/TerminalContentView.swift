@@ -410,37 +410,59 @@ final class TerminalContentView: NSView {
         let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height) - 1, 0)
         let lastRow = min(Int((dirtyRect.maxY - Self.padding) / cellSize.height), lineCount - 1)
         let rows = firstRow ..< max(lastRow + 1, firstRow)
+        var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor)] = []
         for row in rows {
             let line = line(at: row, in: terminal)
+            let selected = selection?
+                .columns(inLine: terminal.removedScrollbackCount + row, count: max(line.count, terminal.columns))
+            var pixels = [UInt32](repeating: 0, count: 2 * line.count)
             for (columns, style) in Self.runs(in: line) {
-                if let background = colors.colors(for: style).background {
+                let (foreground, background) = colors.colors(for: style)
+                let fill = background.map(Self.pixel) ?? 0
+                if let background, fill == 0 {
                     background.setFill()
                     backingAlignedRect(rect(row: row, columns: columns), options: .alignAllEdgesNearest).fill()
                 }
+                lazy var ink = style.isHidden || style.isFaint ? 0 : Self.pixel(foreground)
+                var drawsText = selected != nil || style.isUnderlined || style.isStrikethrough
+                for column in columns {
+                    let character = graphemes.character(of: line[column])
+                    let isBlock = character != " " && "▀▄█".contains(character) && ink >> 24 == 255
+                    drawsText = drawsText || !isBlock && character != " "
+                    (pixels[line.count + column], pixels[column]) =
+                        (isBlock && character != "▄" ? ink : fill, isBlock && character != "▀" ? ink : fill)
+                }
+                if drawsText {
+                    runs.append((line, row, columns, style, foreground))
+                }
             }
-            if let columns = selection?
-                .columns(
-                    inLine: terminal.removedScrollbackCount + row,
-                    count: max(line.count, terminal.columns)
-                )
+            let frame = rect(row: row, columns: 0 ..< line.count)
+            let aligned = backingAlignedRect(frame, options: .alignAllEdgesNearest)
+            if pixels.contains(where: { $0 != 0 }), let context = NSGraphicsContext.current?.cgContext,
+                let space = CGColorSpace(name: CGColorSpace.sRGB),
+                let provider = CGDataProvider(data: Data(bytes: pixels, count: 4 * pixels.count) as CFData),
+                let image = CGImage(
+                    width: line.count, height: 2, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 4 * line.count,
+                    space: space, bitmapInfo: CGBitmapInfo(alpha: .premultipliedFirst, byteOrder: .order32Little),
+                    provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
             {
+                context.saveGState()
+                context.interpolationQuality = .none
+                context.setShouldAntialias(false)
+                context.clip(to: aligned)
+                context.draw(
+                    image, in: CGRect(x: frame.minX, y: aligned.minY, width: frame.width, height: aligned.height))
+                context.restoreGState()
+            }
+            if let selected {
                 selectionColor.setFill()
-                backingAlignedRect(rect(row: row, columns: columns), options: .alignAllEdgesNearest).fill()
+                backingAlignedRect(rect(row: row, columns: selected), options: .alignAllEdgesNearest).fill()
             }
         }
-        for row in rows {
-            let line = line(at: row, in: terminal)
-            for (columns, style) in Self.runs(in: line) {
-                drawText(
-                    line,
-                    columns: columns,
-                    row: row,
-                    style: style,
-                    foreground: colors.colors(for: style).foreground,
-                    underline: colors.color(style.underlineColor),
-                    graphemes: graphemes
-                )
-            }
+        for (line, row, columns, style, foreground) in runs {
+            drawText(
+                line, columns: columns, row: row, style: style, foreground: foreground,
+                underline: colors.color(style.underlineColor), graphemes: graphemes)
         }
 
         if hoveredLinkRevision != session.revision {
@@ -612,6 +634,14 @@ final class TerminalContentView: NSView {
                     CGRect(x: left, y: baseline - font.underlinePosition, width: width, height: thickness),
                     options: .alignAllEdgesNearest))
         }
+    }
+
+    private static func pixel(_ color: NSColor) -> UInt32 {
+        guard color.type == .componentBased, color.colorSpace == .sRGB else {
+            return 0
+        }
+        return [1, color.redComponent, color.greenComponent, color.blueComponent]
+            .reduce(0) { $0 << 8 | UInt32((min(max($1, 0), 1) * color.alphaComponent * 255).rounded()) }
     }
 
     private static func blockElement(_ character: Character) -> (rects: [CGRect], alpha: CGFloat)? {
