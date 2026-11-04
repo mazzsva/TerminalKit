@@ -410,9 +410,10 @@ final class TerminalContentView: NSView {
         let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height) - 1, 0)
         let lastRow = min(Int((dirtyRect.maxY - Self.padding) / cellSize.height), lineCount - 1)
         let rows = firstRow ..< max(lastRow + 1, firstRow)
-        var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor)] = []
+        var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor, VisualOrder?)] = []
         for row in rows {
             let line = line(at: row, in: terminal)
+            let order = Self.visualOrder(of: line, graphemes: graphemes)
             let selected = selection?
                 .columns(inLine: terminal.removedScrollbackCount + row, count: max(line.count, terminal.columns))
             var pixels = [UInt32](repeating: 0, count: 2 * line.count)
@@ -421,7 +422,9 @@ final class TerminalContentView: NSView {
                 let fill = background.map(Self.pixel) ?? 0
                 if let background, fill == 0 {
                     background.setFill()
-                    backingAlignedRect(rect(row: row, columns: columns), options: .alignAllEdgesNearest).fill()
+                    for rect in rects(row: row, columns: columns, order: order) {
+                        backingAlignedRect(rect, options: .alignAllEdgesNearest).fill()
+                    }
                 }
                 lazy var ink = style.isHidden || style.isFaint ? 0 : Self.pixel(foreground)
                 var drawsText = selected != nil || style.isUnderlined || style.isStrikethrough
@@ -429,11 +432,12 @@ final class TerminalContentView: NSView {
                     let character = graphemes.character(of: line[column])
                     let isBlock = character != " " && "▀▄█".contains(character) && ink >> 24 == 255
                     drawsText = drawsText || !isBlock && character != " "
-                    (pixels[line.count + column], pixels[column]) =
+                    let visual = order?.columns[column] ?? column
+                    (pixels[line.count + visual], pixels[visual]) =
                         (isBlock && character != "▄" ? ink : fill, isBlock && character != "▀" ? ink : fill)
                 }
                 if drawsText {
-                    runs.append((line, row, columns, style, foreground))
+                    runs.append((line, row, columns, style, foreground, order))
                 }
             }
             let frame = rect(row: row, columns: 0 ..< line.count)
@@ -456,13 +460,15 @@ final class TerminalContentView: NSView {
             }
             if let selected {
                 selectionColor.setFill()
-                backingAlignedRect(rect(row: row, columns: selected), options: .alignAllEdgesNearest).fill()
+                for rect in rects(row: row, columns: selected, order: order) {
+                    backingAlignedRect(rect, options: .alignAllEdgesNearest).fill()
+                }
             }
         }
-        for (line, row, columns, style, foreground) in runs {
+        for (line, row, columns, style, foreground, order) in runs {
             drawText(
                 line, columns: columns, row: row, style: style, foreground: foreground,
-                underline: colors.color(style.underlineColor), graphemes: graphemes)
+                underline: colors.color(style.underlineColor), graphemes: graphemes, order: order)
         }
 
         if hoveredLinkRevision != session.revision {
@@ -471,8 +477,9 @@ final class TerminalContentView: NSView {
         if let hoveredLink {
             colors.foreground.setFill()
             for span in hoveredLink.spans {
-                let rect = rect(row: span.row, columns: span.columns)
-                CGRect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1).fill()
+                for rect in rects(row: span.row, columns: span.columns, order: visualOrder(ofRow: span.row)) {
+                    CGRect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1).fill()
+                }
             }
         }
 
@@ -523,7 +530,8 @@ final class TerminalContentView: NSView {
             row: terminal.scrollback.count + terminal.cursor.row,
             style: style,
             foreground: colors.colors(for: style).background ?? colors.background.withAlphaComponent(1),
-            graphemes: graphemes
+            graphemes: graphemes,
+            order: Self.visualOrder(of: line, graphemes: graphemes)
         )
     }
 
@@ -565,7 +573,8 @@ final class TerminalContentView: NSView {
         style: Terminal.Style,
         foreground: NSColor,
         underline: NSColor? = nil,
-        graphemes: Terminal.Graphemes
+        graphemes: Terminal.Graphemes,
+        order: VisualOrder? = nil
     ) {
         guard !style.isHidden, let context = NSGraphicsContext.current?.cgContext else {
             return
@@ -593,9 +602,10 @@ final class TerminalContentView: NSView {
             guard character != " " else {
                 continue
             }
+            let visual = order?.columns[column] ?? column
             if let block = Self.blockElement(character) {
                 let cell = backingAlignedRect(
-                    rect(row: row, columns: column ..< column + 1), options: .alignAllEdgesNearest)
+                    rect(row: row, columns: visual ..< visual + 1), options: .alignAllEdgesNearest)
                 let transform = CGAffineTransform(translationX: cell.minX, y: cell.minY)
                     .scaledBy(x: cell.width, y: cell.height)
                 context.setFillColor(color.withAlphaComponent(color.alphaComponent * block.alpha).cgColor)
@@ -604,8 +614,9 @@ final class TerminalContentView: NSView {
                 context.setFillColor(color.cgColor)
                 continue
             }
-            let entry = fonts.glyphs.entry(for: character, font: font, index: index)
-            let x = Self.padding + CGFloat(column) * cellSize.width
+            let entry = fonts.glyphs.entry(
+                for: character, font: font, index: index, isMirrored: order?.isReversed[column] == true)
+            let x = Self.padding + CGFloat(visual) * cellSize.width
             for run in entry.runs {
                 if let current = batchFont, !CFEqual(current, run.font) {
                     flush()
@@ -617,22 +628,27 @@ final class TerminalContentView: NSView {
         }
         flush()
         let thickness = max(font.underlineThickness, 1)
-        let left = Self.padding + CGFloat(columns.lowerBound) * cellSize.width
-        let width = CGFloat(columns.count) * cellSize.width
+        let spans = rects(row: row, columns: columns, order: order)
         if style.isStrikethrough {
             context.fill(
-                backingAlignedRect(
-                    CGRect(x: left, y: baseline - font.xHeight / 2 - thickness / 2, width: width, height: thickness),
-                    options: .alignAllEdgesNearest))
+                spans.map {
+                    backingAlignedRect(
+                        CGRect(
+                            x: $0.minX, y: baseline - font.xHeight / 2 - thickness / 2, width: $0.width,
+                            height: thickness),
+                        options: .alignAllEdgesNearest)
+                })
         }
         if style.isUnderlined {
             if let underline {
                 context.setFillColor((style.isFaint ? underline.withAlphaComponent(0.5) : underline).cgColor)
             }
             context.fill(
-                backingAlignedRect(
-                    CGRect(x: left, y: baseline - font.underlinePosition, width: width, height: thickness),
-                    options: .alignAllEdgesNearest))
+                spans.map {
+                    backingAlignedRect(
+                        CGRect(x: $0.minX, y: baseline - font.underlinePosition, width: $0.width, height: thickness),
+                        options: .alignAllEdgesNearest)
+                })
         }
     }
 
@@ -675,7 +691,8 @@ final class TerminalContentView: NSView {
     }
 
     var cursorRect: CGRect {
-        rect(row: session.terminal.scrollback.count + session.terminal.cursor.row, columns: cursorColumns)
+        let row = session.terminal.scrollback.count + session.terminal.cursor.row
+        return rects(row: row, columns: cursorColumns, order: visualOrder(ofRow: row))[0]
     }
 
     private var cursorColumns: Range<Int> {

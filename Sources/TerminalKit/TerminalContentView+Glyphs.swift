@@ -15,6 +15,7 @@ final class GlyphCache {
     private struct Key: Hashable {
         let scalars: [Unicode.Scalar]
         let font: Int
+        let isMirrored: Bool
     }
 
     private static let capacity = 8_192
@@ -22,31 +23,34 @@ final class GlyphCache {
     private var entries: [Key: Entry] = [:]
     private var asciiEntries = [Entry?](repeating: nil, count: 4 * 128)
 
-    func entry(for character: Character, font: NSFont, index: Int) -> Entry {
-        if let ascii = character.asciiValue {
+    func entry(for character: Character, font: NSFont, index: Int, isMirrored: Bool = false) -> Entry {
+        if let ascii = character.asciiValue, !isMirrored {
             if let entry = asciiEntries[index * 128 + Int(ascii)] {
                 return entry
             }
-            let entry = makeEntry(for: character, font: font)
+            let entry = makeEntry(for: character, font: font, isMirrored: false)
             asciiEntries[index * 128 + Int(ascii)] = entry
             return entry
         }
-        let key = Key(scalars: Array(character.unicodeScalars), font: index)
+        let key = Key(scalars: Array(character.unicodeScalars), font: index, isMirrored: isMirrored)
         if let entry = entries[key] {
             return entry
         }
         if entries.count >= Self.capacity {
             entries.removeAll()
         }
-        let entry = makeEntry(for: character, font: font)
+        let entry = makeEntry(for: character, font: font, isMirrored: isMirrored)
         entries[key] = entry
         return entry
     }
 
-    private func makeEntry(for character: Character, font: NSFont) -> Entry {
+    private func makeEntry(for character: Character, font: NSFont, isMirrored: Bool) -> Entry {
         let isMark = character.unicodeScalars.first?.properties.generalCategory == .spacingMark
-        let line = CTLineCreateWithAttributedString(
-            NSAttributedString(string: (isMark ? "\u{A0}" : "") + String(character), attributes: [.font: font]))
+        let style = NSMutableParagraphStyle()
+        style.baseWritingDirection = isMirrored ? .rightToLeft : .natural
+        let string = NSAttributedString(
+            string: (isMark ? "\u{A0}" : "") + String(character), attributes: [.font: font, .paragraphStyle: style])
+        let line = CTLineCreateWithAttributedString(string)
         let offset = isMark ? CTLineGetImageBounds(line, nil).minX : 0
         let runs = (CTLineGetGlyphRuns(line) as? [CTRun] ?? [])
             .map { run in

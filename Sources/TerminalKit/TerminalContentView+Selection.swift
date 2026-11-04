@@ -107,12 +107,11 @@ extension TerminalContentView {
 
     private func word(at location: CGPoint) -> Selection? {
         let terminal = session.terminal
+        let row = selectionPoint(at: location).line - terminal.removedScrollbackCount
+        let column = min(max(Int(floor((location.x - Self.padding) / cellSize.width)), 0), terminal.columns - 1)
         guard
             let (cells, index) = cells(
-                atRow: selectionPoint(at: location).line - terminal.removedScrollbackCount,
-                column: min(max(Int(floor((location.x - Self.padding) / cellSize.width)), 0), terminal.columns - 1),
-                in: terminal
-            ),
+                atRow: row, column: visualOrder(ofRow: row)?.columns.firstIndex(of: column) ?? column, in: terminal),
             let end = cells.lastIndex(where: { !$0.cell.isSpace }), index <= end
         else {
             return nil
@@ -143,6 +142,11 @@ extension TerminalContentView {
         let x = (location.x - Self.padding) / cellSize.width
         var column = min(max(Int(x.rounded()), 0), terminal.columns)
         let line = line(at: row, in: terminal)
+        if let order = Self.visualOrder(of: line, graphemes: terminal.graphemes),
+            let column = order.logicalColumn(at: x, in: line)
+        {
+            return Selection.Point(line: terminal.removedScrollbackCount + row, column: column)
+        }
         if column < line.count, line[column].width == 0 {
             column += x < CGFloat(column) ? -1 : 1
         }

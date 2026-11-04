@@ -289,6 +289,64 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: cell, of: wide) == pixels(in: cell, of: narrow))
     }
 
+    @Test func drawsRightToLeftTextFromRightToLeft() async throws {
+        let word = try await drawnView(running: "printf '\\327\\220\\327\\221\\n'")
+        let second = try await drawnView(running: "printf '\\327\\221\\n'")
+        let first = try await drawnView(running: "printf ' \\327\\220\\n'")
+        let cell = CGRect(x: 4, y: 4, width: word.cellSize.width, height: word.cellSize.height)
+        let next = cell.offsetBy(dx: word.cellSize.width, dy: 0)
+        #expect(try pixels(in: cell, of: word) == pixels(in: cell, of: second))
+        #expect(try pixels(in: next, of: word) == pixels(in: next, of: first))
+        #expect(try pixels(in: cell, of: word) != pixels(in: next, of: word))
+    }
+
+    @Test func drawsTheMirroredGlyphInRightToLeftText() async throws {
+        let word = try await drawnView(running: "printf '\\327\\220(\\327\\221)\\n'")
+        let open = try await drawnView(running: "printf '(\\n'")
+        let cell = CGRect(x: 4, y: 4, width: word.cellSize.width, height: word.cellSize.height)
+        #expect(try pixels(in: cell, of: word) == pixels(in: cell, of: open))
+    }
+
+    @Test(arguments: [1, 2] as [CGFloat])
+    func underlinesTheVisualCellsOfRightToLeftText(scale: CGFloat) async throws {
+        let plain = try await drawnView(running: "printf '\\327\\220\\327\\221\\n'")
+        let view = try await drawnView(running: "printf '\\033[4m\\327\\220\\033[m\\327\\221\\n'")
+        let windows = [ScaledWindow(contentView: plain), ScaledWindow(contentView: view)]
+        for window in windows {
+            window.scale = scale
+        }
+        let font = view.fonts.regular
+        let underline = CGRect(
+            x: 4, y: 4 + font.ascender - font.underlinePosition, width: view.cellSize.width,
+            height: max(font.underlineThickness, 1)
+        )
+        .insetBy(dx: 0, dy: -1)
+        let next = underline.offsetBy(dx: view.cellSize.width, dy: 0)
+        #expect(try pixels(in: underline, of: view) == pixels(in: underline, of: plain))
+        #expect(try pixels(in: next, of: view) != pixels(in: next, of: plain))
+    }
+
+    @Test(arguments: ["41", "48;2;0;200;0"])
+    func drawsTheBackgroundColorInTheVisualCellsOfRightToLeftText(parameters: String) async throws {
+        let plain = try await drawnView(running: "printf '\\327\\220\\327\\221\\n'")
+        let view = try await drawnView(running: "printf '\\033[\(parameters)m\\327\\220\\033[m\\327\\221\\n'")
+        let cell = CGRect(x: 4, y: 4, width: view.cellSize.width, height: 2)
+        let next = cell.offsetBy(dx: view.cellSize.width, dy: 0)
+        #expect(try pixels(in: cell, of: view) == pixels(in: cell, of: plain))
+        #expect(try pixels(in: next, of: view) != pixels(in: next, of: plain))
+    }
+
+    @Test func drawsTheCharacterUnderTheCursorInItsVisualCell() async throws {
+        let view = try await drawnView(running: "printf '\\327\\220\\327\\221\\r'")
+        let reference = try await drawnView(running: "printf ' \\327\\220\\b'")
+        let windows = [ScaledKeyWindow(contentView: view), ScaledKeyWindow(contentView: reference)]
+        view.palette.cursor = .red
+        reference.palette.cursor = .red
+        #expect(view.cursorRect == reference.cursorRect)
+        #expect(try pixels(in: view.cursorRect, of: view) == pixels(in: reference.cursorRect, of: reference))
+        #expect(windows[0].firstResponder === view && windows[1].firstResponder === reference)
+    }
+
     @Test(arguments: ["\\341\\200\\270", "\\341\\200\\254", "\\340\\244\\276", "\\340\\244\\276\\340\\244\\201"])
     func drawsASpacingMarkInItsCell(character: String) async throws {
         let mark = try await drawnView(running: "printf '\(character)x\\n'")
