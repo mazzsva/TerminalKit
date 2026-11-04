@@ -697,11 +697,13 @@ struct TerminalContentViewTests {
         view.fit(to: CGSize(width: 200, height: 100))
         let row = session.terminal.scrollback.count + session.terminal.rows - 1
         let rect = view.rect(row: row - 2, columns: 0 ..< 1).union(view.rect(row: row, columns: 0 ..< 1))
-        let representation = try #require(view.bitmapImageRepForCachingDisplay(in: rect))
-        view.cacheDisplay(in: rect, to: representation)
+        let part = try #require(view.bitmapImageRepForCachingDisplay(in: rect))
+        view.cacheDisplay(in: rect, to: part)
         let center = CGPoint(x: rect.width / 2, y: rect.height - view.cellSize.height / 2)
-        let color = try #require(color(in: representation, at: center)?.usingColorSpace(.sRGB))
-        #expect(abs(color.redComponent - 194 / 255) < 0.02)
+        let full = try representation(of: view)
+        let fill = color(in: full, at: CGPoint(x: rect.minX + center.x, y: rect.minY + center.y))
+        #expect(isClose(color(in: part, at: center), to: fill))
+        #expect(!isClose(fill, to: color(in: full, at: CGPoint(x: 190, y: rect.minY + center.y))))
     }
 
     @Test func fillsARowOfTruecolorCellsWithOneImage() async throws {
