@@ -263,6 +263,17 @@ struct TerminalViewTests {
         await session.waitForExit()
     }
 
+    @Test func hidesThePointerWhenYouType() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 50; read line")
+        var hides = 0
+        scrollView.terminalView.hidePointer = { hides += 1 }
+        scrollView.terminalView.keyDown(with: try keyDown(NSPageUpFunctionKey, modifierFlags: [.command, .function]))
+        #expect(hides == 0)
+        scrollView.terminalView.keyDown(with: try keyDown("\r"))
+        #expect(hides == 1)
+        await session.waitForExit()
+    }
+
     @Test func scrollsToTheBottomForCommandDelete() async throws {
         let (scrollView, session) = try await scrollView(running: "seq 1 50; read line")
         scrollView.terminalView.scroll(.zero)

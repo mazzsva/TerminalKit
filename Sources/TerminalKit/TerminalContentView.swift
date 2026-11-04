@@ -75,6 +75,7 @@ final class TerminalContentView: NSView {
         }
     }
     var ringBell = { NSSound.beep() }
+    var hidePointer = { NSCursor.setHiddenUntilMouseMoves(true) }
     var currentDate = { Date() }
     var currentModifierFlags = { NSEvent.modifierFlags }
     var pressedMouseButtons = { NSEvent.pressedMouseButtons }
@@ -343,6 +344,7 @@ final class TerminalContentView: NSView {
             }
             return
         }
+        hidePointer()
         scrollToBottom()
         if markedText.isEmpty, let input = keyInput ?? encodedInput(event) {
             insertedText = ""
