@@ -1,6 +1,6 @@
 # TerminalKit
 
-Native macOS terminal view in SwiftUI and AppKit.
+Native macOS terminal view for SwiftUI, built on AppKit.
 
 ## Core technologies
 
@@ -14,7 +14,7 @@ Native macOS terminal view in SwiftUI and AppKit.
 
 ## Quality gates
 
-- **Tests:** 829 [Swift Testing](https://github.com/swiftlang/swift-testing) tests cover every layer, and many run real programs in pseudo terminals.
+- **Tests:** 833 [Swift Testing](https://github.com/swiftlang/swift-testing) tests cover every layer, and many run real programs in pseudo terminals.
 - **CI:** GitHub Actions lints and runs the full suite on every pull request that is ready for review.
 - **Accessibility:** VoiceOver reads the terminal as a text area and gets a notification when the output changes.
 
@@ -44,7 +44,9 @@ struct ContentView: View {
 }
 ```
 
-Send input with `send(_:)` only after `start()`. Input sent before `start()` is dropped.
+Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent before `start()` is dropped.
+
+Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
 
 Claude Code makes clickable links only in terminals that it detects. To turn them on, set `FORCE_HYPERLINK=1` in the `environment` of the Claude Code session only, because every program in the session inherits it.
 
@@ -60,7 +62,7 @@ macOS gives microphone access to the host app, not to the program in the termina
 
 **Safe links.** A Command-click opens web, mail, FTP, and file links, both hyperlinks and plain URLs. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
 
-**The right size from the first frame.** The process starts only after the first layout of the view, so a full-screen program never draws its first frame at the wrong width and then redraws.
+**The right size from the first frame.** When the host calls `start()` after it makes the view, as in the example, the process waits until the view has its size, so a full-screen program never draws its first frame at the wrong width and then redraws.
 
 **Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts.
 
