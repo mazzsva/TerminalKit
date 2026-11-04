@@ -9,14 +9,12 @@ extension Terminal {
         package var foreground = Color.default
         package var background = Color.default
         package var underlineColor = Color.default
-        package var link: UInt16 = 0
         private var flags: UInt8 = 0
 
         package init(
             foreground: Color = .default,
             background: Color = .default,
             underlineColor: Color = .default,
-            link: UInt16 = 0,
             isBold: Bool = false,
             isFaint: Bool = false,
             isItalic: Bool = false,
@@ -28,7 +26,6 @@ extension Terminal {
             self.foreground = foreground
             self.background = background
             self.underlineColor = underlineColor
-            self.link = link
             self.isBold = isBold
             self.isFaint = isFaint
             self.isItalic = isItalic
@@ -87,7 +84,7 @@ extension Terminal {
             while let parameter = parameters.next() {
                 switch parameter {
                 case 0:
-                    self = Style(link: link)
+                    self = Style()
                 case 1:
                     isBold = true
                 case 2:

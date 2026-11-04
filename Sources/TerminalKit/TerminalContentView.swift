@@ -87,7 +87,6 @@ final class TerminalContentView: NSView {
                 return
             }
             needsDisplay = true
-            toolTip = hoveredLink?.toolTip
         }
     }
     var hoveredLinkRevision = 0

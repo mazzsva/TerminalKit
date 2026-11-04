@@ -10,7 +10,6 @@ extension TerminalContentView {
 
         var url: URL
         var spans: [Span]
-        var toolTip: String?
     }
 
     enum LinkAction: Equatable {
@@ -103,34 +102,24 @@ extension TerminalContentView {
         guard let (cells, index) = cells(atRow: row, column: column, in: terminal) else {
             return nil
         }
-        let range: Range<Int>
-        let url: URL?
-        if case let link = cells[index].cell.style.link, link > 0 {
-            let lowerBound = cells[..<index].lastIndex { $0.cell.style.link != link }.map { $0 + 1 } ?? 0
-            let upperBound = cells[index...].firstIndex { $0.cell.style.link != link } ?? cells.count
-            range = lowerBound ..< upperBound
-            url = terminal.links.uri(of: link).flatMap(URL.init(string:))
-        } else {
-            var text = String.UnicodeScalarView()
-            var starts: [Int] = []
-            var count = 0
-            for cell in cells {
-                let scalars = terminal.character(of: cell.cell).unicodeScalars
-                starts.append(count)
-                count += scalars.count
-                text.append(contentsOf: scalars)
-            }
-            let offset = starts[index]
-            guard
-                let match = Self.detectedLinks(in: String(text)).first(where: { $0.contains(offset) }),
-                let lowerBound = starts.firstIndex(of: match.lowerBound)
-            else {
-                return nil
-            }
-            range = lowerBound ..< (starts[lowerBound...].firstIndex { $0 >= match.upperBound } ?? cells.count)
-            url = URL(string: String(cells[range].map { terminal.character(of: $0.cell) }))
+        var text = String.UnicodeScalarView()
+        var starts: [Int] = []
+        var count = 0
+        for cell in cells {
+            let scalars = terminal.character(of: cell.cell).unicodeScalars
+            starts.append(count)
+            count += scalars.count
+            text.append(contentsOf: scalars)
         }
-        guard let url else {
+        let offset = starts[index]
+        guard
+            let match = Self.detectedLinks(in: String(text)).first(where: { $0.contains(offset) }),
+            let lowerBound = starts.firstIndex(of: match.lowerBound)
+        else {
+            return nil
+        }
+        let range = lowerBound ..< (starts[lowerBound...].firstIndex { $0 >= match.upperBound } ?? cells.count)
+        guard let url = URL(string: String(cells[range].map { terminal.character(of: $0.cell) })) else {
             return nil
         }
         let spans = Dictionary(grouping: cells[range], by: \.row)
@@ -140,7 +129,7 @@ extension TerminalContentView {
                     columns: cells[0].column ..< cells[cells.count - 1].column + Int(cells[cells.count - 1].cell.width))
             }
             .sorted { $0.row < $1.row }
-        return Link(url: url, spans: spans, toolTip: cells[index].cell.style.link > 0 ? url.absoluteString : nil)
+        return Link(url: url, spans: spans)
     }
 
     static func detectedLinks(in text: String) -> [Range<Int>] {

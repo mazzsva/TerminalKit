@@ -50,7 +50,6 @@ package struct Terminal: Sendable {
     package private(set) var usesReverseVideo = false
     package private(set) var title = ""
     package internal(set) var graphemes = Graphemes()
-    package internal(set) var links = Links()
     package private(set) var bellCount = 0
     package internal(set) var currentDirectory: URL?
     package private(set) var mouseTracking = MouseTracking.off
@@ -589,41 +588,6 @@ package struct Terminal: Sendable {
         graphemes.character(of: cell)
     }
 
-    private mutating func setLink(_ value: Substring) {
-        guard let (key, uri) = Links.key(from: value) else {
-            return
-        }
-        guard !uri.isEmpty else {
-            style.link = 0
-            return
-        }
-        if links.needsCompaction(forKey: key) {
-            compactLinks()
-        }
-        style.link = links.link(forKey: key, uri: uri)
-    }
-
-    private mutating func compactLinks() {
-        var used = Array(repeating: false, count: links.count)
-        Links.markLinks(in: scrollback, into: &used)
-        Links.markLinks(in: screen, into: &used)
-        for link in [savedCursor.style.link, normalScreen?.savedCursor.style.link ?? 0] {
-            used[Int(link)] = true
-        }
-        if let normalScreen {
-            Links.markLinks(in: normalScreen.lines, into: &used)
-        }
-        let newIndices = links.compact(keeping: used)
-        Links.remapLinks(in: &scrollback, with: newIndices)
-        Links.remapLinks(in: &screen, with: newIndices)
-        savedCursor.style.link = newIndices[Int(savedCursor.style.link)]
-        if var normalScreen {
-            Links.remapLinks(in: &normalScreen.lines, with: newIndices)
-            normalScreen.savedCursor.style.link = newIndices[Int(normalScreen.savedCursor.style.link)]
-            self.normalScreen = normalScreen
-        }
-    }
-
     private mutating func compactGraphemes() {
         var used = Array(repeating: false, count: graphemes.count)
         Graphemes.markIndices(in: scrollback, into: &used)
@@ -721,7 +685,6 @@ package struct Terminal: Sendable {
             removedScrollbackCount += scrollback.count - Self.maximumScrollback
             scrollback.removeFirst(scrollback.count - Self.maximumScrollback)
             graphemes.resetCompactionInterval()
-            links.resetCompactionInterval()
         }
     }
 
@@ -798,8 +761,6 @@ package struct Terminal: Sendable {
         switch parts[0] {
         case "0", "2":
             title = String(parts[1])
-        case "8":
-            setLink(parts[1])
         case "7":
             setCurrentDirectory(parts[1])
         case "10":
@@ -818,7 +779,6 @@ package struct Terminal: Sendable {
         terminal.currentDirectory = currentDirectory
         terminal.reportedColors = reportedColors
         terminal.graphemes = graphemes
-        terminal.links = links
         terminal.scrollback = scrollback
         scrollback = []
         terminal.unwrapLine(before: 0)
@@ -1028,7 +988,6 @@ package struct Terminal: Sendable {
             removedScrollbackCount += scrollback.count
             scrollback.removeAll()
             graphemes.resetCompactionInterval()
-            links.resetCompactionInterval()
         default:
             break
         }
