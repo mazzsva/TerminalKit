@@ -23,7 +23,7 @@ Native macOS terminal view for SwiftUI, built on AppKit.
 Add the package with Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/mazzsva/TerminalKit", branch: "main")
+.package(url: "https://github.com/mazzsva/TerminalKit", from: "1.0.0")
 ```
 
 Then show a terminal that runs Claude Code:
