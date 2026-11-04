@@ -109,6 +109,15 @@ struct TerminalStartSizeTests {
         #expect(await session.linesAfterExit().contains("\(session.terminal.rows) \(session.terminal.columns)"))
     }
 
+    @Test func dropsTheInputThatArrivesBeforeStart() async throws {
+        let session = TerminalSession(running: "read line; echo got $line")
+        session.send("lost ")
+        session.paste("lost ")
+        try session.start()
+        session.send("kept\r")
+        #expect(await session.linesAfterExit().contains("got kept"))
+    }
+
     @Test func sendsTheInputThatArrivesBeforeTheStartInOrder() async throws {
         let session = TerminalSession(running: "read line; echo got $line")
         let scrollView = TerminalScrollView(session: session)
