@@ -910,6 +910,53 @@ struct TerminalContentViewTests {
         #expect(await !session.linesAfterExit().contains { $0.contains("got 00") })
     }
 
+    @Test func replacesTheInsertedTextWithTheChosenAccent() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 4 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.insertText("e", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(view.selectedRange() == NSRange(location: 1, length: 0))
+        let substring = view.attributedSubstring(forProposedRange: NSRange(location: 0, length: 1), actualRange: nil)
+        #expect(substring?.string == "e")
+        view.insertText("é", replacementRange: NSRange(location: 0, length: 1))
+        #expect(await session.linesAfterExit().contains("65  7f  c3  a9"))
+    }
+
+    @Test func replacesTheInsertedTextWithTheMarkedAccent() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.insertText("e", replacementRange: NSRange(location: NSNotFound, length: 0))
+        let original = view.selectedRange()
+        view.setMarkedText(
+            "é",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: original.location - 1, length: 1)
+        )
+        let marked = view.selectedRange()
+        view.insertText("é", replacementRange: NSRange(location: marked.location - 1, length: 1))
+        #expect(await session.linesAfterExit().contains("65  7f  c3"))
+    }
+
+    @Test func keepsTheTextBeforeAnotherKeyOrTheMarkedText() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 9 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.insertText("e", replacementRange: NSRange(location: NSNotFound, length: 0))
+        view.keyDown(with: try keyDown(NSLeftArrowFunctionKey))
+        view.insertText("é", replacementRange: NSRange(location: 0, length: 1))
+        view.setMarkedText(
+            "か",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.insertText("か", replacementRange: NSRange(location: 0, length: 1))
+        #expect(await session.linesAfterExit().contains("65  1b  5b  44  c3  a9  e3  81  8b"))
+    }
+
     @Test func leavesOptionKeysToTheMarkedText() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 4 | od -An -tx1")
         let view = TerminalContentView(session: session)
