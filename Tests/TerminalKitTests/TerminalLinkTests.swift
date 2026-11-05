@@ -171,6 +171,70 @@ struct TerminalLinkTests {
         #expect(window.contentView === view)
     }
 
+    @Test func keepsTheLinkUntilOutputRemovesIt() async throws {
+        let session = TerminalSession(
+            running: "printf 'https://a.com'; read x; printf '\\033[3;1Hz'; read x; printf '\\033[Hdone\\033[K'"
+        )
+        session.resize(columns: 20, rows: 4)
+        let view = TerminalContentView(session: session)
+        let window = MouseWindow(contentView: view)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.currentModifierFlags = { .command }
+        try session.start()
+        await session.waitForText("a.com")
+        window.mouseLocation = view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil)
+        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
+        #expect(view.hoveredLink?.url == URL(string: "https://a.com"))
+        session.send(Array("\r".utf8))
+        await session.waitForText("z")
+        view.display()
+        #expect(view.hoveredLink?.url == URL(string: "https://a.com"))
+        session.send(Array("\r".utf8))
+        await session.waitForText("done")
+        NSCursor.pointingHand.set()
+        view.display()
+        #expect(NSCursor.current == .iBeam)
+        #expect(view.hoveredLink == nil)
+        #expect(window.contentView === view)
+    }
+
+    @Test func updatesTheLinkAfterAScroll() async throws {
+        let session = TerminalSession(running: "for i in $(seq 1 30); do printf 'https://%s.com\\n' $i; done")
+        let scrollView = TerminalScrollView(session: session)
+        let window = MouseWindow(contentView: scrollView)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        scrollView.layoutSubtreeIfNeeded()
+        try session.start()
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        view.currentModifierFlags = { .command }
+        let row = Int((view.visibleRect.midY - TerminalContentView.padding) / view.cellSize.height)
+        window.mouseLocation = view.convert(view.rect(row: row, columns: 1 ..< 2).center, to: nil)
+        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
+        #expect(view.hoveredLink?.url == URL(string: "https://\(row + 1).com"))
+        view.scroll(CGPoint(x: 0, y: view.visibleRect.minY - 5 * view.cellSize.height))
+        #expect(view.hoveredLink?.url == URL(string: "https://\(row - 4).com"))
+        #expect(window.contentView === scrollView)
+    }
+
+    @Test func updatesTheLinkAfterAFontChange() async throws {
+        let (view, window) = try await twoLinks()
+        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
+        #expect(view.hoveredLink?.url == URL(string: "https://b.com"))
+        view.font = .monospacedSystemFont(ofSize: 2 * view.font.pointSize, weight: .regular)
+        #expect(view.hoveredLink?.url == URL(string: "https://a.com"))
+        #expect(window.contentView === view)
+    }
+
+    @Test func showsNoLinkAfterAFontChangeWithoutAHover() async throws {
+        let (view, window) = try await twoLinks()
+        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: [])
+        view.font = .monospacedSystemFont(ofSize: 2 * view.font.pointSize, weight: .regular)
+        #expect(view.hoveredLink == nil)
+        #expect(window.contentView === view)
+    }
+
     @Test func keepsTheUnderlineDuringOutput() async throws {
         let session = TerminalSession(
             running: "printf 'https://a.com'; read x; printf '\\033[3;1Hz'; read x; printf '\\033[H\\033[2@ab'"
@@ -354,6 +418,20 @@ extension CGRect {
     fileprivate var center: CGPoint {
         CGPoint(x: midX, y: midY)
     }
+}
+
+@MainActor
+private func twoLinks() async throws -> (TerminalContentView, MouseWindow) {
+    let session = TerminalSession(running: "printf 'https://a.com https://b.com'")
+    session.resize(columns: 40, rows: 4)
+    let view = TerminalContentView(session: session)
+    let window = MouseWindow(contentView: view)
+    view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+    view.currentModifierFlags = { .command }
+    try session.start()
+    await session.waitForExit()
+    window.mouseLocation = view.convert(view.rect(row: 0, columns: 16 ..< 17).center, to: nil)
+    return (view, window)
 }
 
 @MainActor
