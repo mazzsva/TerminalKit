@@ -62,7 +62,9 @@ extension NSEvent {
     }
 
     func disambiguatedInput(usesOptionAsMetaKey: Bool) -> [UInt8]? {
-        guard let key = charactersIgnoringModifiers?.lowercased().unicodeScalars.first else {
+        guard !modifierFlags.contains(.command),
+            let key = charactersIgnoringModifiers?.lowercased().unicodeScalars.first
+        else {
             return nil
         }
         let modifiers = terminalModifiers
@@ -76,9 +78,7 @@ extension NSEvent {
             return specialKey.terminalSequence(applicationCursorKeys: false, modifiers: modifiers, disambiguates: true)
                 .map { Array($0.utf8) }
         default:
-            guard
-                modifierFlags.contains(.control) || modifierFlags.contains(.command)
-                    || usesOptionAsMetaKey && modifierFlags.contains(.option),
+            guard modifierFlags.contains(.control) || usesOptionAsMetaKey && modifierFlags.contains(.option),
                 let key = modifierFlags.contains(.shift)
                     ? characters(byApplyingModifiers: [])?.unicodeScalars.first : key,
                 key.value >= 0x20, key.value < 0x7F || !modifierFlags.contains(.control)
@@ -147,7 +147,7 @@ extension NSEvent {
     }
 
     private var terminalModifiers: Int {
-        [(NSEvent.ModifierFlags.shift, 1), (.option, 2), (.control, 4), (.command, 8)]
+        [(NSEvent.ModifierFlags.shift, 1), (.option, 2), (.control, 4)]
             .reduce(1) { modifierFlags.contains($1.0) ? $0 + $1.1 : $0 }
     }
 }

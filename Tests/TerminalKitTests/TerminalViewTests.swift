@@ -331,18 +331,6 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.minY == 600)
     }
 
-    @Test func sendsTheScrollKeysOnTheAlternateScreen() async throws {
-        let session = TerminalSession(
-            running: "seq 1 100; printf '\\033[?1049h\\033[>1u'; stty raw -echo; echo ready; head -c 6 | od -An -tx1")
-        let scrollView = TerminalScrollView(session: session)
-        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
-        scrollView.layoutSubtreeIfNeeded()
-        try session.start()
-        await session.waitForText("ready")
-        scrollView.terminalView.keyDown(with: try keyDown(NSHomeFunctionKey, modifierFlags: [.command, .function]))
-        #expect(await session.linesAfterExit().contains("1b  5b  31  3b  39  48"))
-    }
-
     @Test(
         arguments: [
             (NSHomeFunctionKey, -.infinity),
