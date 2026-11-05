@@ -43,4 +43,8 @@ struct CellTests {
     @Test func storesOnlyPlainValues() {
         #expect(_isPOD(Terminal.Cell.self))
     }
+
+    @Test func keepsTheCellSmall() {
+        #expect(MemoryLayout<Terminal.Cell>.stride == 16)
+    }
 }

@@ -102,8 +102,7 @@ struct TerminalFindTests {
     }
 
     @Test func drawsTheFoundCharacters() async throws {
-        let scrollView = try await findView(
-            running: "printf '\\033[31ma\\033[0m c\\033[4;58;2;255;255;0mb\\033[0md\\033[31me'")
+        let scrollView = try await findView(running: "printf '\\033[31ma\\033[0m cbd\\033[31me'")
         let view = scrollView.terminalView
         let rect = view.rect(row: 0, columns: 3 ..< 4)
         let image = NSImage(size: view.bounds.size, flipped: true) { _ in
@@ -124,9 +123,6 @@ struct TerminalFindTests {
                 }
         }
         #expect(pixels(rect).contains { $0 < 0.5 })
-        let font = view.fonts.regular
-        let y = rect.minY + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
-        #expect(pixels(CGRect(x: rect.minX, y: y, width: rect.width, height: 1 / scale)).allSatisfy { $0 < 0.5 })
         #expect(pixels(view.rect(row: 0, columns: 0 ..< 3)).allSatisfy { $0 > 0.5 })
         #expect(pixels(view.rect(row: 0, columns: 4 ..< 6)).allSatisfy { $0 > 0.5 })
     }

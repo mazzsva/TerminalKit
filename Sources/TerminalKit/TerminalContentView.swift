@@ -497,8 +497,8 @@ final class TerminalContentView: NSView {
         }
         for (line, row, columns, style, foreground, order) in runs {
             drawText(
-                line, columns: columns, row: row, style: style, foreground: foreground,
-                underline: colors.color(style.underlineColor), graphemes: graphemes, order: order)
+                line, columns: columns, row: row, style: style, foreground: foreground, graphemes: graphemes,
+                order: order)
         }
 
         if hoveredLinkRevision != session.revision {
@@ -608,7 +608,6 @@ final class TerminalContentView: NSView {
         row: Int,
         style: Terminal.Style,
         foreground: NSColor,
-        underline: NSColor? = nil,
         graphemes: Terminal.Graphemes,
         order: VisualOrder? = nil
     ) {
@@ -666,9 +665,6 @@ final class TerminalContentView: NSView {
         let thickness = max(font.underlineThickness, 1)
         let spans = rects(row: row, columns: columns, order: order)
         if style.isUnderlined {
-            if let underline {
-                context.setFillColor((style.isFaint ? underline.withAlphaComponent(0.5) : underline).cgColor)
-            }
             context.fill(
                 spans.map {
                     backingAlignedRect(
