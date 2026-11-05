@@ -55,13 +55,7 @@ package struct Terminal: Sendable {
     package private(set) var bellCount = 0
     package internal(set) var currentDirectory: URL?
     package private(set) var mouseTracking = MouseTracking.off
-    package var reportedColors: [RGB] = [] {
-        didSet {
-            if usesColorSchemeReports, Self.colorScheme(of: reportedColors) != Self.colorScheme(of: oldValue) {
-                reportColorScheme()
-            }
-        }
-    }
+    package var reportedColors: [RGB] = []
     package private(set) var usesSGRMouseEncoding = false
     package private(set) var modifyOtherKeys = 0
 
@@ -75,7 +69,6 @@ package struct Terminal: Sendable {
 
     private var usesAutowrap = true
     private var usesInsertMode = false
-    private var usesColorSchemeReports = false
 
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
@@ -345,10 +338,6 @@ package struct Terminal: Sendable {
         {
             let level = sequence.final == "m" ? sequence.parameter(at: 1, default: 0) : 0
             modifyOtherKeys = level <= 2 ? level : 0
-            return
-        }
-        if sequence.privateMarker == "?", sequence.final == "n", sequence.parameters == [996] {
-            reportColorScheme()
             return
         }
         guard
@@ -927,8 +916,6 @@ package struct Terminal: Sendable {
             usesSGRMouseEncoding = isEnabled
         case (2004, _):
             usesBracketedPaste = isEnabled
-        case (2031, _):
-            usesColorSchemeReports = isEnabled
         case (47, true), (1047, true):
             enterAlternateScreen()
         case (47, false), (1047, false):
@@ -1002,17 +989,6 @@ package struct Terminal: Sendable {
         default:
             break
         }
-    }
-
-    private mutating func reportColorScheme() {
-        if let scheme = Self.colorScheme(of: reportedColors) {
-            replies += "\u{1B}[?997;\(scheme)n".utf8
-        }
-    }
-
-    private static func colorScheme(of colors: [RGB]) -> Int? {
-        colors.last.map { 0.2126 * Double($0.red) + 0.7152 * Double($0.green) + 0.0722 * Double($0.blue) }
-            .map { $0 < 0x8000 ? 1 : 2 }
     }
 
     private mutating func reportColors(_ queries: Substring, from first: Int) {
