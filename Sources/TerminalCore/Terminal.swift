@@ -305,9 +305,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
-        guard sequence.subparameters.isEmpty || sequence.final == "m" else {
-            return
-        }
         if sequence.privateMarker == nil, sequence.intermediates == " ", sequence.final == "q" {
             setCursorShape(sequence.parameter(at: 0, default: 0))
             return
@@ -349,9 +346,7 @@ package struct Terminal: Sendable {
             moveCursor(row: max(cursor.row - count, topLimit), column: cursor.column)
         case "B":
             moveCursor(row: min(cursor.row + count, bottomLimit), column: cursor.column)
-        case "e":
-            moveCursor(row: cursor.row + count, column: cursor.column)
-        case "C", "a":
+        case "C":
             moveCursor(row: cursor.row, column: cursor.column + count)
         case "D":
             moveCursor(row: cursor.row, column: cursor.column - count)
@@ -402,7 +397,7 @@ package struct Terminal: Sendable {
         case "l" where sequence.parameters.contains(4):
             usesInsertMode = false
         case "m":
-            style.apply(sequence.parameters, subparameters: sequence.subparameters)
+            style.apply(sequence.parameters)
         case "n":
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
