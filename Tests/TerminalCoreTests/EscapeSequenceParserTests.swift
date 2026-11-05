@@ -150,31 +150,56 @@ struct EscapeSequenceParserTests {
     }
 
     @Test func dispatchesOperatingSystemCommands() {
-        #expect(parse("\u{1B}]0;Café\nA\u{7}B") == [.operatingSystemCommand("0;CaféA"), .print("B")])
+        #expect(
+            parse("\u{1B}]0;Café\nA\u{7}B") == [.execute("\n"), .operatingSystemCommand("0;CaféA"), .print("B")])
     }
 
     @Test func endsOperatingSystemCommandsWithTheStringTerminator() {
-        #expect(
-            parse("\u{1B}]2;Title\u{1B}\\A") == [
-                .operatingSystemCommand("2;Title"), .escape(intermediates: "", final: "\\"), .print("A"),
-            ]
-        )
+        #expect(parse("\u{1B}]2;Title\u{1B}\\A") == [.operatingSystemCommand("2;Title"), .print("A")])
+    }
+
+    @Test func endsOperatingSystemCommandsWithASubstitute() {
+        #expect(parse("\u{1B}]2;Title\u{1A}A") == [.operatingSystemCommand("2;Title"), .print("A")])
     }
 
     @Test func limitsOperatingSystemCommands() {
-        let title = String(repeating: "A", count: 4_096)
-        #expect(parse("\u{1B}]\(title)\u{7}") == [.operatingSystemCommand(title)])
-        #expect(parse("\u{1B}]\(title)A\u{7}B") == [.print("B")])
+        let title = String(repeating: "A", count: 999_998)
+        #expect(parse("\u{1B}]2;\(title)\u{7}") == [.operatingSystemCommand("2;\(title)")])
+        #expect(parse("\u{1B}]2;\(title)A\u{7}B") == [.print("B")])
     }
 
-    @Test func cancelsOperatingSystemCommands() {
-        #expect(parse("\u{1B}]0;Title\u{18}A") == [.execute("\u{18}"), .print("A")])
+    @Test func ignoresACancelInAnOperatingSystemCommand() {
+        #expect(parse("\u{1B}]0;Ti\u{18}tle\u{7}") == [.operatingSystemCommand("0;Title")])
+    }
+
+    @Test func dropsTheNextCharacterAfterAnEscapeInAnOperatingSystemCommand() {
+        #expect(parse("\u{1B}]0;Title\u{1B}xA") == [.print("A")])
+        #expect(parse("\u{1B}]0;Title\u{1B}[1CA") == [.print("1"), .print("C"), .print("A")])
+    }
+
+    @Test func startsAnEscapeAfterTwoEscapesInAnOperatingSystemCommand() {
+        #expect(parse("\u{1B}]0;Title\u{1B}\u{1B}7") == [.escape(intermediates: "", final: "7")])
+    }
+
+    @Test func endsAnOperatingSystemCommandAtATabWithNoDispatch() {
+        #expect(parse("\u{1B}]0;Title\tA") == [.execute("\t"), .print("A")])
+    }
+
+    @Test func dropsTheOtherCharactersInTheCommandNumber() {
+        #expect(parse("\u{1B}] 2?;A\u{7}") == [.operatingSystemCommand("2;A")])
+    }
+
+    @Test(arguments: ["A", ":", "n"])
+    func endsAnOperatingSystemCommandInTheCommandNumber(end: String) {
+        #expect(parse("\u{1B}]2\(end);A") == [.print(";"), .print("A")])
     }
 
     @Test(arguments: ["P", "X", "^", "_"])
-    func ignoresStrings(introducer: String) {
+    func printsTheStringsOfOtherControls(introducer: String) {
         #expect(
-            parse("\u{1B}\(introducer)1$q\n\u{7}\u{1B}\\A") == [.escape(intermediates: "", final: "\\"), .print("A")])
+            parse("\u{1B}\(introducer)a\u{1B}\\b") == [
+                .print("a"), .escape(intermediates: "", final: "\\"), .print("b"),
+            ])
     }
 }
 

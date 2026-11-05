@@ -1377,11 +1377,23 @@ struct TerminalTests {
         #expect(terminal.screen[0].prefix(2).map(terminal.character(of:)) == ["a", "b"])
     }
 
-    @Test(arguments: ["\u{1B}]0;title\u{7}", "\u{1B}P1;2\u{7}x\u{1B}\\", "\u{1B}_\u{7}\u{1B}\\"])
-    func ignoresABellInAString(string: String) {
+    @Test func setsATitleThatStartsWithACombiningMark() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}]2;\u{301}x\u{7}")
+        #expect(terminal.title == "\u{301}x")
+    }
+
+    @Test func ignoresABellAsTheEndOfACommand() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}]0;title\u{7}")
+        #expect(terminal.bellCount == 0)
+    }
+
+    @Test(arguments: ["\u{1B}P1;2\u{7}x\u{1B}\\", "\u{1B}_\u{7}\u{1B}\\"])
+    func ringsTheBellInAStringOfOtherControls(string: String) {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive(string)
-        #expect(terminal.bellCount == 0)
+        #expect(terminal.bellCount == 1)
     }
 
     @Test func keepsTheBellCountAfterAReset() {
