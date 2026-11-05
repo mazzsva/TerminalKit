@@ -52,20 +52,8 @@ struct TerminalPasteTests {
         #expect(await session.linesAfterExit().contains { $0.hasPrefix(hash) })
     }
 
-    @Test func pastesAnImageAsAnEmptyBracketedPaste() async throws {
-        let (bytes, canPaste) = try await pastedImageBytes(mode: "\\033[?2004h", count: 13)
-        #expect(canPaste)
-        #expect(bytes == "1b  5b  32  30  30  7e  1b  5b  32  30  31  7e  78")
-    }
-
-    @Test func pastesNoImageWithoutBracketedPasteMode() async throws {
-        let (bytes, canPaste) = try await pastedImageBytes(mode: "\\033[?2004h\\033[?2004l", count: 1)
-        #expect(!canPaste)
-        #expect(bytes == "78")
-    }
-
-    @Test func pastesNothingWithoutAnImage() async throws {
-        let (bytes, canPaste) = try await pastedImageBytes(image: false, mode: "\\033[?2004h", count: 1)
+    @Test func pastesNothingForAnImage() async throws {
+        let (bytes, canPaste) = try await pastedImageBytes(mode: "\\033[?2004h", count: 1)
         #expect(!canPaste)
         #expect(bytes == "78")
     }

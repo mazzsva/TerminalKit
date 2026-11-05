@@ -99,18 +99,14 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     }
 
     func paste(from pasteboard: NSPasteboard) {
-        guard let text = Self.droppedText(from: pasteboard) ?? (canPasteImage(from: pasteboard) ? "" : nil) else {
+        guard let text = Self.droppedText(from: pasteboard) else {
             return
         }
         paste(text: text)
     }
 
     func canPaste(from pasteboard: NSPasteboard) -> Bool {
-        pasteboard.availableType(from: [.fileURL, .string]) != nil || canPasteImage(from: pasteboard)
-    }
-
-    func canPasteImage(from pasteboard: NSPasteboard) -> Bool {
-        session.terminal.usesBracketedPaste && pasteboard.availableType(from: [.tiff, .png]) != nil
+        pasteboard.availableType(from: [.fileURL, .string]) != nil
     }
 
     func paste(text: String) {
