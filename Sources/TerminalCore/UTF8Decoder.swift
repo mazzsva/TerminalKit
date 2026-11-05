@@ -5,7 +5,22 @@ struct UTF8Decoder {
         let bytes = incompleteBytes + bytes
         let end = Self.endOfCompleteSequences(in: bytes)
         incompleteBytes = Array(bytes[end...])
-        return String(decoding: bytes[..<end], as: UTF8.self).unicodeScalars
+        if let text = String(validating: bytes[..<end], as: UTF8.self) {
+            return text.unicodeScalars
+        }
+        var scalars = String.UnicodeScalarView()
+        var parser = Unicode.UTF8.ForwardParser()
+        var iterator = bytes[..<end].makeIterator()
+        while true {
+            switch parser.parseScalar(from: &iterator) {
+            case .valid(let encoded):
+                scalars.append(Unicode.UTF8.decode(encoded))
+            case .error:
+                scalars.append("?")
+            case .emptyInput:
+                return scalars
+            }
+        }
     }
 
     private static func endOfCompleteSequences(in bytes: [UInt8]) -> Int {

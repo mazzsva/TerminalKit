@@ -29,18 +29,23 @@ struct UTF8DecoderTests {
 
     @Test func replacesInvalidBytes() {
         var decoder = UTF8Decoder()
-        #expect(Array(decoder.decode([0x41, 0x80, 0xC0, 0xFF])) == ["A", "\u{FFFD}", "\u{FFFD}", "\u{FFFD}"])
+        #expect(Array(decoder.decode([0x41, 0x80, 0xC0, 0xFF])) == ["A", "?", "?", "?"])
     }
 
     @Test func replacesInterruptedSequences() {
         var decoder = UTF8Decoder()
         #expect(decoder.decode([0xE2, 0x82]).isEmpty)
-        #expect(Array(decoder.decode([0x41])) == ["\u{FFFD}", "A"])
+        #expect(Array(decoder.decode([0x41])) == ["?", "A"])
+    }
+
+    @Test func keepsAReplacementCharacter() {
+        var decoder = UTF8Decoder()
+        #expect(Array(decoder.decode([0xEF, 0xBF, 0xBD])) == ["\u{FFFD}"])
     }
 
     @Test(arguments: [[0xE0, 0x80, 0xAF], [0xED, 0xA0, 0x80], [0xF4, 0x90, 0x80, 0x80]] as [[UInt8]])
     func replacesInvalidSequences(bytes: [UInt8]) {
         var decoder = UTF8Decoder()
-        #expect(Array(decoder.decode(bytes)) == Array(repeating: "\u{FFFD}", count: bytes.count))
+        #expect(Array(decoder.decode(bytes)) == Array(repeating: "?", count: bytes.count))
     }
 }
