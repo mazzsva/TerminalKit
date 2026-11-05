@@ -136,45 +136,15 @@ struct StyleTests {
         #expect(style("4;58;5;2;59") == Terminal.Style(isFaint: true, isUnderlined: true))
     }
 
-    @Test func setsTheTrueColorsWithColons() {
-        #expect(
-            style("38:2::255:128:0;48:2:1:2:3")
-                == Terminal.Style(
-                    foreground: .rgb(red: 255, green: 128, blue: 0), background: .rgb(red: 1, green: 2, blue: 3)))
-        #expect(
-            style("38:2:1:2:3;48:2::4:5:6")
-                == Terminal.Style(
-                    foreground: .rgb(red: 1, green: 2, blue: 3), background: .rgb(red: 4, green: 5, blue: 6)))
-    }
-
-    @Test func setsThe256ColorsWithColons() {
-        #expect(style("38:5:208;48:5:17") == Terminal.Style(foreground: .indexed(208), background: .indexed(17)))
-    }
-
-    @Test(arguments: 1 ... 5)
-    func treatsEachUnderlineStyleAsUnderline(underline: Int) {
-        #expect(style("4:\(underline)") == Terminal.Style(isUnderlined: true))
-    }
-
-    @Test func clearsTheUnderlineWithAColon() {
-        #expect(style("1;4;4:0") == Terminal.Style(isBold: true))
-    }
-
-    @Test func appliesAMixedSequenceWithColons() {
-        #expect(
-            style("1;38:2::10:20:30;4:3")
-                == Terminal.Style(foreground: .rgb(red: 10, green: 20, blue: 30), isBold: true, isUnderlined: true))
+    @Test func joinsTheDigitsAroundAColon() {
+        #expect(style("4:3") == Terminal.Style(background: .indexed(3)))
+        #expect(style("38:2:1:2:3") == Terminal.Style())
+        #expect(style("1;3:1") == Terminal.Style(foreground: .indexed(1), isBold: true))
     }
 
     @Test func ignoresTheUnderlineColorWithColons() {
         #expect(style("4;58:5:2") == Terminal.Style(isUnderlined: true))
         #expect(style("58:2::255:0:0;1") == Terminal.Style(isBold: true))
-    }
-
-    @Test func ignoresUnknownSubparameters() {
-        #expect(
-            style("38:9:1;3;48:2:1:2;7;1:31;38:5:1:2;48:5:1:2;48:5:300;4:3:1;4:6")
-                == Terminal.Style(isBold: true, isItalic: true, isInverse: true))
     }
 
     @Test func appliesOnlyTheFirst32Parameters() {

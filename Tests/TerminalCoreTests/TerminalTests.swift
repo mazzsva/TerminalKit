@@ -696,8 +696,6 @@ struct TerminalTests {
         ("D", Terminal.Position(row: 4, column: 2)),
         ("E", Terminal.Position(row: 6, column: 0)),
         ("F", Terminal.Position(row: 2, column: 0)),
-        ("a", Terminal.Position(row: 4, column: 6)),
-        ("e", Terminal.Position(row: 6, column: 4)),
     ])
     func movesTheCursorRelativeToItsPosition(final: String, position: Terminal.Position) {
         var terminal = Terminal(columns: 10, rows: 10)
@@ -717,12 +715,11 @@ struct TerminalTests {
         #expect(terminal.cursor.row == stop)
     }
 
-    @Test func movesTheCursorDownPastTheBottomMarginForVerticalPositionRelative() {
+    @Test(arguments: ["a", "e"])
+    func ignoresRelativePositionSequences(final: String) {
         var terminal = Terminal(columns: 10, rows: 10)
-        terminal.receive("\u{1B}[4;7r\u{1B}[7;1H\u{1B}[2e")
-        #expect(terminal.cursor == Terminal.Position(row: 8, column: 0))
-        terminal.receive("\u{1B}[99e")
-        #expect(terminal.cursor == Terminal.Position(row: 9, column: 0))
+        terminal.receive("\u{1B}[2\(final)")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
     }
 
     @Test func movesTheCursorOneStepByDefault() {
@@ -1429,15 +1426,18 @@ struct TerminalTests {
         #expect(terminal.character(of: terminal.screen[0][0]) == "x")
     }
 
-    @Test(arguments: [
-        "\u{1B}[2:2H", "\u{1B}[4:1h", "\u{1B}[2:1J", "\u{1B}[1:2P",
-        "\u{1B}[2\(String(repeating: ";1", count: 31)):1H",
-    ])
-    func ignoresColonsInOtherControlSequences(sequence: String) {
+    @Test func acceptsTheLargestParameterForEachFinal() {
+        for final in (0x40 ... 0x7E).compactMap(UnicodeScalar.init) {
+            var terminal = Terminal(columns: 4, rows: 2)
+            terminal.receive("ab\u{1B}[2147483647;2147483647\(final)")
+            #expect(terminal.rows == 2)
+        }
+    }
+
+    @Test func joinsTheDigitsAroundAColonInAControlSequence() {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("ab\u{1B}[H" + sequence + "x")
-        #expect(lines(terminal) == ["xb  ", "    "])
-        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+        terminal.receive("\u{1B}[0:2H")
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
     }
 
     @Test func ignoresAColonInACursorShapeSequence() {
