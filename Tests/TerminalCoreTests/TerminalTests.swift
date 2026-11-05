@@ -845,6 +845,15 @@ struct TerminalTests {
         #expect(terminal.title == "vim")
     }
 
+    @Test(arguments: ["\u{1B}]8;;https://example.com\u{7}", "\u{1B}]8;;https://example.com\u{1B}\\", "\u{1B}]8;u\u{7}"])
+    func printsTheTextOfAHyperlinkWithNoLink(sequence: String) {
+        var terminal = Terminal(columns: 10, rows: 2)
+        var plain = terminal
+        plain.receive("LINK label")
+        #expect(terminal.receive(sequence + "LINK\u{1B}]8;;\u{7} label") == "")
+        #expect(terminal.screen == plain.screen)
+    }
+
     @Test func growsTheScreen() {
         var terminal = Terminal(columns: 2, rows: 2)
         terminal.receive("ab\r\ncd")

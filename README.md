@@ -48,19 +48,17 @@ Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent befor
 
 Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
 
-Claude Code makes clickable links only in terminals that it detects. To turn them on, set `FORCE_HYPERLINK=1` in the `environment` of the Claude Code session only, because every program in the session inherits it.
-
 macOS gives microphone access to the host app, not to the program in the terminal. To use Claude Code voice dictation, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement.
 
 ## Engineering decisions
 
-**Built for Claude Code.** Each protocol traces to the official Claude Code docs: the kitty keyboard protocol for Shift-Return, mouse hover, color queries for the automatic theme, and hyperlinks.
+**Built for Claude Code.** Each protocol traces to the official Claude Code docs: the kitty keyboard protocol for Shift-Return, mouse hover, and color queries for the automatic theme.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 5,000 lines of Swift and C on POSIX and AppKit APIs.
 
 **A value-type emulator.** The full terminal state is one Swift struct. Tests feed it bytes and compare values.
 
-**Safe links.** A Command-click opens web, mail, FTP, and file links, both hyperlinks and plain URLs. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
+**Safe links.** A Command-click opens web, mail, FTP, and file links. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
 
 **The right size from the first frame.** When the host calls `start()` after it makes the view, as in the example, the process waits until the view has its size, so a full-screen program never draws its first frame at the wrong width and then redraws.
 
