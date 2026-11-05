@@ -458,9 +458,9 @@ struct TerminalContentViewTests {
             })
     }
 
-    @Test(arguments: ["4"], [1, 2] as [CGFloat])
-    func alignsTheLineToThePixels(parameter: String, scale: CGFloat) async throws {
-        let view = try await drawnView(running: "printf '\\033[\(parameter);31m  \\033[;31m█\\n'")
+    @Test(arguments: [1, 2] as [CGFloat])
+    func alignsTheUnderlineToThePixels(scale: CGFloat) async throws {
+        let view = try await drawnView(running: "printf '\\033[4;31m  \\033[;31m█\\n'")
         let window = ScaledWindow(contentView: view)
         window.scale = scale
         let representation = try representation(of: view)
@@ -470,6 +470,17 @@ struct TerminalContentViewTests {
         let pixels = try pixels(in: column, of: view)
         #expect(pixels.count { isClose($0, to: foreground) } == Int(scale))
         #expect(pixels.allSatisfy { isClose($0, to: foreground) || isClose($0, to: background) })
+    }
+
+    @Test func drawsTheUnderlineUnderTheCursorInTheCursorTextColor() async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[4;32mX\\033[m\\b'")
+        let font = view.fonts.regular
+        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let representation = try representation(of: view)
+        let underline = try stride(from: view.cursorRect.minX, to: view.cursorRect.maxX, by: 1)
+            .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
+        #expect(underline.allSatisfy { $0.greenComponent - max($0.redComponent, $0.blueComponent) < 0.1 })
+        #expect(window.firstResponder === view)
     }
 
     @Test(arguments: [1, 2] as [CGFloat])
