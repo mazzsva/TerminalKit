@@ -67,9 +67,6 @@ final class TerminalContentView: NSView {
                 return
             }
             needsDisplay = true
-            if isFocused, session.sizingView !== self {
-                session.sizingView = self
-            }
             if session.terminal.usesFocusReporting {
                 session.send(Array((isFocused ? "\u{1B}[I" : "\u{1B}[O").utf8))
             }
@@ -244,14 +241,7 @@ final class TerminalContentView: NSView {
         }
         NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: window)
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: window)
-        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: window)
         if let newWindow {
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(releaseSize),
-                name: NSWindow.willCloseNotification,
-                object: newWindow
-            )
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
                 NotificationCenter.default.addObserver(
                     self,
@@ -265,9 +255,6 @@ final class TerminalContentView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window == nil {
-            releaseSize()
-        }
         if let window, window.firstResponder === window {
             window.makeFirstResponder(self)
         } else if window?.firstResponder is TerminalContentView {
@@ -285,6 +272,7 @@ final class TerminalContentView: NSView {
         flagsMonitor.map(NSEvent.removeMonitor)
         flagsMonitor = nil
         if window != nil {
+            session.sizingView = self
             Self.joinCount += 1
             joinNumber = Self.joinCount
             bellTask = Task { [weak self, session] in
@@ -309,9 +297,7 @@ final class TerminalContentView: NSView {
 
     private func bellDidRing() {
         let date = currentDate()
-        guard session.sizingView == nil || session.sizingView === self,
-            Self.ringsBell(at: date, lastBellDate: lastBellDate)
-        else {
+        guard Self.ringsBell(at: date, lastBellDate: lastBellDate) else {
             return
         }
         lastBellDate = date
@@ -332,12 +318,6 @@ final class TerminalContentView: NSView {
         }
         isFocused = false
         return true
-    }
-
-    @objc private func releaseSize() {
-        if session.sizingView === self {
-            session.sizingView = nil
-        }
     }
 
     @objc private func windowKeyStateDidChange() {
@@ -727,17 +707,13 @@ final class TerminalContentView: NSView {
     }
 
     func fit(to size: CGSize) {
-        _ = session.sizingViewChangeCount
         let columns = (size.width - 2 * Self.padding) / cellSize.width
         let rows = (size.height - 2 * Self.padding) / cellSize.height
         let canSize = columns >= CGFloat(Self.minimumColumns) && rows >= CGFloat(Self.minimumRows)
-        if !canSize, session.sizingView === self {
-            session.sizingView = nil
-        }
-        if canSize, session.sizingView == nil || session.sizingView?.window == nil && window != nil {
+        if canSize, session.sizingView == nil {
             session.sizingView = self
         }
-        if session.sizingView === self {
+        if canSize, session.sizingView === self {
             session.resize(
                 columns: Int(min(columns, CGFloat(Self.maximumColumns))),
                 rows: Int(min(rows, CGFloat(Self.maximumRows)))

@@ -29,12 +29,7 @@ public final class TerminalSession {
     }
     @ObservationIgnored private(set) var revision = 0
     @ObservationIgnored private(set) var widthChangeCount = 0
-    @ObservationIgnored weak var sizingView: TerminalContentView? {
-        didSet {
-            sizingViewChangeCount += 1
-        }
-    }
-    private(set) var sizingViewChangeCount = 0
+    @ObservationIgnored weak var sizingView: TerminalContentView?
     @ObservationIgnored var isShown = false
     @ObservationIgnored private var isSized = false
     @ObservationIgnored private var waitingInput: [UInt8]?

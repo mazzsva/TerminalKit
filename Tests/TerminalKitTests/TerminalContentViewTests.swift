@@ -41,16 +41,16 @@ struct TerminalContentViewTests {
         #expect(session.terminal.columns == 1_000)
     }
 
-    @Test func givesTheSizeToAnotherViewWhenTheSizingViewIsTooSmall() {
+    @Test func letsTheLastViewThatJoinsAWindowSizeTheSession() {
         let session = TerminalSession(running: "exit")
         let first = TerminalContentView(session: session)
         let second = TerminalContentView(session: session)
+        let windows = [KeyWindow(contentView: first), KeyWindow(contentView: second)]
+        windows[1].isKey = false
+        windows[0].isKey = false
+        windows[0].isKey = true
         first.fit(to: cells(100.5, 30.5, in: first))
         second.fit(to: cells(60.5, 20.5, in: second))
-        #expect(session.terminal.columns == 100)
-        first.fit(to: .zero)
-        second.fit(to: cells(60.5, 20.5, in: second))
-        #expect(session.sizingView === second)
         #expect(session.terminal.columns == 60)
     }
 
