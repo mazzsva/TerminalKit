@@ -69,7 +69,7 @@ struct TerminalAppRecordingTests {
         var text: [String] = []
         var isContinuation = false
         for line in lines {
-            let string = String(line.filter { $0.width > 0 }.map { terminal.character(of: $0) })
+            let string = String(line.filter { $0.width > 0 && $0 != .padding }.map { terminal.character(of: $0) })
             if isContinuation, let last = text.popLast() {
                 text.append(last + string)
             } else {
