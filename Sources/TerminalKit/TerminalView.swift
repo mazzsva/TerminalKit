@@ -29,7 +29,5 @@ private struct Representable: NSViewRepresentable {
             view.terminalView.palette = context.environment.terminalPalette
         }
         view.terminalView.usesOptionAsMetaKey = context.environment.usesOptionAsMetaKey
-        let scrollIndicatorVisibility = context.environment.verticalScrollIndicatorVisibility
-        view.hasVerticalScroller = scrollIndicatorVisibility != .hidden && scrollIndicatorVisibility != .never
     }
 }
