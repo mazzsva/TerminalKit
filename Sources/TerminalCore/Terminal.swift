@@ -55,7 +55,6 @@ package struct Terminal: Sendable {
     package private(set) var bellCount = 0
     package internal(set) var currentDirectory: URL?
     package private(set) var mouseTracking = MouseTracking.off
-    package private(set) var synchronizedOutputCount = 0
     package var reportedColors: [RGB] = [] {
         didSet {
             if usesColorSchemeReports, Self.colorScheme(of: reportedColors) != Self.colorScheme(of: oldValue) {
@@ -74,20 +73,6 @@ package struct Terminal: Sendable {
         keyboardFlagStacks[isAlternateScreenActive ? 1 : 0].last == 1
     }
 
-    package var isSynchronizingOutput: Bool {
-        !synchronizedSnapshot.isEmpty
-    }
-
-    package var displayed: Terminal {
-        guard var snapshot = synchronizedSnapshot.first else {
-            return self
-        }
-        snapshot.scrollback = scrollback
-        snapshot.removedScrollbackCount = removedScrollbackCount
-        snapshot.graphemes = graphemes
-        snapshot.links = links
-        return snapshot
-    }
     private var usesAutowrap = true
     private var usesInsertMode = false
     private var usesColorSchemeReports = false
@@ -104,7 +89,6 @@ package struct Terminal: Sendable {
     private var tabStops: [Bool]
     private var replies: [UInt8] = []
     private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
-    private var synchronizedSnapshot: [Terminal] = []
     private var keyboardFlagStacks: [[Int]] = [[], []]
     private var titleStack: [String] = []
 
@@ -119,7 +103,6 @@ package struct Terminal: Sendable {
 
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
-        endSynchronizedOutput()
         if columns != self.columns {
             guard var normalScreen else {
                 let (lines, anchors) = reflow(
@@ -322,10 +305,6 @@ package struct Terminal: Sendable {
             if case .print = action {} else { lastCharacter = nil }
         }
         return replies
-    }
-
-    package mutating func endSynchronizedOutput() {
-        synchronizedSnapshot = []
     }
 
     package mutating func clearToStart() {
@@ -650,7 +629,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func compactLinks() {
-        endSynchronizedOutput()
         var used = Array(repeating: false, count: links.count)
         Links.markLinks(in: scrollback, into: &used)
         Links.markLinks(in: screen, into: &used)
@@ -672,7 +650,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func compactGraphemes() {
-        endSynchronizedOutput()
         var used = Array(repeating: false, count: graphemes.count)
         Graphemes.markIndices(in: scrollback, into: &used)
         Graphemes.markIndices(in: screen, into: &used)
@@ -864,7 +841,6 @@ package struct Terminal: Sendable {
         terminal.title = title
         terminal.bellCount = bellCount
         terminal.currentDirectory = currentDirectory
-        terminal.synchronizedOutputCount = synchronizedOutputCount
         terminal.reportedColors = reportedColors
         terminal.graphemes = graphemes
         terminal.links = links
@@ -974,15 +950,6 @@ package struct Terminal: Sendable {
         case (1049, false):
             exitAlternateScreen()
             restoreCursor()
-        case (2026, true) where synchronizedSnapshot.isEmpty:
-            var snapshot = self
-            snapshot.scrollback = []
-            snapshot.graphemes = Graphemes()
-            snapshot.links = Links()
-            synchronizedSnapshot = [snapshot]
-            synchronizedOutputCount += 1
-        case (2026, false):
-            endSynchronizedOutput()
         default:
             break
         }
@@ -1051,7 +1018,6 @@ package struct Terminal: Sendable {
         case 1004: usesFocusReporting
         case 1006: usesSGRMouseEncoding
         case 2004: usesBracketedPaste
-        case 2026: isSynchronizingOutput
         case 2031: usesColorSchemeReports
         default: nil
         }

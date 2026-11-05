@@ -21,7 +21,7 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1", "PATH": "/bin",
+                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "PATH": "/bin",
             ])
     }
 
@@ -32,7 +32,6 @@ struct TerminalSessionTests {
         #expect(environment["COLORTERM"] == "truecolor")
         #expect(
             environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == inherited["CLAUDE_CODE_FORCE_STRIKETHROUGH"] ?? "1")
-        #expect(environment["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] == inherited["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] ?? "1")
         #expect(environment["PATH"] == inherited["PATH"])
         #expect(environment["TERM_PROGRAM"] == nil)
         #expect(environment["TERM_SESSION_ID"] == nil)
@@ -56,10 +55,11 @@ struct TerminalSessionTests {
         #expect(environment["LANG"] == "en_US.UTF-8")
     }
 
-    @Test(arguments: ["CLAUDE_CODE_FORCE_STRIKETHROUGH", "CLAUDE_CODE_FORCE_SYNC_OUTPUT"])
-    func keepsTheClaudeCodeSettingOfTheUser(name: String) {
-        let environment = TerminalSession.Configuration.loginShell(inheriting: [name: "0"]).environment
-        #expect(environment[name] == "0")
+    @Test func keepsTheClaudeCodeSettingOfTheUser() {
+        let environment = TerminalSession.Configuration
+            .loginShell(inheriting: ["CLAUDE_CODE_FORCE_STRIKETHROUGH": "0"])
+            .environment
+        #expect(environment["CLAUDE_CODE_FORCE_STRIKETHROUGH"] == "0")
     }
 
     @Test func removesTheIdentityOfTheParentTerminal() {
@@ -85,7 +85,7 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1",
+                "CLAUDE_CODE_FORCE_STRIKETHROUGH": "1",
                 "SSH_AUTH_SOCK": "/tmp/agent", "GIT_ASKPASS": "/tmp/askpass",
                 "VSCODE_GIT_IPC_HANDLE": "/tmp/vscode-git.sock",
             ])
@@ -153,6 +153,17 @@ struct TerminalSessionTests {
         try session.start()
         await session.waitForExit()
         #expect(session.title == "Title")
+    }
+
+    @Test func drawsSynchronizedOutputAtOnce() async throws {
+        let session = TerminalSession(running: "stty -echo; printf 'a\\033[?2026hb\\033]0;Title\\007'; read x")
+        try session.start()
+        for await title in Observations({ session.title }) where title == "Title" {
+            break
+        }
+        #expect(session.lines.first == "ab")
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
     }
 
     @Test func showsTheCurrentDirectoryOfTheProcess() async throws {

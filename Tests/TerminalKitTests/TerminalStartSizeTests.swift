@@ -43,7 +43,7 @@ struct TerminalStartSizeTests {
         withObservationTracking {
             _ = session.state
         } onChange: {
-            columns.withLock { $0 = MainActor.assumeIsolated { session.liveTerminal.columns } }
+            columns.withLock { $0 = MainActor.assumeIsolated { session.terminal.columns } }
         }
         scrollView.layoutSubtreeIfNeeded()
         #expect(session.state == .running)

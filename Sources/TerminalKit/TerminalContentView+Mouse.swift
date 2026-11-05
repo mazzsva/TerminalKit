@@ -65,7 +65,7 @@ extension TerminalContentView {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        let terminal = session.liveTerminal
+        let terminal = session.terminal
         guard terminal.mouseTracking != .off || terminal.isAlternateScreenActive else {
             super.scrollWheel(with: event)
             return
@@ -95,7 +95,7 @@ extension TerminalContentView {
     }
 
     func reportsMouse(for event: NSEvent) -> Bool {
-        session.liveTerminal.mouseTracking != .off && !event.modifierFlags.contains(.shift)
+        session.terminal.mouseTracking != .off && !event.modifierFlags.contains(.shift)
     }
 
     func reportMouse(_ event: NSEvent, button: Int, isRelease: Bool = false) {
@@ -104,7 +104,7 @@ extension TerminalContentView {
             .reduce(0) { event.modifierFlags.contains($1.0) ? $0 | $1.1 : $0 }
         lastMousePosition = position
         session.send(
-            session.liveTerminal.mouseReport(
+            session.terminal.mouseReport(
                 button: button | modifiers,
                 column: position.column,
                 row: position.row,
@@ -114,7 +114,7 @@ extension TerminalContentView {
     }
 
     func reportDrag(_ event: NSEvent, button: Int) {
-        if session.liveTerminal.mouseTracking != .clicks, mousePosition(of: event) != lastMousePosition {
+        if session.terminal.mouseTracking != .clicks, mousePosition(of: event) != lastMousePosition {
             reportMouse(event, button: button)
         }
     }
@@ -124,7 +124,7 @@ extension TerminalContentView {
         let location = convert(event.locationInWindow, from: nil)
         let row = Int((location.y - Self.padding) / cellSize.height) - terminal.scrollback.count
         let column = Int((location.x - Self.padding) / cellSize.width)
-        let limit = session.liveTerminal.usesSGRMouseEncoding ? Int.max : 222
+        let limit = session.terminal.usesSGRMouseEncoding ? Int.max : 222
         return Terminal.Position(
             row: min(max(row, 0), terminal.rows - 1, limit), column: min(max(column, 0), terminal.columns - 1, limit))
     }

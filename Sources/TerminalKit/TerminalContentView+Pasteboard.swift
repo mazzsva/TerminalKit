@@ -64,7 +64,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
 
     func copySelection(to pasteboard: NSPasteboard) {
         guard let selectedText else {
-            if markedText.isEmpty, session.liveTerminal.usesDisambiguatedKeys {
+            if markedText.isEmpty, session.terminal.usesDisambiguatedKeys {
                 scrollToBottom()
                 session.send("\u{1B}[99;9u")
             }
@@ -110,7 +110,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     }
 
     func canPasteImage(from pasteboard: NSPasteboard) -> Bool {
-        session.liveTerminal.usesBracketedPaste && pasteboard.availableType(from: [.tiff, .png]) != nil
+        session.terminal.usesBracketedPaste && pasteboard.availableType(from: [.tiff, .png]) != nil
     }
 
     func paste(text: String) {
@@ -143,7 +143,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(copy(_:)):
-            hasSelectedText || markedText.isEmpty && session.liveTerminal.usesDisambiguatedKeys
+            hasSelectedText || markedText.isEmpty && session.terminal.usesDisambiguatedKeys
         case #selector(paste(_:)):
             canPaste(from: .general)
         case #selector(performTextFinderAction(_:)):

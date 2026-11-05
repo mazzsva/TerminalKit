@@ -80,20 +80,6 @@ struct TerminalSessionControlTests {
         #expect(await session.linesAfterExit().contains { $0.hasPrefix("c3  a9  e2  82") })
     }
 
-    @Test func pastesInTheModeOfTheLiveTerminal() async throws {
-        let session = TerminalSession(
-            running: "stty raw -echo; printf '\\033[?2026h\\033[?2004hready'; dd bs=1 count=15 2>/dev/null | od -An -c"
-        )
-        try session.start()
-        for await isEnabled in Observations({ session.liveTerminal.usesBracketedPaste }) where isEnabled {
-            break
-        }
-        #expect(!session.terminal.usesBracketedPaste)
-        session.paste("a\nb\u{1B}")
-        let output = await session.linesAfterExit().joined(separator: " ")
-        #expect(output.contains("033   [   2   0   0   ~   a  \\r   b 033   [   2   0   1   ~"))
-    }
-
     @Test func pastesWithoutBrackets() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; dd bs=1 count=5 2>/dev/null | od -An -c")
         try session.start()

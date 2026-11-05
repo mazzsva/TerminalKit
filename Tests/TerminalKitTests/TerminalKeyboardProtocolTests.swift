@@ -376,34 +376,6 @@ struct TerminalKeyboardProtocolTests {
         #expect(await session.linesAfterExit().contains("c2  b4  1b  5b  39  39  3b  39  75  78"))
     }
 
-    @Test func sendsShiftReturnInTheLiveKeyboardMode() async throws {
-        let session = TerminalSession(
-            running: "stty raw -echo; printf '\\033[?2026h\\033[>1u'; dd bs=1 count=7 2>/dev/null | od -An -tx1")
-        session.synchronizedOutputTimeout = .seconds(30)
-        let view = TerminalContentView(session: session)
-        try session.start()
-        for await isEnabled in Observations({ session.liveTerminal.usesDisambiguatedKeys }) where isEnabled {
-            break
-        }
-        #expect(!session.terminal.usesDisambiguatedKeys)
-        view.keyDown(with: try keyDown("\r", modifierFlags: .shift))
-        #expect(await session.linesAfterExit().contains("1b  5b  31  33  3b  32  75"))
-    }
-
-    @Test func sendsShiftReturnInTheLiveModifyOtherKeysMode() async throws {
-        let session = TerminalSession(
-            running: "stty raw -echo; printf '\\033[?2026h\\033[>4;2m'; dd bs=1 count=10 2>/dev/null | od -An -tx1")
-        session.synchronizedOutputTimeout = .seconds(30)
-        let view = TerminalContentView(session: session)
-        try session.start()
-        for await level in Observations({ session.liveTerminal.modifyOtherKeys }) where level == 2 {
-            break
-        }
-        #expect(session.terminal.modifyOtherKeys == 0)
-        view.keyDown(with: try keyDown("\r", modifierFlags: .shift))
-        #expect(await session.linesAfterExit().contains("1b  5b  32  37  3b  32  3b  31  33  7e"))
-    }
-
     @Test func leavesShiftReturnToTheMarkedText() async throws {
         let session = TerminalSession(
             running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 4 | od -An -tx1")
