@@ -5,15 +5,15 @@ import Testing
 struct StyleTests {
     @Test func setsTheTextStyle() {
         var style = Terminal.Style()
-        style.apply([1, 2, 3, 4, 7, 8, 9])
+        style.apply([1, 2, 3, 4, 7, 8])
         #expect(style.isBold && style.isFaint && style.isItalic && style.isUnderlined)
-        #expect(style.isInverse && style.isHidden && style.isStrikethrough)
+        #expect(style.isInverse && style.isHidden)
     }
 
     @Test func clearsEachTextStyle() {
         var style = Terminal.Style()
-        style.apply([1, 2, 3, 4, 7, 8, 9])
-        style.apply([22, 23, 24, 27, 28, 29])
+        style.apply([1, 2, 3, 4, 7, 8])
+        style.apply([22, 23, 24, 27, 28])
         #expect(style == Terminal.Style())
     }
 
@@ -32,6 +32,11 @@ struct StyleTests {
         style.apply([1, 0, 4])
         #expect(!style.isBold)
         #expect(style.isUnderlined)
+    }
+
+    @Test func ignoresStrikethrough() {
+        #expect(style("9") == Terminal.Style())
+        #expect(style("1;9;29") == Terminal.Style(isBold: true))
     }
 
     @Test func treatsDoubleUnderlineAsUnderline() {
@@ -191,8 +196,8 @@ struct StyleTests {
 
     @Test func ignoresUnknownSubparameters() {
         #expect(
-            style("38:9:1;3;48:2:1:2;9;1:31;38:5:1:2;48:5:1:2;48:5:300;4:3:1;4:6")
-                == Terminal.Style(isBold: true, isItalic: true, isStrikethrough: true))
+            style("38:9:1;3;48:2:1:2;7;1:31;38:5:1:2;48:5:1:2;48:5:300;4:3:1;4:6")
+                == Terminal.Style(isBold: true, isItalic: true, isInverse: true))
     }
 
     @Test func appliesOnlyTheFirst32Parameters() {

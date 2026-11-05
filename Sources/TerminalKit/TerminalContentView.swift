@@ -457,7 +457,7 @@ final class TerminalContentView: NSView {
                     }
                 }
                 lazy var ink = style.isHidden || style.isFaint ? 0 : Self.pixel(foreground)
-                var drawsText = selected != nil || style.isUnderlined || style.isStrikethrough
+                var drawsText = selected != nil || style.isUnderlined
                 for column in columns {
                     let character = graphemes.character(of: line[column])
                     let isBlock = character != " " && "▀▄█".contains(character) && ink >> 24 == 255
@@ -665,16 +665,6 @@ final class TerminalContentView: NSView {
         flush()
         let thickness = max(font.underlineThickness, 1)
         let spans = rects(row: row, columns: columns, order: order)
-        if style.isStrikethrough {
-            context.fill(
-                spans.map {
-                    backingAlignedRect(
-                        CGRect(
-                            x: $0.minX, y: baseline - font.xHeight / 2 - thickness / 2, width: $0.width,
-                            height: thickness),
-                        options: .alignAllEdgesNearest)
-                })
-        }
         if style.isUnderlined {
             if let underline {
                 context.setFillColor((style.isFaint ? underline.withAlphaComponent(0.5) : underline).cgColor)

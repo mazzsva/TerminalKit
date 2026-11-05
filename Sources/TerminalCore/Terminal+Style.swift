@@ -20,8 +20,7 @@ extension Terminal {
             isItalic: Bool = false,
             isUnderlined: Bool = false,
             isInverse: Bool = false,
-            isHidden: Bool = false,
-            isStrikethrough: Bool = false
+            isHidden: Bool = false
         ) {
             self.foreground = foreground
             self.background = background
@@ -32,7 +31,6 @@ extension Terminal {
             self.isUnderlined = isUnderlined
             self.isInverse = isInverse
             self.isHidden = isHidden
-            self.isStrikethrough = isStrikethrough
         }
 
         package var isBold: Bool {
@@ -65,11 +63,6 @@ extension Terminal {
             set { setFlag(5, newValue) }
         }
 
-        package var isStrikethrough: Bool {
-            get { flag(6) }
-            set { setFlag(6, newValue) }
-        }
-
         private func flag(_ bit: UInt8) -> Bool {
             flags & 1 << bit != 0
         }
@@ -97,8 +90,6 @@ extension Terminal {
                     isInverse = true
                 case 8:
                     isHidden = true
-                case 9:
-                    isStrikethrough = true
                 case 22:
                     isBold = false
                     isFaint = false
@@ -110,8 +101,6 @@ extension Terminal {
                     isInverse = false
                 case 28:
                     isHidden = false
-                case 29:
-                    isStrikethrough = false
                 case 30 ... 37:
                     foreground = .indexed(UInt8(parameter - 30))
                 case 38:
