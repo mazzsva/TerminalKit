@@ -54,7 +54,7 @@ extension TerminalSession.Configuration {
     ) -> [String: String] {
         var environment = environment
         for name in [
-            "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID", "TMUX", "TMUX_PANE", "STY", "LC_TERMINAL",
+            "TERM_SESSION_ID", "TMUX", "TMUX_PANE", "STY", "LC_TERMINAL",
             "LC_TERMINAL_VERSION", "ITERM_SESSION_ID", "ITERM_PROFILE", "KITTY_WINDOW_ID", "KITTY_PID", "COLORFGBG",
             "COLUMNS", "LINES", "TERMINFO", "CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION", "CURSOR_TRACE_ID",
             "TERMINAL_EMULATOR", "ALACRITTY_LOG", "ALACRITTY_WINDOW_ID", "WEZTERM_PANE", "WT_SESSION", "VTE_VERSION",
@@ -65,6 +65,8 @@ extension TerminalSession.Configuration {
         }
         environment["TERM"] = "xterm-256color"
         environment["COLORTERM"] = "truecolor"
+        environment["TERM_PROGRAM"] = "Apple_Terminal"
+        environment["TERM_PROGRAM_VERSION"] = "488"
         if environment["LANG"] == nil {
             let name = locale.identifier + ".UTF-8"
             environment["LANG"] =

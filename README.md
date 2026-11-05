@@ -48,6 +48,8 @@ Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent befor
 
 Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
 
+Claude Code treats the session as Terminal.app, so `/terminal-setup` changes the user's Terminal.app profile, not the host. For Option-Return as a new line, turn on `terminalOptionAsMetaKey(_:)`.
+
 macOS gives microphone access to the host app, not to the program in the terminal. To use Claude Code voice dictation, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement.
 
 ## Engineering decisions
@@ -64,4 +66,4 @@ macOS gives microphone access to the host app, not to the program in the termina
 
 **Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts.
 
-**Never touches the shell.** There are no shell integration scripts and no changes to startup files. The host gets the user's own login shell, with the same `PATH` as in Terminal.
+**Never touches the shell.** There are no shell integration scripts and no changes to startup files. The host gets the user's own login shell, with the same `PATH` as in Terminal. Programs see `TERM_PROGRAM=Apple_Terminal`, so they act as in Terminal, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file.

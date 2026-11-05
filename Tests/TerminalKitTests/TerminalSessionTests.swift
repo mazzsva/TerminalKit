@@ -21,7 +21,7 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "PATH": "/bin",
+                "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "488", "PATH": "/bin",
             ])
     }
 
@@ -31,8 +31,34 @@ struct TerminalSessionTests {
         #expect(environment["TERM"] == "xterm-256color")
         #expect(environment["COLORTERM"] == "truecolor")
         #expect(environment["PATH"] == inherited["PATH"])
-        #expect(environment["TERM_PROGRAM"] == nil)
+        #expect(environment["TERM_PROGRAM"] == "Apple_Terminal")
+        #expect(environment["TERM_PROGRAM_VERSION"] == "488")
         #expect(environment["TERM_SESSION_ID"] == nil)
+    }
+
+    @Test func keepsTheHistoryFileWithTheTerminalName() async throws {
+        let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/bin/zsh"),
+                arguments: ["-l", "-i"],
+                environment: TerminalSession.Configuration.terminalEnvironment(
+                    inheriting: ["HOME": home.path(percentEncoded: false), "PATH": "/usr/bin:/bin"]),
+                currentDirectoryURL: home
+            ))
+        try session.start()
+        for await url in Observations({ session.currentDirectoryURL }) where url != nil {
+            break
+        }
+        session.send("[ \"$HISTFILE\" = \"$HOME/.zsh_history\" ] && echo sa\"\"me\r")
+        await session.waitForText("same")
+        session.send("exit\r")
+        let lines = await session.linesAfterExit()
+        #expect(!lines.contains { $0.contains("Saving session") })
+        let sessions = home.appending(path: ".zsh_sessions").path(percentEncoded: false)
+        #expect(!FileManager.default.fileExists(atPath: sessions))
     }
 
     @Test func keepsTheLanguageOfTheUser() {
@@ -76,6 +102,7 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
+                "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "488",
                 "SSH_AUTH_SOCK": "/tmp/agent", "GIT_ASKPASS": "/tmp/askpass",
                 "VSCODE_GIT_IPC_HANDLE": "/tmp/vscode-git.sock",
             ])
