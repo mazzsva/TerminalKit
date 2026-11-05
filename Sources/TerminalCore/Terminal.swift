@@ -35,7 +35,6 @@ package struct Terminal: Sendable {
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
     private static let maximumKeyboardFlagsDepth = 8
-    private static let maximumTitleStackDepth = 10
 
     package private(set) var columns: Int
     package private(set) var rows: Int
@@ -83,7 +82,6 @@ package struct Terminal: Sendable {
     private var replies: [UInt8] = []
     private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
     private var keyboardFlagStacks: [[Int]] = [[], []]
-    private var titleStack: [String] = []
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -414,12 +412,6 @@ package struct Terminal: Sendable {
             saveCursor()
         case "u" where sequence.parameters.isEmpty:
             restoreCursor()
-        case "t" where sequence.parameter(at: 1, default: 2) == 2:
-            if count == 22 {
-                titleStack = Array((titleStack + [title]).suffix(Self.maximumTitleStackDepth))
-            } else if count == 23, let savedTitle = titleStack.popLast() {
-                title = savedTitle
-            }
         default:
             break
         }
