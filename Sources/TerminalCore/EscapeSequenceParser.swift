@@ -28,14 +28,15 @@ struct EscapeSequenceParser: Sendable {
         case controlSequence
         case controlSequenceIntermediate
         case ignoredControlSequence
+        case operatingSystemCommandNumber
         case operatingSystemCommand
-        case ignoredString
+        case operatingSystemCommandEscape
     }
 
     private static let maximumIntermediates = 2
     private static let maximumParameters = 32
     private static let maximumParameterValue = Int(Int32.max)
-    private static let maximumStringLength = 4_096
+    private static let maximumStringLength = 1_000_000
 
     private var state = State.ground
     private var intermediates = ""
@@ -48,17 +49,15 @@ struct EscapeSequenceParser: Sendable {
     mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
         case "\u{1B}":
-            let action = state == .operatingSystemCommand ? finishString() : nil
-            enterEscape()
-            return action
-        case "\u{7}" where state == .operatingSystemCommand:
-            return finishString()
-        case "\u{18}" where isInString, "\u{1A}" where isInString:
-            state = .ground
-            return .execute(scalar)
-        case "\u{18}", "\u{1A}":
+            if isInString {
+                state = .operatingSystemCommandEscape
+            } else {
+                enterEscape()
+            }
             return nil
-        case "\u{0}" ... "\u{1F}" where isInString:
+        case "\u{7}" where isInString, "\u{1A}" where isInString:
+            return finishString()
+        case "\u{18}", "\u{1A}":
             return nil
         case "\t":
             state = .ground
@@ -87,18 +86,20 @@ struct EscapeSequenceParser: Sendable {
             return controlSequenceIntermediate(scalar)
         case .ignoredControlSequence:
             return ignoredControlSequence(scalar)
+        case .operatingSystemCommandNumber:
+            return operatingSystemCommandNumber(scalar)
         case .operatingSystemCommand:
             if string.count <= Self.maximumStringLength {
                 string.append(scalar)
             }
             return nil
-        case .ignoredString:
-            return nil
+        case .operatingSystemCommandEscape:
+            return operatingSystemCommandEscape(scalar)
         }
     }
 
     private var isInString: Bool {
-        state == .operatingSystemCommand || state == .ignoredString
+        state == .operatingSystemCommandNumber || state == .operatingSystemCommand
     }
 
     private mutating func escape(_ scalar: Unicode.Scalar) -> Action? {
@@ -109,10 +110,8 @@ struct EscapeSequenceParser: Sendable {
         case "[":
             state = .controlSequence
         case "]":
-            state = .operatingSystemCommand
-        case "P", "X", "^", "_":
-            state = .ignoredString
-        case " " ... "/":
+            state = .operatingSystemCommandNumber
+        case " " ... "/", "P", "X", "^", "_":
             state = .ground
         case "0" ... "~":
             state = .ground
@@ -204,6 +203,36 @@ struct EscapeSequenceParser: Sendable {
         return nil
     }
 
+    private mutating func operatingSystemCommandNumber(_ scalar: Unicode.Scalar) -> Action? {
+        switch scalar {
+        case "0" ... "9":
+            string.append(scalar)
+        case ";":
+            string.append(scalar)
+            state = .operatingSystemCommand
+        case ":", "@" ... "~":
+            state = .ground
+        case "\u{80}"...:
+            return .print(scalar)
+        default:
+            break
+        }
+        return nil
+    }
+
+    private mutating func operatingSystemCommandEscape(_ scalar: Unicode.Scalar) -> Action? {
+        switch scalar {
+        case "\\":
+            return finishString()
+        case "\u{80}"...:
+            enterEscape()
+            return .print(scalar)
+        default:
+            state = .ground
+            return nil
+        }
+    }
+
     private mutating func enterEscape() {
         state = .escape
         intermediates = ""
@@ -229,6 +258,7 @@ struct EscapeSequenceParser: Sendable {
 
     private mutating func finishString() -> Action? {
         state = .ground
+        defer { string = [] }
         guard string.count <= Self.maximumStringLength else {
             return nil
         }

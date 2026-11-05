@@ -35,12 +35,9 @@ struct CurrentDirectoryTests {
         #expect(terminal.currentDirectory == nil)
     }
 
-    @Test func ignoresACurrentDirectoryOverTheLengthLimit() {
-        let path = "/" + String(repeating: "a", count: 4_086)
+    @Test func keepsALongCurrentDirectory() {
+        let path = "/" + String(repeating: "a", count: 100_000)
         var terminal = Terminal(columns: 20, rows: 5)
-        terminal.receive("\u{1B}]7;file:///a\u{7}\u{1B}]7;file://\(path)b\u{7}c")
-        #expect(terminal.currentDirectory == URL(filePath: "/a"))
-        #expect(terminal.character(of: terminal.screen[0][0]) == "c")
         terminal.receive("\u{1B}]7;file://\(path)\u{7}")
         #expect(terminal.currentDirectory == URL(filePath: path))
     }

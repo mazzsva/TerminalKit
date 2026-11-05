@@ -48,7 +48,7 @@ struct TerminalColorQueryTests {
     @Test func answersTheColorQueriesInTheCurrentAppearance() async throws {
         let session = TerminalSession(
             running:
-                "stty raw -echo; printf a; head -c 1 >/dev/null; printf '\\033]11;?\\033[c'; head -c 32 | tr '\\033' E"
+                "stty raw -echo; printf a; head -c 1 >/dev/null; printf '\\033]11;?\\a\\033[c'; head -c 32 | tr '\\033' E"
         )
         let view = TerminalContentView(session: session)
         view.appearance = NSAppearance(named: .aqua)
@@ -64,7 +64,7 @@ struct TerminalColorQueryTests {
     @Test func keepsTheColorsAfterTheSizingViewIsGone() async throws {
         let session = TerminalSession(
             running:
-                "stty raw -echo; printf a; head -c 1 >/dev/null; printf '\\033]11;?\\033[c'; head -c 32 | tr '\\033' E"
+                "stty raw -echo; printf a; head -c 1 >/dev/null; printf '\\033]11;?\\a\\033[c'; head -c 32 | tr '\\033' E"
         )
         let view = TerminalContentView(session: session)
         view.appearance = NSAppearance(named: .darkAqua)
@@ -106,7 +106,9 @@ struct TerminalColorQueryTests {
     }
 
     @Test func ignoresTheColorQueriesWithoutAView() async throws {
-        let session = TerminalSession(running: "stty raw -echo; printf '\\033]11;?\\033[c'; head -c 7 | tr '\\033' E")
+        let session = TerminalSession(
+            running: "stty raw -echo; printf '\\033]11;?\\a\\033[c'; head -c 7 | tr '\\033' E"
+        )
         try session.start()
         await session.waitForExit()
         #expect(session.lines.contains("E[?1;2c"))

@@ -749,19 +749,20 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ command: String) {
-        let parts = command.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
-        guard parts.count == 2 else {
+        guard let separator = command.unicodeScalars.firstIndex(of: ";") else {
             return
         }
-        switch parts[0] {
-        case "0", "2":
-            title = String(parts[1])
-        case "7":
-            setCurrentDirectory(parts[1])
-        case "10":
-            reportColors(parts[1], from: 0)
-        case "11":
-            reportColors(parts[1], from: 1)
+        let text = command[command.unicodeScalars.index(after: separator)...]
+        let number = Int(command[..<separator]).flatMap { $0 <= Int32.max ? $0 : nil } ?? 0
+        switch number {
+        case 0, 2:
+            title = String(text)
+        case 7:
+            setCurrentDirectory(text)
+        case 10:
+            reportColors(text, from: 0)
+        case 11:
+            reportColors(text, from: 1)
         default:
             break
         }
