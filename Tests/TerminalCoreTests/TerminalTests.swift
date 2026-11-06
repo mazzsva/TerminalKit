@@ -703,16 +703,44 @@ struct TerminalTests {
         #expect(terminal.cursor == position)
     }
 
-    @Test(arguments: [
-        ("A", 3, 1), ("A", 1, 1), ("A", 5, 1), ("A", 0, 0),
-        ("B", 2, 4), ("B", 4, 4), ("B", 0, 4), ("B", 5, 5),
-        ("F", 3, 1), ("F", 5, 1), ("F", 0, 0),
-        ("E", 2, 4), ("E", 0, 4), ("E", 5, 5),
-    ])
-    func stopsTheCursorAtTheMarginsOfTheScrollRegion(final: String, row: Int, stop: Int) {
+    @Test(arguments: [("A", 3, 0), ("A", 5, 0), ("B", 2, 5), ("B", 0, 5), ("F", 3, 0), ("E", 2, 5)])
+    func ignoresTheMarginsWithoutOriginMode(final: String, row: Int, stop: Int) {
         var terminal = Terminal(columns: 10, rows: 6)
         terminal.receive("\u{1B}[2;5r\u{1B}[\(row + 1);3H\u{1B}[10\(final)")
         #expect(terminal.cursor.row == stop)
+    }
+
+    @Test(arguments: [("A", 1), ("B", 4), ("F", 1), ("E", 4)])
+    func stopsTheCursorAtTheMarginsInOriginMode(final: String, stop: Int) {
+        var terminal = Terminal(columns: 10, rows: 6)
+        terminal.receive("\u{1B}[2;5r\u{1B}[?6h\u{1B}[2;3H\u{1B}[10\(final)")
+        #expect(terminal.cursor.row == stop)
+    }
+
+    @Test func countsRowsFromTheTopMarginInOriginMode() {
+        var terminal = Terminal(columns: 10, rows: 6)
+        #expect(terminal.receive("\u{1B}[2;5r\u{1B}[?6h\u{1B}[2;3H\u{1B}[6n") == "\u{1B}[2;3R")
+        #expect(terminal.cursor == Terminal.Position(row: 2, column: 2))
+        terminal.receive("\u{1B}[99d")
+        #expect(terminal.cursor.row == 4)
+    }
+
+    @Test func keepsTheCursorWhenOriginModeEnds() {
+        var terminal = Terminal(columns: 10, rows: 6)
+        terminal.receive("\u{1B}[2;5r\u{1B}[?6h\u{1B}[2;3H\u{1B}[?6l")
+        #expect(terminal.cursor == Terminal.Position(row: 2, column: 2))
+    }
+
+    @Test func restoresTheRowFromTheNewTopMarginInOriginMode() {
+        var terminal = Terminal(columns: 10, rows: 8)
+        terminal.receive("\u{1B}[5;8r\u{1B}[?6h\u{1B}[2;1H\u{1B}7\u{1B}[?6l\u{1B}[1;3r\u{1B}8")
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
+    }
+
+    @Test func savesOriginModeWithTheCursor() {
+        var terminal = Terminal(columns: 10, rows: 6)
+        terminal.receive("\u{1B}[2;5r\u{1B}[?6h\u{1B}7\u{1B}[?6l\u{1B}8\u{1B}[H")
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
     }
 
     @Test(arguments: ["a", "e"])
@@ -1269,10 +1297,10 @@ struct TerminalTests {
         #expect(lines(terminal) == ["a", "x", "b"])
     }
 
-    @Test func staysOnTheFirstLineAboveTheScrollRegion() {
+    @Test func movesToTheLastLineFromTheFirstLineAboveTheScrollRegion() {
         var terminal = Terminal(columns: 1, rows: 3)
         terminal.receive("a\u{1B}[2;3r\u{1B}[1H\u{1B}Mx")
-        #expect(lines(terminal) == ["x", " ", " "])
+        #expect(lines(terminal) == ["a", " ", "x"])
     }
 
     @Test func insertsLines() {
@@ -1302,10 +1330,11 @@ struct TerminalTests {
         #expect(lines(terminal) == ["a", "b", "c", "d"])
     }
 
-    @Test func movesToTheFirstColumnWhenItInsertsLines() {
-        var terminal = Terminal(columns: 3, rows: 2)
-        terminal.receive("abc\u{1B}[Lx")
-        #expect(lines(terminal) == ["x  ", "abc"])
+    @Test(arguments: ["L", "M"])
+    func keepsTheColumnWhenItChangesLines(final: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\u{1B}[\(final)")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
     @Test func insertsCharacters() {

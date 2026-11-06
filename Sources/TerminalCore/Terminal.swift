@@ -28,6 +28,7 @@ package struct Terminal: Sendable {
         var style = Style()
         var isWrapPending = false
         var usesLineDrawing = false
+        var usesOriginMode = false
     }
 
     private static let tabWidth = 8
@@ -66,6 +67,7 @@ package struct Terminal: Sendable {
     }
 
     private var usesAutowrap = true
+    private var usesOriginMode = false
     private var usesInsertMode = false
 
     private var decoder = UTF8Decoder()
@@ -363,9 +365,9 @@ package struct Terminal: Sendable {
         case "g":
             clearTabStops(sequence.parameter(at: 0, default: 0))
         case "H", "f":
-            moveCursor(row: count - 1, column: sequence.parameter(at: 1, default: 1) - 1)
+            moveCursor(row: min(topLimit + count - 1, bottomLimit), column: sequence.parameter(at: 1, default: 1) - 1)
         case "d":
-            moveCursor(row: count - 1, column: cursor.column)
+            moveCursor(row: min(topLimit + count - 1, bottomLimit), column: cursor.column)
         case "J":
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
@@ -641,7 +643,6 @@ package struct Terminal: Sendable {
             return
         }
         scrollDown(count, in: cursor.row ..< scrollRegion.upperBound)
-        carriageReturn()
     }
 
     private mutating func deleteLines(_ count: Int) {
@@ -650,7 +651,6 @@ package struct Terminal: Sendable {
         }
         scrollUp(count, in: cursor.row ..< scrollRegion.upperBound)
         unwrapLine(before: cursor.row)
-        carriageReturn()
     }
 
     private mutating func setScrollRegion(top: Int, bottom: Int) {
@@ -658,7 +658,7 @@ package struct Terminal: Sendable {
             return
         }
         scrollRegion = top ..< bottom
-        moveCursor(row: 0, column: 0)
+        moveCursor(row: topLimit, column: 0)
     }
 
     private mutating func keepInScrollback(_ lines: ArraySlice<Line>) {
@@ -723,17 +723,17 @@ package struct Terminal: Sendable {
         isAfterPrint = false
         if cursor.row == scrollRegion.lowerBound {
             scrollDown(1, in: scrollRegion)
-        } else if cursor.row > 0 {
-            cursor.row -= 1
+        } else {
+            cursor.row = cursor.row == 0 ? rows - 1 : cursor.row - 1
         }
     }
 
     private var topLimit: Int {
-        cursor.row >= scrollRegion.lowerBound ? scrollRegion.lowerBound : 0
+        usesOriginMode ? scrollRegion.lowerBound : 0
     }
 
     private var bottomLimit: Int {
-        cursor.row < scrollRegion.upperBound ? scrollRegion.upperBound - 1 : rows - 1
+        usesOriginMode ? scrollRegion.upperBound - 1 : rows - 1
     }
 
     private mutating func carriageReturn() {
@@ -788,6 +788,7 @@ package struct Terminal: Sendable {
         usesInsertMode = false
         usesApplicationCursorKeys = false
         usesAutowrap = true
+        usesOriginMode = false
         isCursorVisible = true
         cursorShape = .block
         scrollRegion = 0 ..< rows
@@ -846,6 +847,11 @@ package struct Terminal: Sendable {
             usesApplicationCursorKeys = isEnabled
         case (5, _):
             usesReverseVideo = isEnabled
+        case (6, _):
+            usesOriginMode = isEnabled
+            if isEnabled {
+                moveCursor(row: topLimit, column: 0)
+            }
         case (7, _):
             usesAutowrap = isEnabled
         case (25, _):
@@ -933,7 +939,7 @@ package struct Terminal: Sendable {
         case 5:
             replies += "\u{1B}[0n".utf8
         case 6:
-            replies += "\u{1B}[\(cursor.row + 1);\(cursor.column + 1)R".utf8
+            replies += "\u{1B}[\(cursor.row - topLimit + 1);\(cursor.column + 1)R".utf8
         default:
             break
         }
@@ -950,15 +956,17 @@ package struct Terminal: Sendable {
 
     private mutating func saveCursor() {
         savedCursor = SavedCursor(
-            position: cursor,
+            position: Position(row: cursor.row - topLimit, column: cursor.column),
             style: style,
             isWrapPending: isWrapPending,
-            usesLineDrawing: usesLineDrawing
+            usesLineDrawing: usesLineDrawing,
+            usesOriginMode: usesOriginMode
         )
     }
 
     private mutating func restoreCursor() {
-        moveCursor(row: savedCursor.position.row, column: savedCursor.position.column)
+        usesOriginMode = savedCursor.usesOriginMode
+        moveCursor(row: min(topLimit + savedCursor.position.row, bottomLimit), column: savedCursor.position.column)
         style = savedCursor.style
         isWrapPending = savedCursor.isWrapPending
         usesLineDrawing = savedCursor.usesLineDrawing
