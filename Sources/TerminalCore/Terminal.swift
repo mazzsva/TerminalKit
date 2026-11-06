@@ -36,6 +36,7 @@ package struct Terminal: Sendable {
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
     private static let maximumKeyboardFlagsDepth = 8
+    private static let maximumRepeatCount = 1_000_000
 
     package private(set) var columns: Int
     package private(set) var rows: Int
@@ -76,7 +77,7 @@ package struct Terminal: Sendable {
     private var isAfterPrint = false
     private var style = Style()
     private var usesLineDrawing = false
-    private var lastCharacter: Unicode.Scalar?
+    private var lastCharacter: Unicode.Scalar? = " "
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
     private var tabStops: [Bool]
@@ -259,7 +260,9 @@ package struct Terminal: Sendable {
             }
             switch action {
             case .print(let scalar):
-                print(usesLineDrawing ? scalar.lineDrawingCharacter : scalar)
+                let printed = usesLineDrawing ? scalar.lineDrawingCharacter : scalar
+                lastCharacter = scalar.isASCII ? (printed == scalar ? scalar : " ") : nil
+                print(printed)
             case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
                 lineFeed()
             case .execute("\r"):
@@ -294,7 +297,6 @@ package struct Terminal: Sendable {
             default:
                 break
             }
-            if case .print = action {} else { lastCharacter = nil }
         }
         return replies
     }
@@ -375,10 +377,10 @@ package struct Terminal: Sendable {
         case "@":
             insertCharacters(count)
         case "b":
-            if let lastCharacter, !lastCharacter.properties.isEmojiModifier,
-                !("\u{1F1E6}" ... "\u{1F1FF}").contains(lastCharacter)
-            {
-                repeatCharacter(lastCharacter, count: count)
+            if let lastCharacter {
+                for _ in 0 ..< min(isWrapPending ? count - 1 : count, Self.maximumRepeatCount) {
+                    place(lastCharacter)
+                }
             }
         case "P":
             deleteCharacters(count)
@@ -427,7 +429,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func place(_ scalar: Unicode.Scalar) {
-        lastCharacter = scalar
         let width = columns > 1 && !scalar.isASCII ? max(scalar.width, 1) : 1
         place(Cell(scalar: scalar, style: style, width: UInt8(width)))
     }
@@ -480,46 +481,6 @@ package struct Terminal: Sendable {
             screen[cursor.row][column + 1] = blank
         default:
             break
-        }
-    }
-
-    private mutating func repeatCharacter(_ scalar: Unicode.Scalar, count: Int) {
-        var count = count
-        while scalar.width == 0, count > 1, combine(scalar) {
-            count -= 1
-        }
-        print(scalar)
-        let width = columns > 1 ? max(scalar.width, 1) : 1
-        let rowCount = columns / width
-        guard usesAutowrap else {
-            for _ in 0 ..< min(count - 1, rowCount + Self.maximumScalarsPerCell + 2) {
-                print(scalar)
-            }
-            return
-        }
-        let screenCount = (2 * rows - cursor.row) * rowCount
-        var remaining = count - 1 <= screenCount ? count - 1 : screenCount + (count - 1 - screenCount) % rowCount
-        while remaining > 0, !isWrapPending, cursor.column + width <= columns {
-            place(scalar)
-            remaining -= 1
-        }
-        let cells = [Cell(scalar: scalar, style: style, width: UInt8(width)), Cell(style: style, width: 0)]
-        var line = Line((0 ..< columns).map { cells[$0 % width] })
-        while remaining >= rowCount {
-            place(scalar)
-            if columns % width != 0 {
-                let end = screen[cursor.row][usesInsertMode ? 2 : columns - 1]
-                let isBroken = usesInsertMode ? end.width == 2 : screen[cursor.row][columns - 2].width == 2
-                line[columns - 1] = isBroken ? blank : end
-            }
-            line.isWrapped = screen[cursor.row].isWrapped
-            screen[cursor.row] = line
-            cursor.column = columns - 1
-            isWrapPending = columns % width == 0
-            remaining -= rowCount
-        }
-        for _ in 0 ..< remaining {
-            place(scalar)
         }
     }
 
@@ -794,6 +755,7 @@ package struct Terminal: Sendable {
         scrollRegion = 0 ..< rows
         style = Style()
         usesLineDrawing = false
+        lastCharacter = " "
         savedCursor = SavedCursor()
         modifyOtherKeys = 0
     }
