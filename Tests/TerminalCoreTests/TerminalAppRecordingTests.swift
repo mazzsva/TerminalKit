@@ -35,13 +35,19 @@ struct TerminalAppRecordingTests {
 
     @Test(arguments: recordings)
     func matchesTerminalApp(recording: Recording) {
-        var terminal = Terminal(columns: 40, rows: 12)
+        var terminal = terminalLikeTheRecordedWindow()
         let reply = terminal.receive(bytes(recording.input) + Array("\u{1B}[6n".utf8))
         #expect(escaped(reply) == recording.reply)
         #expect(terminal.title == recording.title ?? "")
         #expect(text(terminal.screen, of: terminal) == recording.screen)
         let history = terminal.scrollback + terminal.normalScreenLines + terminal.screen
         #expect(text(history, of: terminal) == recording.history ?? recording.screen)
+    }
+
+    func terminalLikeTheRecordedWindow() -> Terminal {
+        var terminal = Terminal(columns: 40, rows: 12)
+        terminal.windowReport = Terminal.WindowReport(width: 300, height: 197)
+        return terminal
     }
 
     func bytes(_ text: String) -> [UInt8] {
