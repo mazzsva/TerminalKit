@@ -273,7 +273,7 @@ package struct Terminal: Sendable {
             case .execute("\u{8}"):
                 moveBackward(1)
             case .execute("\t"):
-                moveForward(tabStops: 1)
+                moveToNextTabStop()
             case .escape(intermediates: "", final: "D"):
                 lineFeed()
             case .escape(intermediates: "", final: "E"):
@@ -488,6 +488,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func clearWideCharacter(at column: Int) {
+        breakTab(at: column, row: cursor.row)
         switch screen[cursor.row][column].width {
         case 0 where column > 0:
             screen[cursor.row][column - 1] = writtenBlank
@@ -508,6 +509,16 @@ package struct Terminal: Sendable {
         }
         guard column >= 0 else {
             return false
+        }
+        let target = screen[cursor.row][column]
+        if target.isTab || target.isTabGap {
+            guard column + 1 < columns, screen[cursor.row][column + 1].isTabGap else {
+                if target.isTabGap {
+                    screen[cursor.row][column] = Cell(scalar: scalar, style: target.style)
+                }
+                return true
+            }
+            breakTab(at: column, row: cursor.row)
         }
         var text = String(graphemes.character(of: screen[cursor.row][column]))
         guard text.unicodeScalars.count < Self.maximumScalarsPerCell,
@@ -594,6 +605,12 @@ package struct Terminal: Sendable {
 
     private mutating func insertCharacters(_ count: Int) {
         let count = min(count, columns - cursor.column)
+        if screen[cursor.row][cursor.column].isTabGap {
+            breakTab(at: cursor.column, row: cursor.row)
+        }
+        if screen[cursor.row][columns - count].isTabGap {
+            breakTab(at: columns - count, row: cursor.row)
+        }
         screen[cursor.row].insert(contentsOf: repeatElement(writtenBlank, count: count), at: cursor.column)
         screen[cursor.row].removeLast(count)
         for column in [cursor.column, cursor.column + count, columns] {
@@ -603,6 +620,8 @@ package struct Terminal: Sendable {
 
     private mutating func deleteCharacters(_ count: Int) {
         let count = min(count, columns - cursor.column)
+        breakTab(at: cursor.column, row: cursor.row)
+        breakTab(at: cursor.column + count - 1, row: cursor.row)
         screen[cursor.row].removeSubrange(cursor.column ..< cursor.column + count)
         screen[cursor.row].append(contentsOf: repeatElement(blank, count: count))
         blankBrokenWideCharacter(at: cursor.column, row: cursor.row)
@@ -777,6 +796,40 @@ package struct Terminal: Sendable {
         lastCharacter = " "
         savedCursor = SavedCursor()
         modifyOtherKeys = 0
+    }
+
+    private mutating func moveToNextTabStop() {
+        let start = cursor.column
+        moveForward(tabStops: 1)
+        guard start < cursor.column,
+            screen[cursor.row][start ..< cursor.column].allSatisfy({ !$0.isWritten && !$0.isTabGap && $0.width == 1 })
+        else {
+            return
+        }
+        screen[cursor.row][start] = .tab(style: screen[cursor.row][start].style)
+        for column in start + 1 ..< cursor.column {
+            screen[cursor.row][column] = .tabGap(style: screen[cursor.row][column].style)
+        }
+    }
+
+    private mutating func breakTab(at column: Int, row: Int) {
+        guard screen[row][column].isTab || screen[row][column].isTabGap else {
+            return
+        }
+        var start = column
+        while start > 0, screen[row][start].isTabGap {
+            start -= 1
+        }
+        if !screen[row][start].isTab {
+            start += 1
+        }
+        var end = column + 1
+        while end < columns, screen[row][end].isTabGap {
+            end += 1
+        }
+        for index in start ..< end {
+            screen[row][index] = .writtenSpace(style: screen[row][index].style)
+        }
     }
 
     private mutating func moveForward(tabStops count: Int) {
@@ -1015,6 +1068,8 @@ package struct Terminal: Sendable {
     }
 
     private mutating func erase(_ range: Range<Int>, row: Int, with cell: Cell) {
+        breakTab(at: range.lowerBound, row: row)
+        breakTab(at: range.upperBound - 1, row: row)
         screen[row].replaceSubrange(range, with: repeatElement(cell, count: range.count))
         if range.upperBound == columns {
             screen[row].isWrapped = false

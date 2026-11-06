@@ -36,7 +36,7 @@ extension Terminal {
                 for index in positionsByRow[row] ?? [] {
                     offsets.append((cells.count + positions[index].column, index))
                 }
-                cells.append(contentsOf: rowCells)
+                cells.append(contentsOf: rowCells.map { $0.isTab || $0.isTabGap ? .writtenSpace(style: $0.style) : $0 })
             }
             if columns == 1 {
                 offsets = offsets.map { offset, index in

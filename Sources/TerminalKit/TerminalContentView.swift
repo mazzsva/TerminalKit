@@ -612,11 +612,8 @@ final class TerminalContentView: NSView {
             glyphs.removeAll(keepingCapacity: true)
             positions.removeAll(keepingCapacity: true)
         }
-        for column in columns where line[column].width > 0 && line[column] != .padding {
+        for column in columns where line[column].isText && !line[column].isSpace {
             let character = graphemes.character(of: line[column])
-            guard character != " " else {
-                continue
-            }
             let visual = order?.columns[column] ?? column
             if let block = Self.blockElement(character) {
                 let cell = backingAlignedRect(

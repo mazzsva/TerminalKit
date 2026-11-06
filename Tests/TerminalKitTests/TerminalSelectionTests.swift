@@ -349,6 +349,12 @@ struct TerminalSelectionTests {
         #expect(view.selectedText == "two three")
     }
 
+    @Test func copiesATabAsOneCharacter() async throws {
+        let view = try await view(running: "printf 'a\\tb'")
+        view.selectAll(nil)
+        #expect(view.selectedText == "a\tb")
+    }
+
     @Test func extendsByCharactersWithAShiftClickAfterFind() async throws {
         let view = try await view(running: "printf 'one two three'")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 2))

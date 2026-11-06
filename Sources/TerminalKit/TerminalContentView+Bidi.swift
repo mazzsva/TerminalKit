@@ -42,7 +42,7 @@ extension TerminalContentView {
                 units[units.count - 1].columns = last.columns.lowerBound ..< column + 1
                 continue
             }
-            let character = graphemes.character(of: line[column])
+            let character = line[column].isSpace ? " " : graphemes.character(of: line[column])
             units.append((length, column ..< column + 1))
             text.append(character)
             length += character.utf16.count

@@ -41,6 +41,13 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilitySelectedTextRange() == NSRange(location: 7, length: 0))
     }
 
+    @Test func readsATabAsOneCharacter() async throws {
+        let view = try await accessibleView(running: "printf 'a\\tb'")
+        #expect((view.accessibilityValue() as? String)?.hasPrefix("a\tb") == true)
+        let frame = view.accessibilityFrame(for: NSRange(location: 1, length: 1))
+        #expect(frame.width == 7 * view.accessibilityFrame(for: NSRange(location: 0, length: 1)).width)
+    }
+
     @Test func endsTheScrollbackLineAtTheAlternateScreen() async throws {
         let view = try await accessibleView(running: "printf 'abcdefghijKLMNOP\\nx\\ny\\033[?1049h\\033[Hvim'")
         #expect(view.accessibilityValue() as? String == "abcdefghij\nvim\n\n")

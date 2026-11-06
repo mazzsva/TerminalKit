@@ -470,6 +470,67 @@ struct TerminalTests {
         #expect(terminal.usesDisambiguatedKeys)
     }
 
+    @Test func keepsATabInTheText() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("a\tb")
+        #expect(String(terminal.screen[0].filter(\.isText).map(terminal.character(of:))).hasPrefix("a\tb"))
+        #expect(terminal.screen[0][1 ... 7].allSatisfy { !$0.isText || terminal.character(of: $0) == "\t" })
+    }
+
+    @Test(arguments: ["\u{1B}[3Gx", "\u{1B}[4G\u{1B}[X", "\u{1B}[4G\u{1B}[P", "\u{1B}[2G\u{1B}[P", "\u{1B}[4G\u{1B}[@"])
+    func replacesATabWithSpacesWhenAPartChanges(change: String) {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("a\tb" + change)
+        #expect(!terminal.screen[0].contains { terminal.character(of: $0) == "\t" })
+        #expect(terminal.screen[0][1].isWritten)
+    }
+
+    @Test func keepsATabWithAMarkAtItsEnd() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("a\t\u{301}b")
+        #expect(terminal.character(of: terminal.screen[0][1]) == "\t")
+        #expect(terminal.cursor.column == 9)
+    }
+
+    @Test(arguments: ["\u{1B}[4G", "\u{1B}[3G"])
+    func replacesATabWithSpacesForAMarkInside(move: String) {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("a\tb" + move + "\u{301}")
+        #expect(!terminal.screen[0].contains { terminal.character(of: $0) == "\t" })
+    }
+
+    @Test func replacesATabThatInsertedCellsCut() {
+        var terminal = Terminal(columns: 10, rows: 1)
+        terminal.receive("x\u{1B}[3G\t\u{1B}[G\u{1B}[7@")
+        #expect(!terminal.screen[0].contains { terminal.character(of: $0) == "\t" })
+    }
+
+    @Test func keepsATabThatMovesAsAWhole() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("a\tb\u{1B}[2G\u{1B}[@")
+        #expect(terminal.character(of: terminal.screen[0][2]) == "\t")
+    }
+
+    @Test func movesOverTextWithoutATab() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("abc\r\t")
+        #expect(!terminal.screen[0].contains { terminal.character(of: $0) == "\t" })
+    }
+
+    @Test func keepsATabThroughTheScrollback() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("a\tb\r\n")
+        #expect(terminal.character(of: terminal.scrollback[0][1]) == "\t")
+    }
+
+    @Test func replacesATabWithSpacesInAReflow() {
+        var terminal = Terminal(columns: 20, rows: 3)
+        terminal.receive("a\tb\r\nx")
+        terminal.resize(columns: 5, rows: 3)
+        #expect(lines(terminal) == ["a    ", "   b ", "x    "])
+        #expect(!terminal.screen[0].contains { terminal.character(of: $0) == "\t" })
+    }
+
     @Test func movesToTheNextTabStop() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb\tc")
@@ -1508,18 +1569,19 @@ struct TerminalTests {
         #expect(scrollback(terminal) == ["a", "", "", "  ", "  ", "  "])
     }
 
-    @Test(arguments: ["  ", "\u{1B}[X", "\u{1B}[1K", "\u{1B}[1J", "\u{1B}[@"])
+    @Test(arguments: ["\u{20}", "\u{1B}[X", "\u{1B}[1K", "\u{1B}[1J", "\u{1B}[@"])
     func writesSpaces(sequence: String) {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive(sequence)
+        terminal.receive("a\u{1B}[3Gb\u{1B}[G" + sequence)
+        #expect(terminal.screen[0].first.map(terminal.character(of:)) == " ")
         #expect(terminal.screen[0].first?.isWritten == true)
     }
 
     @Test(arguments: ["\u{1B}[K", "\u{1B}[2K", "\u{1B}[J", "\u{1B}[2J", "\u{1B}[P"])
     func clearsWithoutWritingSpaces(sequence: String) {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("\u{1B}[H" + sequence)
-        #expect(terminal.screen[0].first?.isWritten == false)
+        terminal.receive("abcd\u{1B}[H" + sequence)
+        #expect(terminal.screen[0].last?.isWritten == false)
     }
 
     @Test func keepsWrittenSpacesInTheScrollback() {
@@ -1577,7 +1639,7 @@ struct TerminalTests {
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
-    terminal.screen.map { String($0.map(terminal.character(of:))) }
+    terminal.screen.map { String($0.map(terminal.character(of:))).replacing("\t", with: " ") }
 }
 
 private func scrollback(_ terminal: Terminal) -> [String] {

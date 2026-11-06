@@ -3,6 +3,8 @@ extension Terminal {
         package static let padding = Cell(scalar: "\u{0}")
         fileprivate static let firstGraphemeIndex: UInt32 = 0x11_0000
         fileprivate static let writtenSpaceContent: UInt32 = 0x7F
+        fileprivate static let tabContent: UInt32 = 0x9
+        fileprivate static let tabGapContent: UInt32 = 0xB
 
         package var style = Style()
         package var width: UInt8 = 1
@@ -20,8 +22,32 @@ extension Terminal {
             return cell
         }
 
+        static func tab(style: Style) -> Cell {
+            var cell = Cell(style: style)
+            cell.content = tabContent
+            return cell
+        }
+
+        static func tabGap(style: Style) -> Cell {
+            var cell = Cell(style: style)
+            cell.content = tabGapContent
+            return cell
+        }
+
+        var isTab: Bool {
+            content == Self.tabContent
+        }
+
+        package var isTabGap: Bool {
+            content == Self.tabGapContent
+        }
+
         package var isWritten: Bool {
-            content != 0x20 && content != 0
+            content != 0x20 && content != 0 && content != Self.tabGapContent
+        }
+
+        package var isText: Bool {
+            width > 0 && self != .padding && content != Self.tabGapContent
         }
 
         package var isBlank: Bool {
@@ -29,7 +55,7 @@ extension Terminal {
         }
 
         package var isSpace: Bool {
-            content == 0x20 || content == 0 || content == Self.writtenSpaceContent
+            content == 0x20 || content == 0 || content == Self.writtenSpaceContent || isTab || isTabGap
         }
 
         package var isASCII: Bool {
@@ -59,6 +85,9 @@ extension Terminal {
 
         package func character(of cell: Cell) -> Character {
             guard let index = cell.graphemeIndex else {
+                if cell.isTab {
+                    return "\t"
+                }
                 return cell.isSpace ? " " : Unicode.Scalar(cell.content).map(Character.init) ?? " "
             }
             return characters[index]
