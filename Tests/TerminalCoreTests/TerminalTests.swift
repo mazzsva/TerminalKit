@@ -1545,12 +1545,19 @@ struct TerminalTests {
         #expect(terminal.cursorShape == shape)
     }
 
-    @Test(arguments: ["\u{1B}[7 q", "\u{1B}[?2 q", "\u{1B}[2q", "\u{1B}[2!q", "\u{1B}[2 p"])
+    @Test(arguments: ["\u{1B}[7 q", "\u{1B}[2q", "\u{1B}[2!q", "\u{1B}[2 p"])
     func ignoresOtherCursorShapeSequences(sequence: String) {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{1B}[5 q" + sequence + "x")
         #expect(terminal.cursorShape == .bar)
         #expect(terminal.character(of: terminal.screen[0][0]) == "x")
+    }
+
+    @Test func printsTheFinalOfAMarkedCursorShapeSequence() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[5 q\u{1B}[?2 qx")
+        #expect(terminal.cursorShape == .bar)
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["q", "x", " ", " "])
     }
 
     @Test(arguments: ["\u{1B}[m", "\r", "\n", "\u{8}", "\t", "\u{1B}[3;3H", "\u{1B}]2;t\u{7}"])
