@@ -507,7 +507,7 @@ final class TerminalContentView: NSView {
                 var drawsText = selected != nil || style.isUnderlined
                 for column in columns {
                     let character = graphemes.character(of: line[column])
-                    let isBlock = character != " " && "▀▄█".contains(character) && ink >> 24 == 255
+                    let isBlock = ["▀", "▄", "█"].contains(character) && ink >> 24 == 255
                     drawsText = drawsText || !isBlock && character != " "
                     let visual = order?.columns[column] ?? column
                     (pixels[line.count + visual], pixels[visual]) =
@@ -722,7 +722,7 @@ final class TerminalContentView: NSView {
             .reduce(0) { $0 << 8 | UInt32((min(max($1, 0), 1) * color.alphaComponent * 255).rounded()) }
     }
 
-    private static func blockElement(_ character: Character) -> (rects: [CGRect], alpha: CGFloat)? {
+    private static func blockElement(_ character: String) -> (rects: [CGRect], alpha: CGFloat)? {
         guard character.unicodeScalars.count == 1, let value = character.unicodeScalars.first?.value else {
             return nil
         }

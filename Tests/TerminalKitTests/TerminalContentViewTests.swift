@@ -385,8 +385,8 @@ struct TerminalContentViewTests {
 
     @Test(
         arguments: [("\u{585A}", "\u{FA10}"), ("\u{03B1}\u{0301}", "\u{1F71}"), ("\u{1F44D}", "\u{1F44D}\u{1F3FD}")]
-            as [(Character, Character)])
-    func keysTheGlyphsByTheExactScalarsOfACharacter(drawn: Character, character: Character) {
+            as [(String, String)])
+    func keysTheGlyphsByTheExactScalarsOfACharacter(drawn: String, character: String) {
         let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
         let cache = GlyphCache()
         _ = cache.entry(for: drawn, font: font, index: 0)
@@ -395,7 +395,7 @@ struct TerminalContentViewTests {
     }
 
     @Test(arguments: ["⏺", "⏸"], [1, 2] as [CGFloat])
-    func drawsTheGlyphsOfTheFallbackFontOnTheBaseline(character: Character, scale: CGFloat) async throws {
+    func drawsTheGlyphsOfTheFallbackFontOnTheBaseline(character: String, scale: CGFloat) async throws {
         let view = try await drawnView(running: "printf 'a \(character)\\n'")
         let window = ScaledWindow(contentView: view)
         window.scale = scale
@@ -516,6 +516,15 @@ struct TerminalContentViewTests {
         let fill = color(in: try representation(of: view), at: center)
         let edge = CGRect(x: 4 + view.cellSize.width * 8 - 2, y: center.y, width: 4, height: 1)
         #expect(try pixels(in: edge, of: view).allSatisfy { isClose($0, to: fill) })
+    }
+
+    @Test(arguments: ["\u{200D}", "\u{FEFF}", "\u{E0061}"])
+    func drawsNoBlockForAnIgnorableCharacter(character: String) async throws {
+        let view = try await drawnView(running: "printf 'a\(character)b\\n'")
+        let representation = try representation(of: view)
+        let empty = color(in: representation, at: CGPoint(x: 190, y: 90))
+        let center = CGPoint(x: 4 + view.cellSize.width * 1.5, y: 4 + view.cellSize.height / 2)
+        #expect(isClose(color(in: representation, at: center), to: empty))
     }
 
     @Test func drawsTheSelectionWithThePaletteColor() throws {

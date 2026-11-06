@@ -26,7 +26,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
                     ? columns.upperBound
                     : line[columns].lastIndex { !$0.isSpace }.map { $0 + 1 } ?? columns.lowerBound
                 let cells = line[columns.lowerBound ..< end].filter(\.isText)
-                return (String(cells.map(graphemes.character(of:))), continues)
+                return (cells.map(graphemes.character(of:)).joined(), continues)
             }
         guard !pieces.isEmpty else {
             return nil
