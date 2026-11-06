@@ -136,14 +136,28 @@ struct TerminalFindTests {
         let images = try [(word.terminalView, 0), (reference.terminalView, 1)]
             .map { view, location in
                 let image = NSImage(size: view.bounds.size, flipped: true) { _ in
-                    NSColor.yellow.setFill()
+                    NSColor.white.setFill()
                     view.bounds.fill()
                     view.drawCharacters(in: NSRange(location: location, length: 1), forContentView: view)
                     return true
                 }
-                return try #require(image.tiffRepresentation)
+                return try #require(
+                    image.cgImage(forProposedRect: nil, context: nil, hints: nil).map(NSBitmapImageRep.init(cgImage:))
+                )
             }
-        #expect(images[0] == images[1])
+        let view = word.terminalView
+        let scale = CGFloat(images[0].pixelsWide) / view.bounds.width
+        func ink(_ columns: Range<Int>, in image: NSBitmapImageRep) -> [CGFloat] {
+            let rect = view.rect(row: 0, columns: columns)
+            return stride(from: Int(rect.minY * scale), to: Int(rect.maxY * scale), by: 1)
+                .flatMap { y in
+                    stride(from: Int(rect.minX * scale), to: Int(rect.maxX * scale), by: 1)
+                        .compactMap { image.colorAt(x: $0, y: y)?.usingColorSpace(.sRGB)?.redComponent }
+                }
+        }
+        #expect(ink(0 ..< 1, in: images[0]).allSatisfy { $0 > 0.5 })
+        #expect(ink(1 ..< 2, in: images[0]).contains { $0 < 0.5 })
+        #expect(zip(ink(1 ..< 2, in: images[0]), ink(1 ..< 2, in: images[1])).allSatisfy { abs($0 - $1) < 0.2 })
     }
 
     @Test func tellsTheFinderWhenTheTextChanges() async throws {
