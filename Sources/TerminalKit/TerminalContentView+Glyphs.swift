@@ -45,13 +45,10 @@ final class GlyphCache {
     }
 
     private func makeEntry(for character: String, font: NSFont, isMirrored: Bool) -> Entry {
-        let isMark = character.unicodeScalars.first?.properties.generalCategory == .spacingMark
         let style = NSMutableParagraphStyle()
         style.baseWritingDirection = isMirrored ? .rightToLeft : .natural
-        let string = NSAttributedString(
-            string: (isMark ? "\u{A0}" : "") + character, attributes: [.font: font, .paragraphStyle: style])
+        let string = NSAttributedString(string: character, attributes: [.font: font, .paragraphStyle: style])
         let line = CTLineCreateWithAttributedString(string)
-        let offset = isMark ? CTLineGetImageBounds(line, nil).minX : 0
         let runs = (CTLineGetGlyphRuns(line) as? [CTRun] ?? [])
             .map { run in
                 let count = CTRunGetGlyphCount(run)
@@ -61,8 +58,7 @@ final class GlyphCache {
                 CTRunGetPositions(run, CFRange(), &positions)
                 let attributes = CTRunGetAttributes(run) as? [NSAttributedString.Key: Any]
                 let runFont = attributes?[.font] as? NSFont ?? font
-                return Run(
-                    font: runFont, glyphs: glyphs, positions: positions.map { CGPoint(x: $0.x - offset, y: $0.y) })
+                return Run(font: runFont, glyphs: glyphs, positions: positions)
             }
         return Entry(runs: runs)
     }
