@@ -232,7 +232,7 @@ struct TerminalAccessibilityTests {
         let scrollView = TerminalScrollView(session: session)
         let view = scrollView.terminalView
         let window = NSWindow(contentView: scrollView)
-        window.setContentSize(CGSize(width: 200, height: 2 * view.cellSize.height + 8))
+        window.setContentSize(CGSize(width: 200, height: 2 * view.cellSize.height + 17))
         scrollView.layoutSubtreeIfNeeded()
         try session.start()
         await session.waitForExit()

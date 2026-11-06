@@ -178,8 +178,8 @@ extension TerminalContentView {
     override func accessibilityVisibleCharacterRange() -> NSRange {
         let text = accessibilityText
         let visibleRect = enclosingScrollView?.documentVisibleRect ?? bounds
-        let firstRow = row(at: visibleRect.minY + Self.padding, in: text)
-        let lastRow = row(at: visibleRect.maxY - Self.padding - 1, in: text)
+        let firstRow = row(at: visibleRect.minY + Self.topPadding, in: text)
+        let lastRow = row(at: visibleRect.maxY - Self.bottomPadding - 1, in: text)
         return NSRange(
             location: text.rows[firstRow].location, length: text.rows[lastRow].upperBound - text.rows[firstRow].location
         )
@@ -289,7 +289,7 @@ extension TerminalContentView {
     }
 
     private func row(at y: CGFloat, in text: AccessibilityText) -> Int {
-        min(max(Int((y - Self.padding) / cellSize.height), 0), text.rows.count - 1)
+        min(max(Int((y - Self.topPadding) / cellSize.height), 0), text.rows.count - 1)
     }
 
     func index(row: Int, column: Int, in text: AccessibilityText) -> Int {

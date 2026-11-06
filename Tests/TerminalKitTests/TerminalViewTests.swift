@@ -17,8 +17,8 @@ struct TerminalViewTests {
         let visibleSize = try #require(view.enclosingScrollView).contentSize
         #expect(view.session === session)
         #expect(view.frame.size == visibleSize)
-        #expect(session.terminal.columns == Int((visibleSize.width - 8) / view.cellSize.width))
-        #expect(session.terminal.rows == Int((visibleSize.height - 8) / view.cellSize.height))
+        #expect(session.terminal.columns == Int((visibleSize.width - 20) / view.cellSize.width))
+        #expect(session.terminal.rows == Int((visibleSize.height - 17) / view.cellSize.height))
     }
 
     @Test func opensLinksWithoutTheOpenURLActionOfTheEnvironment() throws {
@@ -60,7 +60,7 @@ struct TerminalViewTests {
         let visibleSize = try #require(newView.enclosingScrollView).contentSize
         #expect(newView !== view)
         #expect(newView.session === session)
-        #expect(session.terminal.columns == Int((visibleSize.width - 8) / newView.cellSize.width))
+        #expect(session.terminal.columns == Int((visibleSize.width - 20) / newView.cellSize.width))
     }
 
     @Test func focusesTheNewSession() async throws {
@@ -221,7 +221,7 @@ struct TerminalViewTests {
         let view = scrollView.terminalView
         let lineCount = session.terminal.scrollback.count + session.terminal.rows
         #expect(session.terminal.scrollback.count > 0)
-        #expect(view.frame.height == CGFloat(lineCount) * view.cellSize.height + 8)
+        #expect(view.frame.height == CGFloat(lineCount) * view.cellSize.height + 17)
     }
 
     @Test func followsNewOutputAtTheBottom() async throws {
@@ -246,7 +246,7 @@ struct TerminalViewTests {
         await session.waitForText("10500")
         scrollView.layoutSubtreeIfNeeded()
         let view = scrollView.terminalView
-        view.scroll(CGPoint(x: 0, y: 4 + 5_000 * view.cellSize.height))
+        view.scroll(CGPoint(x: 0, y: 7 + 5_000 * view.cellSize.height))
         let firstLine = { session.terminal.scrollback[Int(scrollView.contentView.bounds.minY / view.cellSize.height)] }
         let line = firstLine()
         session.send(Array("\r".utf8))
@@ -459,13 +459,13 @@ struct TerminalViewTests {
         let view = try #require(contentView(in: hostingView))
         let visibleWidth = try #require(view.enclosingScrollView).contentSize.width
         #expect(view.font == large)
-        #expect(session.terminal.columns == Int((visibleWidth - 8) / view.cellSize.width))
+        #expect(session.terminal.columns == Int((visibleWidth - 20) / view.cellSize.width))
 
         let small = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
         hostingView.rootView = TerminalView(session: session).terminalFont(small)
         hostingView.layoutSubtreeIfNeeded()
         #expect(view.font == small)
-        #expect(session.terminal.columns == Int((visibleWidth - 8) / view.cellSize.width))
+        #expect(session.terminal.columns == Int((visibleWidth - 20) / view.cellSize.width))
     }
 
     @Test func usesTheTerminalPalette() throws {

@@ -61,7 +61,7 @@ struct TerminalStartSizeTests {
         scrollView.terminalView.fit(
             to: CGSize(
                 width: 80 * cellSize.width + 2 * TerminalContentView.padding,
-                height: 24 * cellSize.height + 2 * TerminalContentView.padding
+                height: 24 * cellSize.height + TerminalContentView.topPadding + TerminalContentView.bottomPadding
             )
         )
         #expect(session.state == .running)

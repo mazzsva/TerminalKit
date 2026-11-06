@@ -11,7 +11,7 @@ struct TerminalContentViewTests {
     @Test func fitsTheScreenToTheView() {
         let session = TerminalSession(running: "exit")
         let view = TerminalContentView(session: session)
-        view.fit(to: CGSize(width: 8 + view.cellSize.width * 100.5, height: 8 + view.cellSize.height * 30.5))
+        view.fit(to: CGSize(width: 20 + view.cellSize.width * 100.5, height: 17 + view.cellSize.height * 30.5))
         #expect(session.terminal.columns == 100)
         #expect(session.terminal.rows == 30)
     }
@@ -67,7 +67,7 @@ struct TerminalContentViewTests {
     }
 
     private func cells(_ columns: CGFloat, _ rows: CGFloat, in view: TerminalContentView) -> CGSize {
-        CGSize(width: 8 + view.cellSize.width * columns, height: 8 + view.cellSize.height * rows)
+        CGSize(width: 20 + view.cellSize.width * columns, height: 17 + view.cellSize.height * rows)
     }
 
     @Test func makesTheStyledFontsFromTheFont() {
@@ -96,7 +96,7 @@ struct TerminalContentViewTests {
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
         let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: representation)
-        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
         let corner = CGPoint(x: 190, y: 90)
         #expect(color(in: representation, at: center) != color(in: representation, at: corner))
         #expect(window.firstResponder === view)
@@ -262,7 +262,7 @@ struct TerminalContentViewTests {
     @Test func hidesTheCursor() async throws {
         let view = try await drawnView(running: "printf '\\033[?25l'")
         let representation = try representation(of: view)
-        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
         #expect(color(in: representation, at: center) == color(in: representation, at: CGPoint(x: 190, y: 90)))
     }
 
@@ -270,8 +270,8 @@ struct TerminalContentViewTests {
         let wide = try await drawnView(running: "printf '中x\\n'")
         let narrow = try await drawnView(running: "printf '  x\\n'")
         let cell = CGRect(
-            x: 4 + 2 * wide.cellSize.width,
-            y: 4,
+            x: 10 + 2 * wide.cellSize.width,
+            y: 7,
             width: wide.cellSize.width,
             height: wide.cellSize.height
         )
@@ -282,7 +282,7 @@ struct TerminalContentViewTests {
         let word = try await drawnView(running: "printf '\\327\\220\\327\\221\\n'")
         let second = try await drawnView(running: "printf '\\327\\221\\n'")
         let first = try await drawnView(running: "printf ' \\327\\220\\n'")
-        let cell = CGRect(x: 4, y: 4, width: word.cellSize.width, height: word.cellSize.height)
+        let cell = CGRect(x: 10, y: 7, width: word.cellSize.width, height: word.cellSize.height)
         let next = cell.offsetBy(dx: word.cellSize.width, dy: 0)
         #expect(try pixels(in: cell, of: word) == pixels(in: cell, of: second))
         #expect(try pixels(in: next, of: word) == pixels(in: next, of: first))
@@ -292,7 +292,7 @@ struct TerminalContentViewTests {
     @Test func drawsTheMirroredGlyphInRightToLeftText() async throws {
         let word = try await drawnView(running: "printf '\\327\\220(\\327\\221)\\n'")
         let open = try await drawnView(running: "printf '(\\n'")
-        let cell = CGRect(x: 4, y: 4, width: word.cellSize.width, height: word.cellSize.height)
+        let cell = CGRect(x: 10, y: 7, width: word.cellSize.width, height: word.cellSize.height)
         #expect(try pixels(in: cell, of: word) == pixels(in: cell, of: open))
     }
 
@@ -306,7 +306,7 @@ struct TerminalContentViewTests {
         }
         let font = view.fonts.regular
         let underline = CGRect(
-            x: 4, y: 4 + font.ascender - font.underlinePosition, width: view.cellSize.width,
+            x: 10, y: 7 + font.ascender - font.underlinePosition, width: view.cellSize.width,
             height: max(font.underlineThickness, 1)
         )
         .insetBy(dx: 0, dy: -1)
@@ -319,7 +319,7 @@ struct TerminalContentViewTests {
     func drawsTheBackgroundColorInTheVisualCellsOfRightToLeftText(parameters: String) async throws {
         let plain = try await drawnView(running: "printf '\\327\\220\\327\\221\\n'")
         let view = try await drawnView(running: "printf '\\033[\(parameters)m\\327\\220\\033[m\\327\\221\\n'")
-        let cell = CGRect(x: 4, y: 4, width: view.cellSize.width, height: 2)
+        let cell = CGRect(x: 10, y: 7, width: view.cellSize.width, height: 2)
         let next = cell.offsetBy(dx: view.cellSize.width, dy: 0)
         #expect(try pixels(in: cell, of: view) == pixels(in: cell, of: plain))
         #expect(try pixels(in: next, of: view) != pixels(in: next, of: plain))
@@ -340,7 +340,7 @@ struct TerminalContentViewTests {
     func drawsASpacingMarkAlone(character: String) async throws {
         let mark = try await drawnView(running: "printf '\(character)x\\n'")
         let spaced = try await drawnView(running: "printf ' x\\n'")
-        let first = CGRect(x: 4, y: 4, width: mark.cellSize.width, height: mark.cellSize.height)
+        let first = CGRect(x: 10, y: 7, width: mark.cellSize.width, height: mark.cellSize.height)
         #expect(try pixels(in: first, of: mark) != pixels(in: first, of: spaced))
     }
 
@@ -356,8 +356,8 @@ struct TerminalContentViewTests {
             view.font = .systemFont(ofSize: 13)
         }
         let cell = CGRect(
-            x: 4 + 4 * narrow.cellSize.width,
-            y: 4,
+            x: 10 + 4 * narrow.cellSize.width,
+            y: 7,
             width: narrow.cellSize.width,
             height: narrow.cellSize.height
         )
@@ -368,7 +368,7 @@ struct TerminalContentViewTests {
     func drawsACharacterOutsideASCII(character: String) async throws {
         let blank = try await drawnView(running: "printf '  \\r'")
         let drawn = try await drawnView(running: "printf '\(character)\\r'")
-        let cells = CGRect(x: 4, y: 4, width: 2 * drawn.cellSize.width, height: drawn.cellSize.height)
+        let cells = CGRect(x: 10, y: 7, width: 2 * drawn.cellSize.width, height: drawn.cellSize.height)
         #expect(try pixels(in: cells, of: drawn) != pixels(in: cells, of: blank))
     }
 
@@ -380,7 +380,7 @@ struct TerminalContentViewTests {
         let second = try await drawnView(running: "printf 'x\(other)\\r'")
         let spaced = try await drawnView(running: "printf ' \(character)\\r'")
         let cells = CGRect(
-            x: 4 + first.cellSize.width, y: 4, width: 2 * first.cellSize.width, height: first.cellSize.height)
+            x: 10 + first.cellSize.width, y: 7, width: 2 * first.cellSize.width, height: first.cellSize.height)
         #expect(try pixels(in: cells, of: first) != pixels(in: cells, of: second))
         #expect(try pixels(in: cells, of: first) == pixels(in: cells, of: spaced))
     }
@@ -408,8 +408,8 @@ struct TerminalContentViewTests {
         for (column, glyph) in [(0, "a"), (2, character)] {
             let run = try #require(view.fonts.glyphs.entry(for: glyph, font: font, index: 0).runs.first)
             let bounds = CTFontGetBoundingRectsForGlyphs(run.font, .default, run.glyphs, nil, 1)
-            let x = 4 + CGFloat(column) * view.cellSize.width
-            let top = stride(from: 4, to: 4 + view.cellSize.height, by: 1 / scale)
+            let x = 10 + CGFloat(column) * view.cellSize.width
+            let top = stride(from: 7, to: 7 + view.cellSize.height, by: 1 / scale)
                 .first { y in
                     stride(from: x, to: x + view.cellSize.width, by: 1 / scale)
                         .contains {
@@ -417,17 +417,17 @@ struct TerminalContentViewTests {
                             return abs((pixel?.brightnessComponent ?? 0) - background.brightnessComponent) > 0.5
                         }
                 }
-            #expect(abs(try #require(top) - (4 + font.ascender - bounds.maxY)) < 1)
+            #expect(abs(try #require(top) - (7 + font.ascender - bounds.maxY)) < 1)
         }
     }
 
     @Test func underlinesARunWithAWideCharacter() async throws {
         let view = try await drawnView(running: "printf '\\033[4ma\\344\\270\\255b\\033[m\\r'")
         let font = view.fonts.regular
-        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
         let background = color(in: representation, at: CGPoint(x: 190, y: 90))
-        let underline = stride(from: 4 + view.cellSize.width / 4, to: 4 + view.cellSize.width * 3.75, by: 1)
+        let underline = stride(from: 10 + view.cellSize.width / 4, to: 10 + view.cellSize.width * 3.75, by: 1)
             .map { color(in: representation, at: CGPoint(x: $0, y: y)) }
         #expect(underline.allSatisfy { $0 != background })
     }
@@ -440,7 +440,7 @@ struct TerminalContentViewTests {
         for window in windows {
             window.scale = scale
         }
-        let cells = CGRect(x: 4, y: 4, width: 2 * view.cellSize.width, height: view.cellSize.height)
+        let cells = CGRect(x: 10, y: 7, width: 2 * view.cellSize.width, height: view.cellSize.height)
         #expect(try pixels(in: cells, of: view) == pixels(in: cells, of: plain))
     }
 
@@ -451,9 +451,9 @@ struct TerminalContentViewTests {
         window.scale = scale
         view.palette = highContrastPalette
         let font = view.fonts.regular
-        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
-        let underline = try stride(from: 4, to: 3 + 2 * view.cellSize.width, by: 1 / scale)
+        let underline = try stride(from: 10, to: 9 + 2 * view.cellSize.width, by: 1 / scale)
             .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
         #expect(
             underline.allSatisfy {
@@ -468,8 +468,8 @@ struct TerminalContentViewTests {
         window.scale = scale
         let representation = try representation(of: view)
         let background = color(in: representation, at: CGPoint(x: 190, y: 90))
-        let foreground = color(in: representation, at: CGPoint(x: 4 + 2.5 * view.cellSize.width, y: 10))
-        let column = CGRect(x: 4 + view.cellSize.width, y: 4, width: 1 / scale, height: view.cellSize.height)
+        let foreground = color(in: representation, at: CGPoint(x: 10 + 2.5 * view.cellSize.width, y: 10))
+        let column = CGRect(x: 10 + view.cellSize.width, y: 7, width: 1 / scale, height: view.cellSize.height)
         let pixels = try pixels(in: column, of: view)
         #expect(pixels.count { isClose($0, to: foreground) } == Int(scale))
         #expect(pixels.allSatisfy { isClose($0, to: foreground) || isClose($0, to: background) })
@@ -478,7 +478,7 @@ struct TerminalContentViewTests {
     @Test func drawsTheUnderlineUnderTheCursorInTheTextColor() async throws {
         let (view, window) = try await focusedView(running: "printf '\\033[4;32mX\\033[m\\b'")
         let font = view.fonts.regular
-        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
         let underline = try stride(from: view.cursorRect.minX, to: view.cursorRect.maxX, by: 1)
             .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
@@ -490,9 +490,9 @@ struct TerminalContentViewTests {
         let view = try await drawnView(running: "printf '\\033[?25l\\033[2;4mab\\033[m\\r'")
         view.palette = highContrastPalette
         let font = view.fonts.regular
-        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
-        let color = try #require(color(in: representation, at: CGPoint(x: 8, y: y))?.usingColorSpace(.sRGB))
+        let color = try #require(color(in: representation, at: CGPoint(x: 14, y: y))?.usingColorSpace(.sRGB))
         #expect(abs(color.redComponent - 0.58) < 0.25)
     }
 
@@ -506,9 +506,9 @@ struct TerminalContentViewTests {
             (window.contentView as? TerminalContentView)?.palette = highContrastPalette
         }
         let font = view.fonts.regular
-        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
         let representations = try [representation(of: plain), representation(of: view)]
-        for x in stride(from: 4, to: 3 + 2 * view.cellSize.width, by: 1 / scale) {
+        for x in stride(from: 10, to: 9 + 2 * view.cellSize.width, by: 1 / scale) {
             let point = CGPoint(x: x, y: y)
             #expect(color(in: representations[0], at: point) != color(in: representations[1], at: point))
         }
@@ -516,7 +516,7 @@ struct TerminalContentViewTests {
 
     @Test func drawsTheBackgroundColor() async throws {
         let view = try await drawnView(running: "printf '\\033[41m  \\033[m'")
-        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
         let color = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
         #expect(abs(color.redComponent - 180 / 255) < 0.02)
         #expect(abs(color.greenComponent - 85 / 255) < 0.02)
@@ -525,10 +525,11 @@ struct TerminalContentViewTests {
 
     @Test func drawsTheBackgroundColorWithoutASeamBetweenRuns() async throws {
         let view = try await drawnView(running: "printf '\\033[44m        \\033[31m        \\033[m'")
+        view.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         #expect(view.cellSize.width != view.cellSize.width.rounded())
-        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
         let fill = color(in: try representation(of: view), at: center)
-        let edge = CGRect(x: 4 + view.cellSize.width * 8 - 2, y: center.y, width: 4, height: 1)
+        let edge = CGRect(x: 10 + view.cellSize.width * 8 - 2, y: center.y, width: 4, height: 1)
         #expect(try pixels(in: edge, of: view).allSatisfy { isClose($0, to: fill) })
     }
 
@@ -537,7 +538,7 @@ struct TerminalContentViewTests {
         let view = try await drawnView(running: "printf 'a\(character)b\\n'")
         let representation = try representation(of: view)
         let empty = color(in: representation, at: CGPoint(x: 190, y: 90))
-        let center = CGPoint(x: 4 + view.cellSize.width * 1.5, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width * 1.5, y: 7 + view.cellSize.height / 2)
         #expect(isClose(color(in: representation, at: center), to: empty))
     }
 
@@ -546,7 +547,7 @@ struct TerminalContentViewTests {
         let window = KeyWindow(contentView: view)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
         let green = Color(.sRGB, red: 0.4, green: 0.6, blue: 0.2)
-        let center = CGPoint(x: 4 + view.cellSize.width * 2.5, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width * 2.5, y: 7 + view.cellSize.height / 2)
         view.palette.background = green
         let fill = color(in: try representation(of: view), at: center)
         view.palette = .standard
@@ -561,11 +562,11 @@ struct TerminalContentViewTests {
         let view = try await drawnView(running: "printf '        \\033[44m        \\033[m'")
         view.selection = TerminalContentView.Selection(
             anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 8))
-        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
         let representation = try representation(of: view)
         let selected = color(in: representation, at: center)
         let fill = color(in: representation, at: CGPoint(x: center.x + view.cellSize.width * 12, y: center.y))
-        let edge = CGRect(x: 4 + view.cellSize.width * 8 - 2, y: center.y, width: 4, height: 1)
+        let edge = CGRect(x: 10 + view.cellSize.width * 8 - 2, y: center.y, width: 4, height: 1)
         #expect(!isClose(selected, to: fill))
         #expect(try pixels(in: edge, of: view).allSatisfy { isClose($0, to: selected) || isClose($0, to: fill) })
     }
@@ -581,13 +582,13 @@ struct TerminalContentViewTests {
             view.selection = TerminalContentView.Selection(
                 anchor: .init(line: 0, column: 0), head: .init(line: 1, column: 1))
         }
-        let strip = CGRect(x: 0, y: 4 + view.cellSize.height, width: view.bounds.width, height: view.cellSize.height)
+        let strip = CGRect(x: 0, y: 7 + view.cellSize.height, width: view.bounds.width, height: view.cellSize.height)
         let representation = try #require(view.bitmapImageRepForCachingDisplay(in: strip))
         view.cacheDisplay(in: strip, to: representation)
         let background = try #require(
-            color(in: representation, at: CGPoint(x: 4, y: view.cellSize.height / 2))?.usingColorSpace(.sRGB))
+            color(in: representation, at: CGPoint(x: 10, y: view.cellSize.height / 2))?.usingColorSpace(.sRGB))
         func ink(y: CGFloat) -> CGFloat {
-            stride(from: 4 + view.cellSize.width / 4, to: 4 + view.cellSize.width * 3 / 4, by: 1 / scale)
+            stride(from: 10 + view.cellSize.width / 4, to: 10 + view.cellSize.width * 3 / 4, by: 1 / scale)
                 .compactMap { color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB) }
                 .map { abs($0.brightnessComponent - background.brightnessComponent) }
                 .max() ?? 0
@@ -673,7 +674,7 @@ struct TerminalContentViewTests {
         await session.waitForExit()
         view.fit(to: CGSize(width: 200, height: 100))
         #expect(!session.terminal.scrollback.isEmpty)
-        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
         let color = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
         #expect(abs(color.redComponent - 180 / 255) < 0.02)
     }
@@ -685,7 +686,7 @@ struct TerminalContentViewTests {
         palette.ansiColors[1] = Color(.sRGB, red: 0.4, green: 0.6, blue: 0.2)
         view.palette = palette
         let representation = try representation(of: view)
-        let cell = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let cell = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
         #expect(isClose(color(in: representation, at: cell), to: [0.4, 0.6, 0.2]))
         #expect(isClose(color(in: representation, at: CGPoint(x: 190, y: 90)), to: [0.2, 0.3, 0.4]))
     }
@@ -706,7 +707,7 @@ struct TerminalContentViewTests {
         view.palette = palette
         let representation = try representation(of: view)
         let points = [0, 2, 4]
-            .map { CGPoint(x: 4 + view.cellSize.width * (CGFloat($0) + 0.5), y: 4 + view.cellSize.height / 2) }
+            .map { CGPoint(x: 10 + view.cellSize.width * (CGFloat($0) + 0.5), y: 7 + view.cellSize.height / 2) }
         let fill: [CGFloat] = count > 2 ? [0.1, 0.9, 0.5] : [222.0 / 255, 230.0 / 255, 236.0 / 255]
         let brightFill: [CGFloat] = count > 2 ? [0.1, 0.9, 0.5] : [230.0 / 255, 239.0 / 255, 246.0 / 255]
         #expect(isClose(color(in: representation, at: points[0]), to: [0.4, 0.6, 0.2]))
@@ -735,7 +736,7 @@ struct TerminalContentViewTests {
 
     @Test func drawsInverseText() async throws {
         let view = try await drawnView(running: "printf '\\033[7m  \\033[m'")
-        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
+        let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
         let representation = try representation(of: view)
         #expect(color(in: representation, at: center) != color(in: representation, at: CGPoint(x: 190, y: 90)))
     }
@@ -772,7 +773,7 @@ struct TerminalContentViewTests {
         )
         let representation = try representation(of: view)
         let points = (0 ..< 10)
-            .map { CGPoint(x: 4 + view.cellSize.width * (CGFloat($0) + 0.5), y: 4 + view.cellSize.height / 2) }
+            .map { CGPoint(x: 10 + view.cellSize.width * (CGFloat($0) + 0.5), y: 7 + view.cellSize.height / 2) }
         #expect(isClose(color(in: representation, at: points[0]), to: [180.0 / 255, 85.0 / 255, 71.0 / 255]))
         #expect(isClose(color(in: representation, at: points[1]), to: [0.6, 0.7, 0.8]))
         #expect(isClose(color(in: representation, at: points[2]), to: [53.0 / 255, 66.0 / 255, 75.0 / 255]))
@@ -1207,7 +1208,7 @@ struct TerminalContentViewTests {
             window.scale = scale
             mark(10, in: view)
         }
-        let composition = full.rect(row: 1, columns: 36 ..< 48)
+        let composition = full.rect(row: 1, columns: 39 ..< 52)
         #expect(try pixels(in: composition, of: full) == pixels(in: composition, of: empty))
     }
 
@@ -1233,7 +1234,7 @@ struct TerminalContentViewTests {
         )
         window.contentView = view
         let rect = view.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
-        #expect(rect.origin == CGPoint(x: 104, y: 346 - view.cellSize.height))
+        #expect(rect.origin == CGPoint(x: 110, y: 343 - view.cellSize.height))
         #expect(rect.size == view.cellSize)
     }
 }
