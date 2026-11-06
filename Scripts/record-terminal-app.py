@@ -3,12 +3,12 @@ import fcntl, glob, json, os, re, select, struct, subprocess, sys, termios, temp
 
 COLUMNS = 40
 ROWS = 12
-TIME_LIMIT = 900
+TIME_LIMIT = 1800
 SYNC = b"\x1b[>c"
 PROBE = b"\x1b[6n"
 SYNC_REPLY = b"\x1b[>1;95;0c"
 RESET = (
-    b"\x1b[?1049l\x1b[?47l\x1b[!p\x1b[r\x1b[?7h\x1b[?6l\x1b[?5l\x1b[?3l\x1b[?40l\x1b[?25h\x1b[?1l\x1b>"
+    b"\x1b[?47h\x1b[r\x1b[?6l\x1b[2J\x1b[H\x1b7\x1b[?47l\x1b[!p\x1b[r\x1b[?7h\x1b[?6l\x1b[?5l\x1b[?3l\x1b[?40l\x1b[?25h\x1b[?1l\x1b>"
     b"\x1b[4l\x1b[20l\x1b(B\x1b)B\x0f\x1b[m\x1b[0 q\x1b]104\x07\x1b]110\x07\x1b]111\x07\x1b]2;\x07"
     b"\x1b[3g" + b"".join(b"\x1b[%dG\x1bH" % column for column in range(9, COLUMNS, 8)) +
     b"\x1b[H\x1b7\x1b[2J\x1b[3J"

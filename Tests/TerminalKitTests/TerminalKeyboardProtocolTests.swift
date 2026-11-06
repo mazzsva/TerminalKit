@@ -326,7 +326,7 @@ struct TerminalKeyboardProtocolTests {
         try session.start()
         await session.waitForText("ready")
         view.keyDown(with: try keyDown("k", modifierFlags: .command))
-        #expect(session.lines.prefix(3) == ["", "b", "cready"])
+        #expect(session.lines.prefix(2) == ["b", "cready"])
         session.send("x")
         await session.waitForExit()
     }

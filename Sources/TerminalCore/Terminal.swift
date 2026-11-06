@@ -58,6 +58,10 @@ package struct Terminal: Sendable {
     package private(set) var usesSGRMouseEncoding = false
     package private(set) var modifyOtherKeys = 0
 
+    package var normalScreenLines: [Line] {
+        normalScreen?.lines ?? []
+    }
+
     package var isAlternateScreenActive: Bool {
         normalScreen != nil
     }
@@ -83,6 +87,7 @@ package struct Terminal: Sendable {
     private var tabStops: [Bool]
     private var replies: [UInt8] = []
     private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
+    private var alternateScreen: (lines: [Line], savedCursor: SavedCursor)?
     private var keyboardFlagStacks: [[Int]] = [[], []]
 
     package init(columns: Int, rows: Int) {
@@ -340,10 +345,7 @@ package struct Terminal: Sendable {
             modifyOtherKeys = level <= 2 ? level : 0
             return
         }
-        guard
-            sequence.privateMarker == nil
-                || sequence.privateMarker == "?" && (sequence.final == "J" || sequence.final == "K")
-        else {
+        guard sequence.privateMarker == nil else {
             return
         }
         let count = sequence.parameter(at: 0, default: 1)
@@ -385,7 +387,8 @@ package struct Terminal: Sendable {
             insertCharacters(count)
         case "b":
             if let lastCharacter {
-                for _ in 0 ..< min(isWrapPending ? count - 1 : count, Self.maximumRepeatCount) {
+                isWrapPending = false
+                for _ in 0 ..< min(count, Self.maximumRepeatCount) {
                     place(lastCharacter)
                 }
             }
@@ -399,7 +402,7 @@ package struct Terminal: Sendable {
             deleteLines(count)
         case "S":
             scrollRegionUp(count)
-        case "T" where sequence.parameters.count <= 1:
+        case "T":
             scrollDown(count, in: scrollRegion)
         case "c" where sequence.parameter(at: 0, default: 0) == 0:
             replies += "\u{1B}[?1;2c".utf8
@@ -413,10 +416,6 @@ package struct Terminal: Sendable {
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
             setScrollRegion(top: count - 1, bottom: min(sequence.parameter(at: 1, default: rows), rows))
-        case "s" where sequence.parameters.isEmpty:
-            saveCursor()
-        case "u" where sequence.parameters.isEmpty:
-            restoreCursor()
         default:
             break
         }
@@ -584,12 +583,19 @@ package struct Terminal: Sendable {
         if let normalScreen {
             Graphemes.markIndices(in: normalScreen.lines, into: &used)
         }
+        if let alternateScreen {
+            Graphemes.markIndices(in: alternateScreen.lines, into: &used)
+        }
         let newIndices = graphemes.compact(keeping: used)
         Graphemes.remapIndices(in: &scrollback, with: newIndices)
         Graphemes.remapIndices(in: &screen, with: newIndices)
         if var normalScreen {
             Graphemes.remapIndices(in: &normalScreen.lines, with: newIndices)
             self.normalScreen = normalScreen
+        }
+        if var alternateScreen {
+            Graphemes.remapIndices(in: &alternateScreen.lines, with: newIndices)
+            self.alternateScreen = alternateScreen
         }
     }
 
@@ -645,6 +651,10 @@ package struct Terminal: Sendable {
 
     private mutating func deleteLines(_ count: Int) {
         guard scrollRegion.contains(cursor.row) else {
+            return
+        }
+        if cursor.row == 0 {
+            scrollRegionUp(count)
             return
         }
         scrollUp(count, in: cursor.row ..< scrollRegion.upperBound)
@@ -854,6 +864,10 @@ package struct Terminal: Sendable {
     }
 
     private mutating func moveBackwardFromWrap(_ count: Int) {
+        guard cursor.column == columns - 1 else {
+            moveCursor(row: cursor.row, column: 1)
+            return
+        }
         let rowCount = count / columns
         var row = cursor.row
         for _ in 0 ..< min(rowCount, rows) {
@@ -930,18 +944,19 @@ package struct Terminal: Sendable {
             usesSGRMouseEncoding = isEnabled
         case (2004, _):
             usesBracketedPaste = isEnabled
-        case (47, true), (1047, true):
+        case (47, true):
             enterAlternateScreen()
-        case (47, false), (1047, false):
-            exitAlternateScreen()
-        case (1048, true):
-            saveCursor()
-        case (1048, false):
-            restoreCursor()
+            homeCursor()
+        case (47, false):
+            if let position = normalScreen?.cursor {
+                exitAlternateScreen()
+                moveCursor(row: position.row, column: position.column)
+            }
         case (1049, true):
             saveCursor()
             enterAlternateScreen()
-            eraseInDisplay(2)
+            screen = blankLines(rows)
+            homeCursor()
         case (1049, false):
             exitAlternateScreen()
             restoreCursor()
@@ -950,19 +965,28 @@ package struct Terminal: Sendable {
         }
     }
 
+    private mutating func homeCursor() {
+        cursor = Position(row: topLimit, column: 0)
+        isAfterPrint = false
+    }
+
     private mutating func enterAlternateScreen() {
         guard normalScreen == nil else {
             return
         }
         normalScreen = (screen, cursor, savedCursor)
-        screen = blankLines(rows)
-        savedCursor = SavedCursor()
+        screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
+        if let alternateScreen, alternateScreen.lines.count == rows, alternateScreen.lines.first?.count == columns {
+            screen = alternateScreen.lines
+        }
+        savedCursor = alternateScreen?.savedCursor ?? SavedCursor()
     }
 
     private mutating func exitAlternateScreen() {
         guard let normalScreen else {
             return
         }
+        alternateScreen = (screen, savedCursor)
         screen = normalScreen.lines
         savedCursor = normalScreen.savedCursor
         self.normalScreen = nil
@@ -1043,9 +1067,13 @@ package struct Terminal: Sendable {
             screen.replaceSubrange(0 ..< cursor.row, with: blankLines(cursor.row))
             eraseInLine(1)
         case 2:
+            if normalScreen == nil, screen.contains(where: { $0.contains(where: \.isWritten) }) {
+                keepInScrollback(screen[...])
+            }
             unwrapLine(before: 0)
             screen = blankLines(rows)
         case 3:
+            normalScreen?.lines = Array(repeating: Self.blankLine(columns: columns), count: rows)
             removedScrollbackCount += scrollback.count
             scrollback.removeAll()
             graphemes.resetCompactionInterval()
