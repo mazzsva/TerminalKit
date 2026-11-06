@@ -212,6 +212,15 @@ private struct SeededGenerator: RandomNumberGenerator {
     }
 }
 
+@Test func keepsTheClustersOfTheStoredAlternateScreen() {
+    var terminal = Terminal(columns: 8, rows: 2)
+    terminal.graphemes = Terminal.Graphemes(capacity: 128)
+    terminal.receive("\u{1B}[?47he\u{307}\u{1B}[?47l")
+    terminal.receive(clusters(count: 300))
+    terminal.receive("\u{1B}[?47h")
+    #expect(terminal.character(of: terminal.screen[0][0]) == "e\u{307}")
+}
+
 private func clusters(count: Int) -> String {
     var text = ""
     var made = 0

@@ -40,7 +40,8 @@ struct TerminalAppRecordingTests {
         #expect(escaped(reply) == recording.reply)
         #expect(terminal.title == recording.title ?? "")
         #expect(text(terminal.screen, of: terminal) == recording.screen)
-        #expect(text(terminal.scrollback + terminal.screen, of: terminal) == recording.history ?? recording.screen)
+        let history = terminal.scrollback + terminal.normalScreenLines + terminal.screen
+        #expect(text(history, of: terminal) == recording.history ?? recording.screen)
     }
 
     func bytes(_ text: String) -> [UInt8] {
