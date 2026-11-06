@@ -80,11 +80,11 @@ struct TerminalDropTests {
         let terminal = session.terminal
         let output = (terminal.scrollback + terminal.screen)
             .map {
-                String($0.filter { $0.width > 0 }.map(terminal.character(of:))).trimmingCharacters(in: .whitespaces)
+                String($0.filter(\.isText).map(terminal.character(of:))).trimmingCharacters(in: .whitespaces)
             }
             .joined(separator: "\n")
         for name in names {
-            #expect(output.contains("</x/" + name.replacing("\t", with: " ") + ">"), "\(name)")
+            #expect(output.contains("</x/" + name + ">"), "\(name)")
         }
     }
 }

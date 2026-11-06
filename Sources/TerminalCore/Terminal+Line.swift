@@ -12,6 +12,13 @@ extension Terminal {
             self.isWrapped = isWrapped
         }
 
+        package func columnCount(at column: Int) -> Int {
+            guard self[column].isTab else {
+                return Swift.max(Int(self[column].width), 1)
+            }
+            return (self[(column + 1)...].firstIndex { !$0.isTabGap } ?? count) - column
+        }
+
         package var startIndex: Int {
             cells.startIndex
         }

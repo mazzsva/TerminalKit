@@ -25,7 +25,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
                     continues
                     ? columns.upperBound
                     : line[columns].lastIndex { !$0.isSpace }.map { $0 + 1 } ?? columns.lowerBound
-                let cells = line[columns.lowerBound ..< end].filter { $0.width > 0 && $0 != .padding }
+                let cells = line[columns.lowerBound ..< end].filter(\.isText)
                 return (String(cells.map(graphemes.character(of:))), continues)
             }
         guard !pieces.isEmpty else {

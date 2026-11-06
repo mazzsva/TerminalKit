@@ -109,7 +109,7 @@ extension TerminalContentView: NSTextFinderClient {
         let start = position(of: range.location, in: text)
         let last = range.length > 0 ? position(of: range.upperBound - 1, in: text) : start
         let line = line(at: last.row)
-        let width = line.indices.contains(last.column) ? max(Int(line[last.column].width), 1) : 1
+        let width = line.indices.contains(last.column) ? line.columnCount(at: last.column) : 1
         return (start, (last.row, last.column + width))
     }
 }

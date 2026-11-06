@@ -120,7 +120,7 @@ extension TerminalContentView {
         }
 
         static func isText(_ cell: Terminal.Cell) -> Bool {
-            cell.width > 0 && cell != .padding
+            cell.isText
         }
 
         private static func textEnd(of line: Terminal.Line, continues: Bool) -> Int {
@@ -265,6 +265,9 @@ extension TerminalContentView {
         if column < line.count, line[column].width == 0 {
             column -= 1
         }
+        while column > 0, column < line.count, line[column].isTabGap {
+            column -= 1
+        }
         return accessibilityRange(for: min(index(row: row, column: column, in: text), max(text.length - 1, 0)))
     }
 
@@ -276,7 +279,7 @@ extension TerminalContentView {
         let start = position(of: range.location, in: text)
         let end = range.length > 0 ? position(of: range.upperBound - 1, in: text) : start
         let endLine = line(at: end.row)
-        let endColumn = end.column + (endLine.indices.contains(end.column) ? max(Int(endLine[end.column].width), 1) : 1)
+        let endColumn = end.column + (endLine.indices.contains(end.column) ? endLine.columnCount(at: end.column) : 1)
         let frame =
             start.row == end.row
             ? rect(row: start.row, columns: start.column ..< endColumn)
