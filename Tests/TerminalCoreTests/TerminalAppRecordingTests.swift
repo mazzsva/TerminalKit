@@ -39,11 +39,8 @@ struct TerminalAppRecordingTests {
         let reply = terminal.receive(bytes(recording.input) + Array("\u{1B}[6n".utf8))
         #expect(escaped(reply) == recording.reply)
         #expect(terminal.title == recording.title ?? "")
-        let screen = text(terminal.screen, of: terminal)
-        #expect(screen == Self.trimmed(recording.screen))
-        #expect(
-            text(terminal.scrollback + terminal.screen, of: terminal)
-                == Self.trimmed(recording.history ?? recording.screen))
+        #expect(text(terminal.screen, of: terminal) == recording.screen)
+        #expect(text(terminal.scrollback + terminal.screen, of: terminal) == recording.history ?? recording.screen)
     }
 
     func bytes(_ text: String) -> [UInt8] {
@@ -69,28 +66,18 @@ struct TerminalAppRecordingTests {
         var text: [String] = []
         var isContinuation = false
         for line in lines {
-            let string = String(line.filter { $0.width > 0 && $0 != .padding }.map { terminal.character(of: $0) })
+            let end = (line.lastIndex(where: \.isWritten) ?? -1) + 1
+            let string = String(line[..<end].filter { $0.width > 0 && $0 != .padding }.map(terminal.character(of:)))
             if isContinuation, let last = text.popLast() {
-                text.append((Self.trimmed([last]).first ?? "") + string)
+                text.append(last + string)
             } else {
                 text.append(string)
             }
             isContinuation = line.isWrapped
         }
-        return Self.trimmed(text)
-    }
-
-    private static func trimmed(_ lines: [String]) -> [String] {
-        var lines = lines.map { line in
-            var line = line
-            while line.last == " " {
-                line.removeLast()
-            }
-            return line
+        while text.last == "" {
+            text.removeLast()
         }
-        while lines.last == "" {
-            lines.removeLast()
-        }
-        return lines
+        return text
     }
 }

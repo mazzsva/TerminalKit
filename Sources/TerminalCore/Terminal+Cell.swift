@@ -2,6 +2,7 @@ extension Terminal {
     package struct Cell: Equatable, Sendable {
         package static let padding = Cell(scalar: "\u{0}")
         fileprivate static let firstGraphemeIndex: UInt32 = 0x11_0000
+        fileprivate static let writtenSpaceContent: UInt32 = 0x7F
 
         package var style = Style()
         package var width: UInt8 = 1
@@ -13,12 +14,22 @@ extension Terminal {
             content = scalar.value
         }
 
+        package static func writtenSpace(style: Style = Style()) -> Cell {
+            var cell = Cell(style: style)
+            cell.content = writtenSpaceContent
+            return cell
+        }
+
+        package var isWritten: Bool {
+            content != 0x20 && content != 0
+        }
+
         package var isBlank: Bool {
             self == Cell() || self == .padding
         }
 
         package var isSpace: Bool {
-            content == 0x20 || content == 0
+            content == 0x20 || content == 0 || content == Self.writtenSpaceContent
         }
 
         package var isASCII: Bool {
@@ -48,7 +59,7 @@ extension Terminal {
 
         package func character(of cell: Cell) -> Character {
             guard let index = cell.graphemeIndex else {
-                return cell.content == 0 ? " " : Unicode.Scalar(cell.content).map(Character.init) ?? " "
+                return cell.isSpace ? " " : Unicode.Scalar(cell.content).map(Character.init) ?? " "
             }
             return characters[index]
         }

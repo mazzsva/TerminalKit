@@ -41,7 +41,7 @@ def osascript(script):
 
 def text_lines(text):
     lines = text.split("\n")
-    while lines and not lines[-1].strip(" "):
+    while lines and not lines[-1]:
         lines.pop()
     return lines
 
@@ -84,6 +84,14 @@ def probe(window, paths):
         return data, False
 
     def contents_and_history():
+        for _ in range(4):
+            try:
+                return read_contents_and_history()
+            except RuntimeError:
+                time.sleep(1)
+        return read_contents_and_history()
+
+    def read_contents_and_history():
         return osascript(
             f'tell application "Terminal" to return (contents of {tab}) & (ASCII character 1) & (history of {tab}) & (ASCII character 1) & (custom title of {tab})'
         ).split("\x01")
@@ -94,7 +102,10 @@ def probe(window, paths):
         for path in paths:
             with open(path) as file:
                 recordings = json.load(file)
-            for recording in recordings:
+            for index, recording in enumerate(recordings):
+                if index % 200 == 0:
+                    with open(path, "w") as file:
+                        file.write(format_recordings(recordings))
                 write(RESET + SYNC)
                 if not read_to_sync(2)[1]:
                     write(b"\x07\x1b\\" + RESET + SYNC)
