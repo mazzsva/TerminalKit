@@ -164,10 +164,7 @@ final class TerminalContentView: NSView {
             background = isReversed ? currentForeground : currentBackground
             backgroundAlpha = paletteBackground.alphaComponent
             bold = isReversed ? foreground : changes.bold.map { NSColor($0) } ?? NSColor(palette.bold)
-            let cursor = changes.cursor.map { NSColor($0, alpha: paletteCursor.alphaComponent) } ?? paletteCursor
-            self.cursor =
-                isReversed && cursor.terminalRGB == background.terminalRGB
-                ? foreground.withAlphaComponent(cursor.alphaComponent) : cursor
+            cursor = changes.cursor.map { NSColor($0, alpha: paletteCursor.alphaComponent) } ?? paletteCursor
             selection = changes.selection.map { NSColor($0) } ?? NSColor(palette.selection)
             var ansiColors =
                 (palette.ansiColors.prefix(16) + TerminalPalette.standard.ansiColors.dropFirst(palette.ansiColors.count))
@@ -615,7 +612,7 @@ final class TerminalContentView: NSView {
             columns: cursorColumns,
             row: terminal.scrollback.count + terminal.cursor.row,
             style: style,
-            foreground: colors.colors(for: style).background ?? colors.background.withAlphaComponent(1),
+            foreground: colors.colors(for: style).foreground,
             graphemes: graphemes,
             order: Self.visualOrder(of: line, graphemes: graphemes)
         )

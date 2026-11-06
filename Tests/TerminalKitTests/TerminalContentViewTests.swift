@@ -475,14 +475,14 @@ struct TerminalContentViewTests {
         #expect(pixels.allSatisfy { isClose($0, to: foreground) || isClose($0, to: background) })
     }
 
-    @Test func drawsTheUnderlineUnderTheCursorInTheCursorTextColor() async throws {
+    @Test func drawsTheUnderlineUnderTheCursorInTheTextColor() async throws {
         let (view, window) = try await focusedView(running: "printf '\\033[4;32mX\\033[m\\b'")
         let font = view.fonts.regular
         let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
         let underline = try stride(from: view.cursorRect.minX, to: view.cursorRect.maxX, by: 1)
             .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
-        #expect(underline.allSatisfy { $0.greenComponent - max($0.redComponent, $0.blueComponent) < 0.1 })
+        #expect(underline.contains { $0.greenComponent - max($0.redComponent, $0.blueComponent) > 0.1 })
         #expect(window.firstResponder === view)
     }
 
@@ -801,21 +801,13 @@ struct TerminalContentViewTests {
         #expect(!isClose(color(in: unfocused, at: edge), to: color(in: unfocused, at: corner)))
     }
 
-    @Test(arguments: [
-        (Color(.sRGB, red: 0.2, green: 0.3, blue: 0.4).opacity(0.5), "102;128;153"),
-        (Color(.sRGB, red: 1, green: 0.5, blue: 0), "255;128;0"),
-    ])
-    func drawsTheCursorColorInReverseVideo(cursor: Color, background: String) async throws {
-        let (view, window) = try await focusedView(running: "printf '\\033[?5h\\033[48;2;\(background)m \\033[m'")
-        var palette = TerminalPalette.standard
-        palette.foreground = Color(.sRGB, red: 0.2, green: 0.3, blue: 0.4)
-        palette.background = Color(.sRGB, red: 0.6, green: 0.7, blue: 0.8)
-        palette.cursor = cursor
-        view.palette = palette
+    @Test func keepsTheCursorColorInReverseVideo() async throws {
+        let (view, window) = try await focusedView(running: "printf '\\033[?5h'")
+        view.palette.cursor = Color(.sRGB, red: 1, green: 0.5, blue: 0)
         let representation = try representation(of: view)
         let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
-        let cell = CGPoint(x: center.x - view.cellSize.width, y: center.y)
-        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: cell)))
+        let drawn = try #require(color(in: representation, at: center)?.usingColorSpace(.sRGB))
+        #expect(drawn.redComponent > 0.8 && drawn.blueComponent < 0.3)
         #expect(window.firstResponder === view)
     }
 
@@ -832,17 +824,17 @@ struct TerminalContentViewTests {
     }
 
     @Test func drawsTheTextUnderTheCursorInReverseVideo() async throws {
-        let (view, window) = try await focusedView(running: "printf '\\033[?5h\u{2588}\\r'")
+        let (view, window) = try await focusedView(running: "printf '\\033[?5h\u{2588}\u{2588}\\r'")
         let representation = try representation(of: view)
         let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
-        let corner = CGPoint(x: 190, y: 90)
-        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: corner)))
+        let cell = CGPoint(x: center.x + view.cellSize.width, y: center.y)
+        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: cell)))
         #expect(window.firstResponder === view)
     }
 
     @Test func drawsTheTextUnderTheCursorOnAColorInReverseVideo() async throws {
         let (view, window) = try await focusedView(
-            running: "printf '\\033[?5h\\033[40m\u{2588}\\033[0;30m\u{2588}\\r'")
+            running: "printf '\\033[?5h\\033[30m\u{2588}\u{2588}\\033[m\\r'")
         let representation = try representation(of: view)
         let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
         let cell = CGPoint(x: center.x + view.cellSize.width, y: center.y)
