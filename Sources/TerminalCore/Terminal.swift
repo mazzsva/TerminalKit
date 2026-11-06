@@ -26,7 +26,6 @@ package struct Terminal: Sendable {
     private struct SavedCursor {
         var position = Position(row: 0, column: 0)
         var style = Style()
-        var isWrapPending = false
         var usesLineDrawing = false
         var usesOriginMode = false
     }
@@ -74,6 +73,7 @@ package struct Terminal: Sendable {
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
     private var isWrapPending = false
+    private var isTextRunClipped = false
     private var isAfterPrint = false
     private var style = Style()
     private var usesLineDrawing = false
@@ -96,32 +96,32 @@ package struct Terminal: Sendable {
 
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
+        isTextRunClipped = false
         if columns != self.columns {
             guard var normalScreen else {
                 let (lines, anchors) = reflow(
                     screen,
-                    keeping: [(cursor, isWrapPending), (savedCursor.position, savedCursor.isWrapPending)],
+                    keeping: [(cursor, isWrapPending), (savedCursor.position, false)],
                     columns: columns,
                     rows: rows
                 )
                 screen = lines
                 (cursor, isWrapPending) = anchors[0]
-                (savedCursor.position, savedCursor.isWrapPending) = anchors[1]
+                savedCursor.position = anchors[1].position
                 setSize(columns: columns, rows: rows)
                 return
             }
             let saved = normalScreen.savedCursor
             let (lines, anchors) = reflow(
                 normalScreen.lines,
-                keeping: [(normalScreen.cursor, false), (saved.position, saved.isWrapPending)],
+                keeping: [(normalScreen.cursor, false), (saved.position, false)],
                 columns: columns,
                 rows: rows
             )
             normalScreen.lines = lines
             normalScreen.cursor = anchors[0].position
-            (normalScreen.savedCursor.position, normalScreen.savedCursor.isWrapPending) = anchors[1]
+            normalScreen.savedCursor.position = anchors[1].position
             self.normalScreen = normalScreen
-            savedCursor.isWrapPending = false
         }
         let removedRows = max(cursor.row + 1 - rows, 0)
         if normalScreen == nil {
@@ -258,6 +258,7 @@ package struct Terminal: Sendable {
             guard let action = parser.advance(scalar) else {
                 continue
             }
+            if case .print = action {} else { isTextRunClipped = false }
             switch action {
             case .print(let scalar):
                 let printed = usesLineDrawing ? scalar.lineDrawingCharacter : scalar
@@ -270,7 +271,7 @@ package struct Terminal: Sendable {
             case .execute("\u{7}"):
                 bellCount += 1
             case .execute("\u{8}"):
-                moveCursor(row: cursor.row, column: cursor.column - 1)
+                moveBackward(1)
             case .execute("\t"):
                 moveForward(tabStops: 1)
             case .escape(intermediates: "", final: "D"):
@@ -297,6 +298,7 @@ package struct Terminal: Sendable {
             default:
                 break
             }
+            if case .print = action {} else { isTextRunClipped = false }
         }
         return replies
     }
@@ -353,7 +355,11 @@ package struct Terminal: Sendable {
         case "C":
             moveCursor(row: cursor.row, column: cursor.column + count)
         case "D":
-            moveCursor(row: cursor.row, column: cursor.column - count)
+            if isWrapPending {
+                moveBackwardFromWrap(count)
+            } else {
+                moveBackward(count)
+            }
         case "E":
             moveCursor(row: min(cursor.row + count, bottomLimit), column: 0)
         case "F":
@@ -369,7 +375,8 @@ package struct Terminal: Sendable {
         case "H", "f":
             moveCursor(row: min(topLimit + count - 1, bottomLimit), column: sequence.parameter(at: 1, default: 1) - 1)
         case "d":
-            moveCursor(row: min(topLimit + count - 1, bottomLimit), column: cursor.column)
+            cursor.row = min(topLimit + count - 1, bottomLimit)
+            isAfterPrint = false
         case "J":
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
@@ -435,23 +442,25 @@ package struct Terminal: Sendable {
 
     private mutating func place(_ cell: Cell) {
         let width = Int(cell.width)
-        if isWrapPending || cursor.column + width > columns {
-            if usesAutowrap {
-                let row = cursor.row
-                let scrolls = row == scrollRegion.upperBound - 1
-                if !isWrapPending, screen[row][columns - 1] == Cell() {
-                    screen[row][columns - 1] = .padding
-                }
-                screen[row].isWrapped = true
-                carriageReturn()
-                lineFeed()
-                if scrolls, cursor.row > 0 {
-                    screen[cursor.row - 1].isWrapped = true
-                } else if !scrolls, cursor.row == row {
-                    screen[row].isWrapped = false
-                }
-            } else {
-                cursor.column = columns - width
+        if !usesAutowrap {
+            guard !isTextRunClipped, cursor.column + width <= columns else {
+                isTextRunClipped = true
+                return
+            }
+            isWrapPending = false
+        } else if isWrapPending || cursor.column + width > columns {
+            let row = cursor.row
+            let scrolls = row == scrollRegion.upperBound - 1
+            if !isWrapPending, screen[row][columns - 1] == Cell() {
+                screen[row][columns - 1] = .padding
+            }
+            screen[row].isWrapped = true
+            carriageReturn()
+            lineFeed()
+            if scrolls, cursor.row > 0 {
+                screen[cursor.row - 1].isWrapped = true
+            } else if !scrolls, cursor.row == row {
+                screen[row].isWrapped = false
             }
         }
         if usesInsertMode {
@@ -467,6 +476,7 @@ package struct Terminal: Sendable {
         if cursor.column + width == columns {
             cursor.column = columns - 1
             isWrapPending = usesAutowrap
+            isTextRunClipped = !usesAutowrap
         } else {
             cursor.column += width
         }
@@ -485,7 +495,10 @@ package struct Terminal: Sendable {
     }
 
     private mutating func combine(_ scalar: Unicode.Scalar) -> Bool {
-        var column = isWrapPending ? cursor.column : cursor.column - 1
+        var column = isWrapPending || isTextRunClipped ? cursor.column : cursor.column - 1
+        if isTextRunClipped, screen[cursor.row][cursor.column].isBlank {
+            return true
+        }
         if column > 0, screen[cursor.row][column].width == 0 {
             column -= 1
         }
@@ -527,6 +540,9 @@ package struct Terminal: Sendable {
             cell.width = 2
             screen[cursor.row][column] = .padding
             place(cell)
+            return
+        }
+        guard column + 1 < columns else {
             return
         }
         if usesInsertMode {
@@ -573,7 +589,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func insertCharacters(_ count: Int) {
-        isWrapPending = false
         let count = min(count, columns - cursor.column)
         screen[cursor.row].insert(contentsOf: repeatElement(blank, count: count), at: cursor.column)
         screen[cursor.row].removeLast(count)
@@ -583,7 +598,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func deleteCharacters(_ count: Int) {
-        isWrapPending = false
         let count = min(count, columns - cursor.column)
         screen[cursor.row].removeSubrange(cursor.column ..< cursor.column + count)
         screen[cursor.row].append(contentsOf: repeatElement(blank, count: count))
@@ -742,6 +756,7 @@ package struct Terminal: Sendable {
         terminal.removedScrollbackCount = removedScrollbackCount
         terminal.decoder = decoder
         terminal.replies = replies
+        terminal.isWrapPending = isWrapPending
         self = terminal
     }
 
@@ -761,10 +776,36 @@ package struct Terminal: Sendable {
     }
 
     private mutating func moveForward(tabStops count: Int) {
+        isWrapPending = false
         isAfterPrint = false
         for _ in 0 ..< min(count, columns) {
             cursor.column = tabStops[(cursor.column + 1)...].firstIndex(of: true) ?? columns - 1
         }
+    }
+
+    private mutating func moveBackward(_ count: Int) {
+        var row = cursor.row
+        var column = cursor.column - count
+        while column < 0, row > 0, screen[row - 1].isWrapped {
+            row -= 1
+            column += columns
+        }
+        if column < 0, row == 0, normalScreen == nil, scrollback.last?.isWrapped == true {
+            column += columns
+        }
+        moveCursor(row: row, column: column)
+    }
+
+    private mutating func moveBackwardFromWrap(_ count: Int) {
+        let rowCount = count / columns
+        var row = cursor.row
+        for _ in 0 ..< min(rowCount, rows) {
+            guard row > 0, screen[row - 1].isWrapped else {
+                break
+            }
+            row -= 1
+        }
+        moveCursor(row: row, column: columns - 1 - max(count - 1 - rowCount * columns, 0))
     }
 
     private mutating func moveBackward(tabStops count: Int) {
@@ -920,7 +961,6 @@ package struct Terminal: Sendable {
         savedCursor = SavedCursor(
             position: Position(row: cursor.row - topLimit, column: cursor.column),
             style: style,
-            isWrapPending: isWrapPending,
             usesLineDrawing: usesLineDrawing,
             usesOriginMode: usesOriginMode
         )
@@ -930,7 +970,6 @@ package struct Terminal: Sendable {
         usesOriginMode = savedCursor.usesOriginMode
         moveCursor(row: min(topLimit + savedCursor.position.row, bottomLimit), column: savedCursor.position.column)
         style = savedCursor.style
-        isWrapPending = savedCursor.isWrapPending
         usesLineDrawing = savedCursor.usesLineDrawing
     }
 
@@ -948,7 +987,6 @@ package struct Terminal: Sendable {
             eraseInLine(1)
         case 2:
             unwrapLine(before: 0)
-            isWrapPending = false
             screen = blankLines(rows)
         case 3:
             removedScrollbackCount += scrollback.count
@@ -973,7 +1011,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func erase(_ range: Range<Int>, row: Int) {
-        isWrapPending = false
         screen[row].replaceSubrange(range, with: repeatElement(blank, count: range.count))
         if range.upperBound == columns {
             screen[row].isWrapped = false

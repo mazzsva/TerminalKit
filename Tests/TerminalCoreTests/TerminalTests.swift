@@ -359,10 +359,10 @@ struct TerminalTests {
         #expect(lines(terminal) == ["abcg", "h   "])
     }
 
-    @Test func keepsAWideCharacterOnTheLineWithoutAutowrap() {
+    @Test func dropsAWideCharacterThatDoesNotFitWithoutAutowrap() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("\u{1B}[?7labc中")
-        #expect(lines(terminal) == ["ab中 ", "    "])
+        #expect(lines(terminal) == ["abc ", "    "])
     }
 
     @Test func insertsCharactersInInsertMode() {
@@ -614,10 +614,101 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
-    @Test func cancelsThePendingWrapOnErase() {
+    @Test(arguments: ["\u{1B}[K", "\u{1B}[J", "\u{1B}[P", "\u{1B}[X", "\u{1B}[@"])
+    func keepsThePendingWrapOnErase(erase: String) {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("abcd\u{1B}[Ke")
-        #expect(lines(terminal) == ["abce", "    "])
+        terminal.receive("abcd\(erase)e")
+        #expect(lines(terminal) == ["abc ", "e   "])
+    }
+
+    @Test(arguments: ["\t", "\u{1B}[I", "\u{1B}[C", "\u{1B}[G"])
+    func cancelsThePendingWrapOnAMove(move: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\(move)")
+        let cursor = terminal.cursor
+        terminal.receive("e")
+        #expect(terminal.screen[1][0] == Terminal.Cell())
+        #expect(terminal.cursor.row == cursor.row)
+    }
+
+    @Test func keepsThePendingWrapOnAVerticalPosition() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("abcd\u{1B}[2dx")
+        #expect(lines(terminal) == ["abcd", "    ", "x   "])
+    }
+
+    @Test func keepsThePendingWrapOnAFullReset() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\u{1B}cx")
+        #expect(lines(terminal) == ["    ", "x   "])
+    }
+
+    @Test(arguments: [(1, 3), (2, 2), (3, 1), (4, 3), (5, 3), (6, 2), (8, 3), (9, 3)])
+    func movesBackFromThePendingWrap(count: Int, column: Int) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\u{1B}[\(count)D")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: column))
+    }
+
+    @Test func movesUpOverWrappedLinesFromThePendingWrap() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("abcdefghijkl\u{1B}[8D")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
+    }
+
+    @Test(arguments: ["\u{8}", "\u{1B}[D"])
+    func movesBackOverAWrappedLine(back: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcde\r\(back)")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
+    }
+
+    @Test(arguments: ["\u{8}", "\u{1B}[D"])
+    func staysAtTheStartOfAHardLine(back: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("abcd\r\ne\r\(back)")
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
+    }
+
+    @Test func movesBackOverALineInTheScrollback() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("abcde\r\u{8}")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
+    }
+
+    @Test func repeatsTheDroppedCharacterWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?7labcde\u{1B}[b")
+        #expect(lines(terminal) == ["abce"])
+    }
+
+    @Test func dropsACombiningMarkAfterADroppedWideCharacter() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?7labc中\u{301}")
+        #expect(lines(terminal) == ["abc "])
+    }
+
+    @Test(arguments: ["\u{261D}\u{1F3FD}", "\u{1F1FA}\u{1F1F8}"])
+    func acceptsAnEmojiPairAtTheEndWithoutAutowrap(pair: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[?7labc\(pair)")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
+    }
+
+    @Test func allowsTextAfterAResizeWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?7labcd")
+        terminal.resize(columns: 8, rows: 1)
+        terminal.receive("e")
+        #expect(lines(terminal) == ["abce    "])
+    }
+
+    @Test func dropsTheRestOfTheTextWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?7labcdef")
+        #expect(lines(terminal) == ["abcd"])
+        terminal.receive("\u{1B}[mg")
+        #expect(lines(terminal) == ["abcg"])
     }
 
     @Test(arguments: [
@@ -636,7 +727,7 @@ struct TerminalTests {
 
     @Test func erasesTheDisplayWithTheBackgroundColor() {
         var terminal = Terminal(columns: 2, rows: 2)
-        terminal.receive("abcd\u{1B}[44m\u{1B}[2Jx")
+        terminal.receive("abc\u{1B}[44m\u{1B}[2Jx")
         #expect(lines(terminal) == ["  ", " x"])
         #expect(terminal.screen.flatMap { $0.map(\.style.background) } == Array(repeating: .indexed(4), count: 4))
         #expect(terminal.screen.map(\.isWrapped) == [false, false])
@@ -906,10 +997,10 @@ struct TerminalTests {
         #expect(terminal.screen[0][0].style == Terminal.Style(foreground: .indexed(1), isBold: true))
     }
 
-    @Test func restoresThePendingWrap() {
+    @Test func clearsThePendingWrapWhenItRestoresTheCursor() {
         var terminal = Terminal(columns: 2, rows: 2)
         terminal.receive("ab\u{1B}7\r\u{1B}8c")
-        #expect(lines(terminal) == ["ab", "c "])
+        #expect(lines(terminal) == ["ac", "  "])
     }
 
     @Test(arguments: [(8, ["abcX    ", "        ", "        "]), (2, ["aX", "  ", "  "])])
@@ -919,14 +1010,6 @@ struct TerminalTests {
         terminal.resize(columns: columns, rows: 3)
         terminal.receive("\u{1B}8X")
         #expect(lines(terminal) == expected)
-    }
-
-    @Test func keepsTheSavedPendingWrapOnTheAlternateScreenWhenTheRowsChange() {
-        var terminal = Terminal(columns: 4, rows: 3)
-        terminal.receive("\u{1B}[?1049habcd\u{1B}7")
-        terminal.resize(columns: 4, rows: 2)
-        terminal.receive("\u{1B}8X")
-        #expect(lines(terminal) == ["abcd", "X   "])
     }
 
     @Test func restoresTheHomePositionWithoutASave() {
@@ -989,10 +1072,10 @@ struct TerminalTests {
         #expect(lines(terminal) == ["  x "])
     }
 
-    @Test func resetsThePendingWrapOn1049() {
+    @Test func keepsThePendingWrapOn1049() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("abcd\u{1B}[?1049hx")
-        #expect(lines(terminal) == ["   x"])
+        #expect(lines(terminal) == ["x   "])
     }
 
     @Test(arguments: [47, 1047, 1049])
