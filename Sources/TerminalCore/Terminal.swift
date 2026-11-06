@@ -70,7 +70,8 @@ package struct Terminal: Sendable {
     package private(set) var bellCount = 0
     package internal(set) var currentDirectory: URL?
     package private(set) var mouseTracking = MouseTracking.off
-    package var reportedColors: [RGB] = []
+    package var defaultColors: DefaultColors?
+    package internal(set) var changedColors = ChangedColors()
     package var windowReport = WindowReport()
     package private(set) var usesSGRMouseEncoding = false
     package private(set) var modifyOtherKeys = 0
@@ -104,7 +105,7 @@ package struct Terminal: Sendable {
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
     private var tabStops: [Bool]
-    private var replies: [UInt8] = []
+    var replies: [UInt8] = []
     private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
     private var alternateScreen: (lines: [Line], savedCursor: SavedCursor)?
     private var keyboardFlagStacks: [[Int]] = [[], []]
@@ -810,20 +811,28 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ command: String) {
-        guard let separator = command.unicodeScalars.firstIndex(of: ";") else {
-            return
-        }
-        let text = command[command.unicodeScalars.index(after: separator)...]
-        let number = Int(command[..<separator]).flatMap { $0 <= Int32.max ? $0 : nil } ?? 0
-        switch number {
-        case 0, 2:
+        let separator = command.unicodeScalars.firstIndex(of: ";")
+        let text = separator.map { command[command.unicodeScalars.index(after: $0)...] }
+        let number = Int(command[..<(separator ?? command.endIndex)]).flatMap { $0 <= Int32.max ? $0 : nil } ?? 0
+        switch (number, text) {
+        case (0, let text?), (2, let text?):
             title = String(text)
-        case 7:
+        case (7, let text?):
             setCurrentDirectory(text)
-        case 10:
-            reportColors(text, from: 0)
-        case 11:
-            reportColors(text, from: 1)
+        case (4, let text?):
+            changeIndexedColors(text)
+        case (5, let text?):
+            changeSpecialColors(text)
+        case (10 ... 19, let text?):
+            changeDynamicColors(text, from: number)
+        case (104, _):
+            resetIndexedColors(text)
+        case (105, let text?):
+            resetSpecialColors(text)
+        case (110, _), (111, _), (112, _), (117, _):
+            if text?.isEmpty != false {
+                resetDynamicColor(number - 100)
+            }
         default:
             break
         }
@@ -833,7 +842,9 @@ package struct Terminal: Sendable {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.bellCount = bellCount
-        terminal.reportedColors = reportedColors
+        terminal.defaultColors = defaultColors
+        terminal.changedColors = changedColors
+        terminal.changedColors.indexed = [:]
         terminal.windowReport = windowReport
         terminal.graphemes = graphemes
         terminal.scrollback = scrollback
@@ -853,6 +864,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func softReset() {
+        changedColors.indexed = [:]
         usesInsertMode = false
         usesNewLineMode = false
         usesApplicationCursorKeys = false
@@ -1109,15 +1121,6 @@ package struct Terminal: Sendable {
     private mutating func reportTerminalParameters(_ request: Int) {
         if request <= 1 {
             replies += "\u{1B}[\(request + 2);1;1;112;112;1;0x".utf8
-        }
-    }
-
-    private mutating func reportColors(_ queries: Substring, from first: Int) {
-        let queries = queries.split(separator: ";", omittingEmptySubsequences: false)
-        for (index, query) in zip(reportedColors.indices.dropFirst(first), queries) where query == "?" {
-            let color = reportedColors[usesReverseVideo ? 1 - index : index]
-            let rgb = String(format: "rgb:%04x/%04x/%04x", color.red, color.green, color.blue)
-            replies += "\u{1B}]\(10 + index);\(rgb)\u{1B}\\".utf8
         }
     }
 
