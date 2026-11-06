@@ -119,7 +119,7 @@ extension TerminalContentView {
             return nil
         }
         let range = lowerBound ..< (starts[lowerBound...].firstIndex { $0 >= match.upperBound } ?? cells.count)
-        guard let url = URL(string: String(cells[range].map { terminal.character(of: $0.cell) })) else {
+        guard let url = URL(string: cells[range].map { terminal.character(of: $0.cell) }.joined()) else {
             return nil
         }
         let spans = Dictionary(grouping: cells[range], by: \.row)

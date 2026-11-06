@@ -70,14 +70,22 @@ struct TerminalAppRecordingTests {
     }
 
     func bytes(_ text: String) -> [UInt8] {
+        let source = Array(text.utf8)
         var bytes: [UInt8] = []
-        var rest = Substring(text)
-        while let range = rest.range(of: #"\\x[0-9A-Fa-f]{2}"#, options: .regularExpression) {
-            bytes += Array(rest[..<range.lowerBound].utf8)
-            bytes.append(UInt8(rest[range].dropFirst(2), radix: 16) ?? 0)
-            rest = rest[range.upperBound...]
+        var index = 0
+        while index < source.count {
+            if source[index] == 0x5C, index + 3 < source.count, source[index + 1] == 0x78,
+                let high = Character(UnicodeScalar(source[index + 2])).hexDigitValue,
+                let low = Character(UnicodeScalar(source[index + 3])).hexDigitValue
+            {
+                bytes.append(UInt8(high * 16 + low))
+                index += 4
+            } else {
+                bytes.append(source[index])
+                index += 1
+            }
         }
-        return bytes + Array(rest.utf8)
+        return bytes
     }
 
     func escaped(_ bytes: [UInt8]) -> String {
@@ -93,7 +101,7 @@ struct TerminalAppRecordingTests {
         var isContinuation = false
         for line in lines {
             let end = (line.lastIndex(where: \.isWritten) ?? -1) + 1
-            let string = String(line[..<end].filter(\.isText).map(terminal.character(of:)))
+            let string = line[..<end].filter(\.isText).map(terminal.character(of:)).joined()
             if isContinuation, let last = text.popLast() {
                 text.append(last + string)
             } else {

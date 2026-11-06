@@ -573,21 +573,21 @@ package struct Terminal: Sendable {
             }
             breakTab(at: column, row: cursor.row)
         }
-        var text = String(graphemes.character(of: screen[cursor.row][column]))
+        var text = graphemes.character(of: screen[cursor.row][column])
         guard text.unicodeScalars.count < Self.maximumScalarsPerCell,
             scalar.properties.generalCategory != .spacingMark || text.unicodeScalars.first?.width != 0
         else {
             return false
         }
         text.unicodeScalars.append(scalar)
-        guard let character = text.first, text.count == 1 else {
+        guard text.count == 1 else {
             return false
         }
-        if graphemes.needsCompaction(for: character) {
+        if graphemes.needsCompaction(for: text) {
             compactGraphemes()
         }
-        let cell = graphemes.cell(screen[cursor.row][column], with: character)
-        guard graphemes.character(of: cell).unicodeScalars.elementsEqual(character.unicodeScalars) else {
+        let cell = graphemes.cell(screen[cursor.row][column], with: text)
+        guard graphemes.character(of: cell).utf8.elementsEqual(text.utf8) else {
             return false
         }
         screen[cursor.row][column] = cell
@@ -626,7 +626,7 @@ package struct Terminal: Sendable {
         }
     }
 
-    package func character(of cell: Cell) -> Character {
+    package func character(of cell: Cell) -> String {
         graphemes.character(of: cell)
     }
 

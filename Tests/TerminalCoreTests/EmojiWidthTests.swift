@@ -19,7 +19,7 @@ struct EmojiWidthTests {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive(text + "x")
         #expect(terminal.screen[0].prefix(widths.count + 1).map(\.width) == widths + [1])
-        #expect(terminal.character(of: terminal.screen[0][0]) == Character(text))
+        #expect(terminal.character(of: terminal.screen[0][0]) == text)
         #expect(terminal.screen[0][widths.count] == Terminal.Cell(scalar: "x"))
         #expect(terminal.cursor == Terminal.Position(row: 0, column: widths.count + 1))
     }
@@ -29,7 +29,7 @@ struct EmojiWidthTests {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive(base + "\u{1F3FD}x")
         #expect(terminal.screen[0].prefix(3).map(\.width) == [1, 1, 1])
-        #expect(terminal.screen[0].prefix(2).map(terminal.character(of:)) == [Character(base + "\u{1F3FD}"), "x"])
+        #expect(terminal.screen[0].prefix(2).map(terminal.character(of:)) == [base + "\u{1F3FD}", "x"])
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
@@ -38,7 +38,7 @@ struct EmojiWidthTests {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive(base + "\u{1F3FD}x")
         #expect(terminal.screen[0].prefix(3).map(\.width) == [1, 1, 1])
-        #expect(terminal.character(of: terminal.screen[0][0]) == Character(base + "\u{1F3FD}"))
+        #expect(terminal.character(of: terminal.screen[0][0]) == base + "\u{1F3FD}")
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
@@ -134,7 +134,7 @@ struct EmojiWidthTests {
         #expect(terminal.screen[0][3] == .padding)
         #expect(terminal.screen[0].isWrapped)
         #expect(terminal.screen[1].map(\.width) == [2, 0, 1, 1])
-        #expect(terminal.character(of: terminal.screen[1][0]) == Character(text))
+        #expect(terminal.character(of: terminal.screen[1][0]) == text)
         #expect(terminal.screen[1][2] == Terminal.Cell(scalar: "x"))
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 3))
     }
@@ -146,7 +146,7 @@ struct EmojiWidthTests {
         #expect(terminal.screen[0].map(terminal.character(of:)) == ["a", "b", "c", " "])
         #expect(terminal.screen[0].isWrapped)
         #expect(terminal.screen[1].map(\.width) == [2, 0, 1, 1])
-        #expect(terminal.character(of: terminal.screen[1][0]) == Character(text))
+        #expect(terminal.character(of: terminal.screen[1][0]) == text)
         #expect(terminal.screen[1][2] == Terminal.Cell(scalar: "x"))
         #expect(terminal.screen[2].allSatisfy { $0 == Terminal.Cell() })
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 3))
@@ -158,7 +158,7 @@ struct EmojiWidthTests {
         terminal.receive("\u{1B}[2;1Hxy\u{1B}[Habc\u{1B}[4h" + text)
         #expect(terminal.screen[0][3] == .padding)
         #expect(terminal.screen[1].map(\.width) == [2, 0, 1, 1])
-        #expect(terminal.character(of: terminal.screen[1][0]) == Character(text))
+        #expect(terminal.character(of: terminal.screen[1][0]) == text)
         #expect(terminal.screen[1].suffix(2).map(terminal.character(of:)) == ["x", "y"])
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
     }

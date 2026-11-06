@@ -50,7 +50,7 @@ struct GraphemeTests {
         terminal.receive(text)
         let shown = (terminal.scrollback + terminal.screen).flatMap { $0 }.filter { $0.width > 0 && !$0.isBlank }
             .map(terminal.character(of:))
-        let expected = Array(text)
+        let expected = text.map(String.init)
         #expect(shown.count == expected.count)
         #expect(zip(shown, expected).allSatisfy { $1.unicodeScalars.starts(with: $0.unicodeScalars) })
         #expect(zip(shown, expected).filter { $0 == $1 }.count >= 60)
@@ -70,7 +70,7 @@ struct GraphemeTests {
 
     @Test func waitsLongerAfterACompactionThatFreesNothing() {
         var graphemes = Terminal.Graphemes(capacity: 64)
-        let characters = Array(clusters(count: 1_000))
+        let characters = clusters(count: 1_000).map(String.init)
         var compactions = 0
         for character in characters {
             if graphemes.needsCompaction(for: character) {
@@ -94,7 +94,7 @@ struct GraphemeTests {
     @Test(arguments: [2, 3])
     func keepsTheUsedCharactersWhenItCompactsALargeTable(keepingEvery stride: Int) {
         var graphemes = Terminal.Graphemes()
-        let characters = Array(clusters(count: graphemes.capacity))
+        let characters = clusters(count: graphemes.capacity).map(String.init)
         var lines = [Terminal.Line(characters.map { graphemes.cell(Terminal.Cell(), with: $0) })]
         let used = characters.indices.map { $0.isMultiple(of: stride) }
         let newIndices = graphemes.compact(keeping: used)
@@ -132,7 +132,7 @@ struct GraphemeTests {
 
     @Test func keepsTheScalarsOfCanonicallyEquivalentCharactersThroughACompaction() {
         var graphemes = Terminal.Graphemes(capacity: 8)
-        let pair: [Character] = ["e\u{323}\u{301}", "e\u{301}\u{323}"]
+        let pair = ["e\u{323}\u{301}", "e\u{301}\u{323}"]
         for character in ["a\u{301}", "b\u{301}", "c\u{301}"] + pair {
             _ = graphemes.cell(Terminal.Cell(), with: character)
         }
@@ -243,5 +243,5 @@ private func clusters(count: Int) -> String {
 }
 
 private func text(_ lines: [Terminal.Line], in terminal: Terminal) -> [String] {
-    lines.map { String($0.map(terminal.character(of:))).trimmingCharacters(in: .whitespaces) }
+    lines.map { $0.map(terminal.character(of:)).joined().trimmingCharacters(in: .whitespaces) }
 }

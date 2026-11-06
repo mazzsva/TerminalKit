@@ -80,7 +80,7 @@ struct TerminalDropTests {
         let terminal = session.terminal
         let output = (terminal.scrollback + terminal.screen)
             .map {
-                String($0.filter(\.isText).map(terminal.character(of:))).trimmingCharacters(in: .whitespaces)
+                $0.filter(\.isText).map(terminal.character(of:)).joined().trimmingCharacters(in: .whitespaces)
             }
             .joined(separator: "\n")
         for name in names {

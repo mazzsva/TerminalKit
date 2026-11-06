@@ -69,8 +69,8 @@ extension Terminal {
 
     package struct Graphemes: Sendable {
         let capacity: Int
-        private var characters: [Character] = []
-        private var indices: [[Unicode.Scalar]: UInt32] = [:]
+        private var characters: [String] = []
+        private var indices: [[UInt8]: UInt32] = [:]
         private var additionsSinceCompaction = 0
         private var compactionInterval: Int
 
@@ -83,12 +83,12 @@ extension Terminal {
             characters.count
         }
 
-        package func character(of cell: Cell) -> Character {
+        package func character(of cell: Cell) -> String {
             guard let index = cell.graphemeIndex else {
                 if cell.isTab {
                     return "\t"
                 }
-                return cell.isSpace ? " " : Unicode.Scalar(cell.content).map(Character.init) ?? " "
+                return cell.isSpace ? " " : Unicode.Scalar(cell.content).map(String.init) ?? " "
             }
             return characters[index]
         }
@@ -97,15 +97,15 @@ extension Terminal {
             compactionInterval = max(capacity / 64, 1)
         }
 
-        func needsCompaction(for character: Character) -> Bool {
+        func needsCompaction(for character: String) -> Bool {
             characters.count >= capacity && additionsSinceCompaction >= compactionInterval
-                && character.unicodeScalars.count > 1 && indices[Array(character.unicodeScalars)] == nil
+                && !character.unicodeScalars.dropFirst().isEmpty && indices[Array(character.utf8)] == nil
         }
 
-        mutating func cell(_ cell: Cell, with character: Character) -> Cell {
+        mutating func cell(_ cell: Cell, with character: String) -> Cell {
             var cell = cell
             let scalars = character.unicodeScalars
-            if scalars.count == 1, let scalar = scalars.first {
+            if let scalar = scalars.first, scalars.dropFirst().isEmpty {
                 cell.content = scalar.value
             } else if let index = index(of: character) {
                 cell.content = Cell.firstGraphemeIndex + index
@@ -125,7 +125,7 @@ extension Terminal {
 
         mutating func compact(keeping used: [Bool]) -> [UInt32] {
             var newIndices = Array(repeating: UInt32(0), count: characters.count)
-            var kept: [Character] = []
+            var kept: [String] = []
             for (index, character) in characters.enumerated() where used[index] {
                 newIndices[index] = UInt32(kept.count)
                 kept.append(character)
@@ -133,11 +133,11 @@ extension Terminal {
             if kept.count < characters.count - kept.count {
                 indices.removeAll(keepingCapacity: true)
                 for (index, character) in kept.enumerated() {
-                    indices[Array(character.unicodeScalars)] = UInt32(index)
+                    indices[Array(character.utf8)] = UInt32(index)
                 }
             } else {
                 for (index, character) in characters.enumerated() where !used[index] {
-                    indices[Array(character.unicodeScalars)] = nil
+                    indices[Array(character.utf8)] = nil
                 }
                 indices = indices.mapValues { newIndices[Int($0)] }
             }
@@ -158,8 +158,8 @@ extension Terminal {
             }
         }
 
-        private mutating func index(of character: Character) -> UInt32? {
-            if let index = indices[Array(character.unicodeScalars)] {
+        private mutating func index(of character: String) -> UInt32? {
+            if let index = indices[Array(character.utf8)] {
                 return index
             }
             additionsSinceCompaction += 1
@@ -168,7 +168,7 @@ extension Terminal {
             }
             let index = UInt32(characters.count)
             characters.append(character)
-            indices[Array(character.unicodeScalars)] = index
+            indices[Array(character.utf8)] = index
             return index
         }
     }

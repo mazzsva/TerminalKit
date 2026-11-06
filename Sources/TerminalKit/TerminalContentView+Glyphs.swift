@@ -23,8 +23,8 @@ final class GlyphCache {
     private var entries: [Key: Entry] = [:]
     private var asciiEntries = [Entry?](repeating: nil, count: 4 * 128)
 
-    func entry(for character: Character, font: NSFont, index: Int, isMirrored: Bool = false) -> Entry {
-        if let ascii = character.asciiValue, !isMirrored {
+    func entry(for character: String, font: NSFont, index: Int, isMirrored: Bool = false) -> Entry {
+        if character.utf8.count == 1, let ascii = character.utf8.first, ascii < 128, !isMirrored {
             if let entry = asciiEntries[index * 128 + Int(ascii)] {
                 return entry
             }
@@ -44,12 +44,12 @@ final class GlyphCache {
         return entry
     }
 
-    private func makeEntry(for character: Character, font: NSFont, isMirrored: Bool) -> Entry {
+    private func makeEntry(for character: String, font: NSFont, isMirrored: Bool) -> Entry {
         let isMark = character.unicodeScalars.first?.properties.generalCategory == .spacingMark
         let style = NSMutableParagraphStyle()
         style.baseWritingDirection = isMirrored ? .rightToLeft : .natural
         let string = NSAttributedString(
-            string: (isMark ? "\u{A0}" : "") + String(character), attributes: [.font: font, .paragraphStyle: style])
+            string: (isMark ? "\u{A0}" : "") + character, attributes: [.font: font, .paragraphStyle: style])
         let line = CTLineCreateWithAttributedString(string)
         let offset = isMark ? CTLineGetImageBounds(line, nil).minX : 0
         let runs = (CTLineGetGlyphRuns(line) as? [CTRun] ?? [])

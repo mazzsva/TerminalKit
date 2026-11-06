@@ -185,7 +185,7 @@ struct TerminalTests {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive(cluster)
         let cells = terminal.screen[0].filter { $0.width > 0 && !$0.isBlank }
-        #expect(String(cells.map(terminal.character(of:))) == cluster)
+        #expect(cells.map(terminal.character(of:)).joined() == cluster)
     }
 
     @Test func dropsTheMarksAfterSixteenScalars() {
@@ -223,7 +223,7 @@ struct TerminalTests {
     func combinesSpacingMarksThatJoin(character: String) {
         var terminal = Terminal(columns: 3, rows: 1)
         terminal.receive(character + "x")
-        #expect(terminal.screen[0].map(terminal.character(of:)) == [Character(character), "x", " "])
+        #expect(terminal.screen[0].map(terminal.character(of:)) == [character, "x", " "])
         #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
     }
 
@@ -545,7 +545,7 @@ struct TerminalTests {
     @Test func keepsATabInTheText() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("a\tb")
-        #expect(String(terminal.screen[0].filter(\.isText).map(terminal.character(of:))).hasPrefix("a\tb"))
+        #expect(terminal.screen[0].filter(\.isText).map(terminal.character(of:)).joined().hasPrefix("a\tb"))
         #expect(terminal.screen[0][1 ... 7].allSatisfy { !$0.isText || terminal.character(of: $0) == "\t" })
     }
 
@@ -1806,11 +1806,11 @@ struct TerminalTests {
 }
 
 private func lines(_ terminal: Terminal) -> [String] {
-    terminal.screen.map { String($0.map(terminal.character(of:))).replacing("\t", with: " ") }
+    terminal.screen.map { $0.map(terminal.character(of:)).joined().replacing("\t", with: " ") }
 }
 
 private func scrollback(_ terminal: Terminal) -> [String] {
-    terminal.scrollback.map { String($0.map(terminal.character(of:))) }
+    terminal.scrollback.map { $0.map(terminal.character(of:)).joined() }
 }
 
 struct WindowReportTests {
