@@ -426,7 +426,7 @@ struct TerminalTests {
         #expect(!terminal.usesApplicationCursorKeys)
         #expect(terminal.isCursorVisible)
         #expect(terminal.cursorShape == .block)
-        #expect(terminal.usesReverseVideo)
+        #expect(!terminal.usesReverseVideo)
     }
 
     @Test func softResetsInsertMode() {
@@ -435,10 +435,41 @@ struct TerminalTests {
         #expect(lines(terminal) == ["xbc "])
     }
 
-    @Test func softResetsAutowrap() {
+    @Test(arguments: ["\u{1B}[!p", "\u{1B}c"])
+    func keepsAutowrapOffAfterAReset(reset: String) {
         var terminal = Terminal(columns: 2, rows: 2)
-        terminal.receive("\u{1B}[?7l\u{1B}[!pabc")
-        #expect(lines(terminal) == ["ab", "c "])
+        terminal.receive("\u{1B}[?7l\(reset)abc")
+        #expect(lines(terminal) == ["ab", "  "])
+    }
+
+    @Test(arguments: ["\n", "\u{B}", "\u{C}"])
+    func returnsToTheFirstColumnInNewLineMode(lineFeed: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[20hab\(lineFeed)")
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
+        terminal.receive("\u{1B}[20l\u{1B}[Hab\(lineFeed)")
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
+    }
+
+    @Test(arguments: ["\u{1B}[!p", "\u{1B}c"])
+    func resetsNewLineMode(reset: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[20h\(reset)ab\n")
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
+    }
+
+    @Test func softResetsTheTabStops() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("\u{1B}[3g\u{1B}[!p\t")
+        #expect(terminal.cursor.column == 8)
+    }
+
+    @Test func fillsTheScreenWithoutMovingTheCursor() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("\u{1B}[41m\u{1B}[2;2H\u{1B}#8")
+        #expect(lines(terminal) == ["EE", "EE"])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+        #expect(terminal.screen[0][0].style == Terminal.Style())
     }
 
     @Test func softResetsTheScrollRegion() {

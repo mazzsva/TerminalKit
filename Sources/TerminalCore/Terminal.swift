@@ -73,6 +73,7 @@ package struct Terminal: Sendable {
     private var usesAutowrap = true
     private var usesOriginMode = false
     private var usesInsertMode = false
+    private var usesNewLineMode = false
 
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
@@ -271,6 +272,9 @@ package struct Terminal: Sendable {
                 print(printed)
             case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
                 lineFeed()
+                if usesNewLineMode {
+                    carriageReturn()
+                }
             case .execute("\r"):
                 carriageReturn()
             case .execute("\u{7}"):
@@ -292,6 +296,8 @@ package struct Terminal: Sendable {
                 reverseLineFeed()
             case .escape(intermediates: "(", let final):
                 usesLineDrawing = final == "0"
+            case .escape(intermediates: "#", final: "8"):
+                fillScreen()
             case .escape(intermediates: "", final: "7"):
                 saveCursor()
             case .escape(intermediates: "", final: "8"):
@@ -406,10 +412,14 @@ package struct Terminal: Sendable {
             scrollDown(count, in: scrollRegion)
         case "c" where sequence.parameter(at: 0, default: 0) == 0:
             replies += "\u{1B}[?1;2c".utf8
-        case "h" where sequence.parameters.contains(4):
-            usesInsertMode = true
-        case "l" where sequence.parameters.contains(4):
-            usesInsertMode = false
+        case "h", "l":
+            for mode in sequence.parameters {
+                if mode == 4 {
+                    usesInsertMode = sequence.final == "h"
+                } else if mode == 20 {
+                    usesNewLineMode = sequence.final == "h"
+                }
+            }
         case "m":
             style.apply(sequence.parameters)
         case "n":
@@ -780,7 +790,6 @@ package struct Terminal: Sendable {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.bellCount = bellCount
-        terminal.currentDirectory = currentDirectory
         terminal.reportedColors = reportedColors
         terminal.graphemes = graphemes
         terminal.scrollback = scrollback
@@ -790,14 +799,22 @@ package struct Terminal: Sendable {
         terminal.decoder = decoder
         terminal.replies = replies
         terminal.isWrapPending = isWrapPending
+        terminal.usesAutowrap = usesAutowrap
         self = terminal
+    }
+
+    private mutating func fillScreen() {
+        screen = Array(repeating: Line(repeatElement(Cell(scalar: "E"), count: columns)), count: rows)
+        unwrapLine(before: 0)
     }
 
     private mutating func softReset() {
         usesInsertMode = false
+        usesNewLineMode = false
         usesApplicationCursorKeys = false
-        usesAutowrap = true
         usesOriginMode = false
+        usesReverseVideo = false
+        tabStops = Self.defaultTabStops(0 ..< columns)
         isCursorVisible = true
         cursorShape = .block
         scrollRegion = 0 ..< rows
