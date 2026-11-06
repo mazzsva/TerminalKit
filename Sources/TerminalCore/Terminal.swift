@@ -26,7 +26,7 @@ package struct Terminal: Sendable {
     private struct SavedCursor {
         var position = Position(row: 0, column: 0)
         var style = Style()
-        var usesLineDrawing = false
+        var characterSets: [Unicode.Scalar] = ["B", "B", "B", "B"]
         var usesOriginMode = false
     }
 
@@ -81,7 +81,8 @@ package struct Terminal: Sendable {
     private var isTextRunClipped = false
     private var isAfterPrint = false
     private var style = Style()
-    private var usesLineDrawing = false
+    private var characterSets: [Unicode.Scalar] = ["B", "B", "B", "B"]
+    private var activeCharacterSet = 0
     private var lastCharacter: Unicode.Scalar? = " "
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
@@ -267,7 +268,8 @@ package struct Terminal: Sendable {
             if case .print = action {} else { isTextRunClipped = false }
             switch action {
             case .print(let scalar):
-                let printed = usesLineDrawing ? scalar.lineDrawingCharacter : scalar
+                let characterSet = characterSets[activeCharacterSet]
+                let printed = characterSet == "B" ? scalar : Self.translated(scalar, byCharacterSet: characterSet)
                 lastCharacter = scalar.isASCII ? (printed == scalar ? scalar : " ") : nil
                 print(printed)
             case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
@@ -294,8 +296,22 @@ package struct Terminal: Sendable {
                 tabStops[cursor.column] = true
             case .escape(intermediates: "", final: "M"):
                 reverseLineFeed()
+            case .execute("\u{E}"):
+                activeCharacterSet = 1
+            case .execute("\u{F}"):
+                activeCharacterSet = 0
+            case .escape(intermediates: "", final: "n"):
+                activeCharacterSet = 2
+            case .escape(intermediates: "", final: "o"):
+                activeCharacterSet = 3
             case .escape(intermediates: "(", let final):
-                usesLineDrawing = final == "0"
+                characterSets[0] = final
+            case .escape(intermediates: ")", let final), .escape(intermediates: "-", let final):
+                characterSets[1] = final
+            case .escape(intermediates: "*", let final), .escape(intermediates: ".", let final):
+                characterSets[2] = final
+            case .escape(intermediates: "+", let final), .escape(intermediates: "/", let final):
+                characterSets[3] = final
             case .escape(intermediates: "#", final: "8"):
                 fillScreen()
             case .escape(intermediates: "", final: "7"):
@@ -819,7 +835,8 @@ package struct Terminal: Sendable {
         cursorShape = .block
         scrollRegion = 0 ..< rows
         style = Style()
-        usesLineDrawing = false
+        characterSets = ["B", "B", "B", "B"]
+        activeCharacterSet = 0
         lastCharacter = " "
         savedCursor = SavedCursor()
         modifyOtherKeys = 0
@@ -1059,7 +1076,7 @@ package struct Terminal: Sendable {
         savedCursor = SavedCursor(
             position: Position(row: cursor.row - topLimit, column: cursor.column),
             style: style,
-            usesLineDrawing: usesLineDrawing,
+            characterSets: characterSets,
             usesOriginMode: usesOriginMode
         )
     }
@@ -1068,7 +1085,7 @@ package struct Terminal: Sendable {
         usesOriginMode = savedCursor.usesOriginMode
         moveCursor(row: min(topLimit + savedCursor.position.row, bottomLimit), column: savedCursor.position.column)
         style = savedCursor.style
-        usesLineDrawing = savedCursor.usesLineDrawing
+        characterSets = savedCursor.characterSets
     }
 
     private mutating func eraseInDisplay(_ mode: Int) {

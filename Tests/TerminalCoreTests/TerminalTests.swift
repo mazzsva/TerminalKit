@@ -464,6 +464,40 @@ struct TerminalTests {
         #expect(terminal.cursor.column == 8)
     }
 
+    @Test func shiftsBetweenCharacterSets() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B})0q\u{E}q\u{F}q")
+        #expect(lines(terminal) == ["q─q "])
+    }
+
+    @Test(arguments: [("*", "n"), ("+", "o")])
+    func locksTheOtherCharacterSets(designator: String, shift: String) {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}\(designator)0\u{1B}\(shift)q")
+        #expect(lines(terminal) == ["─   "])
+    }
+
+    @Test(arguments: [
+        ("A", "#", "£"), ("K", "~", "ß"), ("4", "@", "¾"), ("Z", "[", "¡"), ("1", "q", "q"), ("U", "q", "q"),
+    ])
+    func translatesWithEachCharacterSet(final: String, input: String, output: String) {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}(\(final)\(input)")
+        #expect(lines(terminal) == [output + "   "])
+    }
+
+    @Test func savesTheCharacterSetsButNotTheShift() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B})0\u{E}\u{1B}7\u{F}\u{1B})B\u{1B}8q\u{E}q")
+        #expect(lines(terminal) == ["q─  "])
+    }
+
+    @Test func keepsAnUnderscoreInLineDrawing() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}(0_")
+        #expect(lines(terminal) == ["_   "])
+    }
+
     @Test func fillsTheScreenWithoutMovingTheCursor() {
         var terminal = Terminal(columns: 2, rows: 2)
         terminal.receive("\u{1B}[41m\u{1B}[2;2H\u{1B}#8")
