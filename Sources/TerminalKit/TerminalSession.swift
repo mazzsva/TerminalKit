@@ -143,8 +143,8 @@ public final class TerminalSession {
     }
 
     private func receive(_ bytes: [UInt8]) {
-        if let colors = sizingView?.reportedColors, colors != terminal.reportedColors {
-            terminal.reportedColors = colors
+        if let view = sizingView, view.reportedColors != terminal.defaultColors {
+            terminal.defaultColors = view.reportedColors
         }
         if let report = sizingView?.windowReport {
             if report != terminal.windowReport {

@@ -25,11 +25,12 @@ final class TerminalContentView: NSView {
     var palette = TerminalPalette.standard {
         didSet {
             colors = Colors(palette)
+            changedColorsCache = nil
             updateReportedColors()
             needsDisplay = true
         }
     }
-    private(set) var reportedColors: [Terminal.RGB] = []
+    private(set) var reportedColors: Terminal.DefaultColors?
     var usesOptionAsMetaKey = false
     var markedString = NSAttributedString() {
         didSet {
@@ -96,6 +97,7 @@ final class TerminalContentView: NSView {
     var autoscrollClock: any Clock<Duration> = ContinuousClock()
 
     private var colors = Colors(.standard)
+    private var changedColorsCache: (changes: Terminal.ChangedColors, isReversed: Bool, colors: Colors)?
     private(set) var fonts = Fonts(defaultFont)
     private(set) var keyDownEvent: NSEvent?
     private var bellTask: Task<Void, Never>?
@@ -110,6 +112,7 @@ final class TerminalContentView: NSView {
         let cursor: NSColor
         let selection: NSColor
         let ansiColors: [NSColor]
+        private let changedColors: [UInt8: NSColor]
         private let cache = ColorCache()
 
         private final class ColorCache {
@@ -117,6 +120,9 @@ final class TerminalContentView: NSView {
         }
 
         func color(_ color: Terminal.Color) -> NSColor? {
+            if case .indexed(let index) = color, let changed = changedColors[index] {
+                return changed
+            }
             if let cached = cache.colors[color] {
                 return cached
             }
@@ -135,17 +141,36 @@ final class TerminalContentView: NSView {
                 ? (background ?? self.background.withAlphaComponent(1), foreground) : (foreground, background)
         }
 
-        init(_ palette: TerminalPalette, isReversed: Bool = false) {
-            foreground = isReversed ? NSColor(palette.background).withAlphaComponent(1) : NSColor(palette.foreground)
-            background = NSColor(isReversed ? palette.foreground : palette.background)
-            let cursor = NSColor(palette.cursor)
+        init(
+            _ palette: TerminalPalette,
+            isReversed: Bool = false,
+            changes: Terminal.ChangedColors = Terminal.ChangedColors()
+        ) {
+            let paletteForeground = NSColor(palette.foreground)
+            let paletteBackground = NSColor(palette.background)
+            let paletteCursor = NSColor(palette.cursor)
+            let currentForeground = changes.foreground.map { NSColor($0) } ?? paletteForeground
+            let currentBackground =
+                changes.background.map { NSColor($0, alpha: paletteBackground.alphaComponent) } ?? paletteBackground
+            foreground = isReversed ? currentBackground.withAlphaComponent(1) : currentForeground
+            background = isReversed ? currentForeground : currentBackground
+            let cursor = changes.cursor.map { NSColor($0, alpha: paletteCursor.alphaComponent) } ?? paletteCursor
             self.cursor =
                 isReversed && cursor.terminalRGB == background.terminalRGB
                 ? foreground.withAlphaComponent(cursor.alphaComponent) : cursor
-            selection = NSColor(palette.selection)
+            selection = changes.selection.map { NSColor($0) } ?? NSColor(palette.selection)
             var ansiColors =
                 (palette.ansiColors.prefix(16) + TerminalPalette.standard.ansiColors.dropFirst(palette.ansiColors.count))
                 .map(NSColor.init)
+            var changedColors: [UInt8: NSColor] = [:]
+            for (index, color) in changes.indexed {
+                if index < 16 {
+                    ansiColors[Int(index)] = NSColor(color)
+                } else {
+                    changedColors[index] = NSColor(color)
+                }
+            }
+            self.changedColors = changedColors
             if isReversed {
                 ansiColors.swapAt(0, 7)
                 ansiColors.swapAt(8, 15)
@@ -217,13 +242,44 @@ final class TerminalContentView: NSView {
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
+        changedColorsCache = nil
         updateReportedColors()
+    }
+
+    private func currentColors(for terminal: Terminal) -> Colors {
+        guard terminal.usesReverseVideo || !terminal.changedColors.isEmpty else {
+            return colors
+        }
+        if let cache = changedColorsCache, cache.changes == terminal.changedColors,
+            cache.isReversed == terminal.usesReverseVideo
+        {
+            return cache.colors
+        }
+        let colors = Colors(palette, isReversed: terminal.usesReverseVideo, changes: terminal.changedColors)
+        changedColorsCache = (terminal.changedColors, terminal.usesReverseVideo, colors)
+        return colors
     }
 
     private func updateReportedColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            let reported = [colors.foreground, colors.background].compactMap(\.terminalRGB)
-            reportedColors = reported.count == 2 ? reported : []
+            let ansi = colors.ansiColors.compactMap(\.terminalRGB)
+            guard let foreground = colors.foreground.terminalRGB,
+                let background = colors.background.terminalRGB,
+                let cursor = colors.cursor.terminalRGB,
+                let selection = colors.selection.terminalRGB,
+                ansi.count == colors.ansiColors.count
+            else {
+                reportedColors = nil
+                return
+            }
+            reportedColors = Terminal.DefaultColors(
+                foreground: foreground,
+                background: background,
+                cursor: cursor,
+                selection: selection,
+                bold: foreground,
+                ansi: ansi
+            )
         }
     }
 
@@ -421,7 +477,7 @@ final class TerminalContentView: NSView {
             textFinder?.noteClientStringWillChange()
         }
         let terminal = session.terminal
-        let colors = terminal.usesReverseVideo ? Colors(palette, isReversed: true) : self.colors
+        let colors = currentColors(for: terminal)
         colors.background.setFill()
         dirtyRect.fill()
 
@@ -480,7 +536,7 @@ final class TerminalContentView: NSView {
                 context.restoreGState()
             }
             if let selected {
-                selectionColor.setFill()
+                (isFocused ? colors.selection : .unemphasizedSelectedTextBackgroundColor).setFill()
                 for rect in rects(row: row, columns: selected, order: order) {
                     backingAlignedRect(rect, options: .alignAllEdgesNearest).fill()
                 }
@@ -575,10 +631,6 @@ final class TerminalContentView: NSView {
 
     func line(at row: Int, in terminal: Terminal) -> Terminal.Line {
         row < terminal.scrollback.count ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
-    }
-
-    private var selectionColor: NSColor {
-        isFocused ? colors.selection : .unemphasizedSelectedTextBackgroundColor
     }
 
     static func runs(in line: Terminal.Line) -> [(columns: Range<Int>, style: Terminal.Style)] {

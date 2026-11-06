@@ -55,8 +55,10 @@ struct EscapeSequenceParser: Sendable {
                 enterEscape()
             }
             return nil
-        case "\u{7}" where isInString, "\u{1A}" where isInString:
+        case "\u{7}" where isInString:
             return finishString()
+        case "\u{1A}" where isInString:
+            return finishString(requiringSeparator: true)
         case "\u{18}", "\u{1A}":
             return nil
         case "\t":
@@ -223,7 +225,7 @@ struct EscapeSequenceParser: Sendable {
     private mutating func operatingSystemCommandEscape(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
         case "\\":
-            return finishString()
+            return finishString(requiringSeparator: true)
         case "\u{80}"...:
             enterEscape()
             return .print(scalar)
@@ -256,10 +258,10 @@ struct EscapeSequenceParser: Sendable {
         )
     }
 
-    private mutating func finishString() -> Action? {
+    private mutating func finishString(requiringSeparator: Bool = false) -> Action? {
         state = .ground
         defer { string = [] }
-        guard string.count <= Self.maximumStringLength else {
+        guard string.count <= Self.maximumStringLength, !requiringSeparator || string.contains(";") else {
             return nil
         }
         return .operatingSystemCommand(String(String.UnicodeScalarView(string)))
