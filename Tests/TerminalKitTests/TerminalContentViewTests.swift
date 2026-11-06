@@ -16,6 +16,23 @@ struct TerminalContentViewTests {
         #expect(session.terminal.rows == 30)
     }
 
+    @Test func usesTheTerminalAppCellWithTheDefaultFont() {
+        let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        #expect(view.cellSize == CGSize(width: 7, height: 15))
+        view.font = .monospacedSystemFont(ofSize: 20, weight: .regular)
+        #expect(view.cellSize.width != 7)
+        view.font = TerminalContentView.defaultFont
+        #expect(view.cellSize == CGSize(width: 7, height: 15))
+    }
+
+    @Test func usesTheTerminalAppMargins() {
+        let session = TerminalSession(running: "exit")
+        let view = TerminalContentView(session: session)
+        view.fit(to: CGSize(width: 300, height: 197))
+        #expect(session.terminal.columns == 40)
+        #expect(session.terminal.rows == 12)
+    }
+
     @Test func keepsTheSizeInAViewThatIsTooSmall() {
         let session = TerminalSession(running: "exit")
         let view = TerminalContentView(session: session)
@@ -336,17 +353,16 @@ struct TerminalContentViewTests {
         #expect(windows[0].firstResponder === view && windows[1].firstResponder === reference)
     }
 
-    @Test(arguments: ["\\341\\200\\270", "\\340\\244\\276"])
-    func drawsASpacingMarkAlone(character: String) async throws {
-        let mark = try await drawnView(running: "printf '\(character)x\\n'")
-        let spaced = try await drawnView(running: "printf ' x\\n'")
-        let first = CGRect(x: 10, y: 7, width: mark.cellSize.width, height: mark.cellSize.height)
-        #expect(try pixels(in: first, of: mark) != pixels(in: first, of: spaced))
+    @Test(arguments: ["\u{1038}", "\u{93E}"])
+    func drawsASpacingMarkWithNoBase(character: String) throws {
+        let entry = GlyphCache().entry(for: character, font: TerminalContentView.defaultFont, index: 0)
+        #expect(entry.runs.first?.positions.first?.x == 0)
     }
 
-    @Test func drawsABlockFromTheFont() throws {
-        let entry = GlyphCache().entry(for: "\u{2588}", font: TerminalContentView.defaultFont, index: 0)
-        #expect(entry.runs.flatMap(\.glyphs).count == 1)
+    @Test func drawsAShadeFromTheFont() async throws {
+        let view = try await drawnView(running: "printf '\\033[?25l\u{2593}'")
+        let cell = view.rect(row: 0, columns: 0 ..< 1).insetBy(dx: 1, dy: 3)
+        #expect(Set(try pixels(in: cell, of: view)).count > 1)
     }
 
     @Test func drawsEachCharacterInItsCellWithAProportionalFont() async throws {
@@ -487,13 +503,12 @@ struct TerminalContentViewTests {
     }
 
     @Test func drawsFaintTextAtTheMeasuredAlpha() async throws {
-        let view = try await drawnView(running: "printf '\\033[?25l\\033[2;4mab\\033[m\\r'")
+        let view = try await drawnView(running: "printf '\\033[?25l\\033[2m\u{2588}\\033[m'")
         view.palette = highContrastPalette
-        let font = view.fonts.regular
-        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
-        let representation = try representation(of: view)
-        let color = try #require(color(in: representation, at: CGPoint(x: 14, y: y))?.usingColorSpace(.sRGB))
-        #expect(abs(color.redComponent - 0.58) < 0.25)
+        let rect = view.rect(row: 0, columns: 0 ..< 1)
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let drawn = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
+        #expect(abs(drawn.redComponent - 0.646) < 0.03)
     }
 
     @Test(arguments: [1, 2] as [CGFloat])
@@ -804,11 +819,12 @@ struct TerminalContentViewTests {
 
     @Test func keepsTheCursorColorInReverseVideo() async throws {
         let (view, window) = try await focusedView(running: "printf '\\033[?5h'")
-        view.palette.cursor = Color(.sRGB, red: 1, green: 0.5, blue: 0)
+        view.palette.foreground = Color(.sRGB, red: 1, green: 0.5, blue: 0)
+        view.palette.cursor = view.palette.foreground
         let representation = try representation(of: view)
         let center = CGPoint(x: view.cursorRect.midX, y: view.cursorRect.midY)
-        let drawn = try #require(color(in: representation, at: center)?.usingColorSpace(.sRGB))
-        #expect(drawn.redComponent > 0.8 && drawn.blueComponent < 0.3)
+        let corner = CGPoint(x: 190, y: 90)
+        #expect(isClose(color(in: representation, at: center), to: color(in: representation, at: corner)))
         #expect(window.firstResponder === view)
     }
 

@@ -499,7 +499,7 @@ final class TerminalContentView: NSView {
             let order = Self.visualOrder(of: line, graphemes: graphemes)
             let selected = selection?
                 .columns(inLine: terminal.removedScrollbackCount + row, count: max(line.count, terminal.columns))
-            var pixels = [UInt32](repeating: 0, count: 2 * line.count)
+            var pixels = [UInt32](repeating: 0, count: line.count)
             for (columns, style) in Self.runs(in: line) {
                 let (foreground, background) = colors.colors(for: style)
                 let fill = background.map(Self.pixel) ?? 0
@@ -513,7 +513,7 @@ final class TerminalContentView: NSView {
                 for column in columns {
                     drawsText = drawsText || !line[column].isSpace
                     let visual = order?.columns[column] ?? column
-                    (pixels[line.count + visual], pixels[visual]) = (fill, fill)
+                    pixels[visual] = fill
                 }
                 if drawsText {
                     runs.append((line, row, columns, style, foreground, order))
@@ -525,7 +525,7 @@ final class TerminalContentView: NSView {
                 let space = CGColorSpace(name: CGColorSpace.sRGB),
                 let provider = CGDataProvider(data: Data(bytes: pixels, count: 4 * pixels.count) as CFData),
                 let image = CGImage(
-                    width: line.count, height: 2, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 4 * line.count,
+                    width: line.count, height: 1, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 4 * line.count,
                     space: space, bitmapInfo: CGBitmapInfo(alpha: .premultipliedFirst, byteOrder: .order32Little),
                     provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
             {
@@ -579,8 +579,9 @@ final class TerminalContentView: NSView {
                 x: max(Self.padding, min(cursor.minX, bounds.width - Self.padding - size.width)),
                 y: cursor.minY
             )
-            colors.background.withAlphaComponent(1).setFill()
-            CGRect(origin: origin, size: CGSize(width: size.width, height: max(size.height, cursor.height))).fill()
+            colors.background.setFill()
+            CGRect(origin: origin, size: CGSize(width: size.width, height: max(size.height, cursor.height)))
+                .fill(using: .copy)
             text.draw(at: origin)
             return
         }

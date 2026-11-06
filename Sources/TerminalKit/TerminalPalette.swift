@@ -5,8 +5,13 @@ public struct TerminalPalette: Equatable, Sendable {
     public var background: Color
     public var cursor: Color
     public var selection: Color
-    public var bold: Color
     public var ansiColors: [Color]
+    private var customBold: Color?
+
+    public var bold: Color {
+        get { customBold ?? foreground }
+        set { customBold = newValue }
+    }
 
     public init(
         foreground: Color,
@@ -20,8 +25,8 @@ public struct TerminalPalette: Equatable, Sendable {
         self.background = background
         self.cursor = cursor
         self.selection = selection
-        self.bold = bold ?? foreground
         self.ansiColors = ansiColors
+        customBold = bold
     }
 
     public static let standard = TerminalPalette(
