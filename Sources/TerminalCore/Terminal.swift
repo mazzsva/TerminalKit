@@ -392,7 +392,7 @@ package struct Terminal: Sendable {
         case "P":
             deleteCharacters(count)
         case "X":
-            erase(cursor.column ..< min(cursor.column + count, columns), row: cursor.row)
+            erase(cursor.column ..< min(cursor.column + count, columns), row: cursor.row, with: writtenBlank)
         case "L":
             insertLines(count)
         case "M":
@@ -436,6 +436,10 @@ package struct Terminal: Sendable {
     }
 
     private mutating func place(_ scalar: Unicode.Scalar) {
+        guard scalar != " " else {
+            place(.writtenSpace(style: style))
+            return
+        }
         let width = columns > 1 && !scalar.isASCII ? max(scalar.width, 1) : 1
         place(Cell(scalar: scalar, style: style, width: UInt8(width)))
     }
@@ -486,9 +490,9 @@ package struct Terminal: Sendable {
     private mutating func clearWideCharacter(at column: Int) {
         switch screen[cursor.row][column].width {
         case 0 where column > 0:
-            screen[cursor.row][column - 1] = blank
+            screen[cursor.row][column - 1] = writtenBlank
         case 2 where column + 1 < columns:
-            screen[cursor.row][column + 1] = blank
+            screen[cursor.row][column + 1] = writtenBlank
         default:
             break
         }
@@ -590,7 +594,7 @@ package struct Terminal: Sendable {
 
     private mutating func insertCharacters(_ count: Int) {
         let count = min(count, columns - cursor.column)
-        screen[cursor.row].insert(contentsOf: repeatElement(blank, count: count), at: cursor.column)
+        screen[cursor.row].insert(contentsOf: repeatElement(writtenBlank, count: count), at: cursor.column)
         screen[cursor.row].removeLast(count)
         for column in [cursor.column, cursor.column + count, columns] {
             blankBrokenWideCharacter(at: column, row: cursor.row)
@@ -606,10 +610,10 @@ package struct Terminal: Sendable {
 
     private mutating func blankBrokenWideCharacter(at column: Int, row: Int) {
         if column > 0, screen[row][column - 1].width == 2, column == columns || screen[row][column].width != 0 {
-            screen[row][column - 1] = blank
+            screen[row][column - 1] = writtenBlank
         }
         if column < columns, screen[row][column].width == 0, column == 0 || screen[row][column - 1].width != 2 {
-            screen[row][column] = blank
+            screen[row][column] = writtenBlank
         }
     }
 
@@ -1000,18 +1004,18 @@ package struct Terminal: Sendable {
     private mutating func eraseInLine(_ mode: Int) {
         switch mode {
         case 0:
-            erase(cursor.column ..< columns, row: cursor.row)
+            erase(cursor.column ..< columns, row: cursor.row, with: blank)
         case 1:
-            erase(0 ..< cursor.column + 1, row: cursor.row)
+            erase(0 ..< cursor.column + 1, row: cursor.row, with: writtenBlank)
         case 2:
-            erase(0 ..< columns, row: cursor.row)
+            erase(0 ..< columns, row: cursor.row, with: blank)
         default:
             break
         }
     }
 
-    private mutating func erase(_ range: Range<Int>, row: Int) {
-        screen[row].replaceSubrange(range, with: repeatElement(blank, count: range.count))
+    private mutating func erase(_ range: Range<Int>, row: Int, with cell: Cell) {
+        screen[row].replaceSubrange(range, with: repeatElement(cell, count: range.count))
         if range.upperBound == columns {
             screen[row].isWrapped = false
         }
@@ -1021,6 +1025,10 @@ package struct Terminal: Sendable {
 
     private var blank: Cell {
         Cell(style: Style(background: style.background))
+    }
+
+    private var writtenBlank: Cell {
+        .writtenSpace(style: Style(background: style.background))
     }
 
     private func blankLines(_ count: Int) -> [Line] {

@@ -1508,10 +1508,30 @@ struct TerminalTests {
         #expect(scrollback(terminal) == ["a", "", "", "  ", "  ", "  "])
     }
 
+    @Test(arguments: ["  ", "\u{1B}[X", "\u{1B}[1K", "\u{1B}[1J", "\u{1B}[@"])
+    func writesSpaces(sequence: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive(sequence)
+        #expect(terminal.screen[0].first?.isWritten == true)
+    }
+
+    @Test(arguments: ["\u{1B}[K", "\u{1B}[2K", "\u{1B}[J", "\u{1B}[2J", "\u{1B}[P"])
+    func clearsWithoutWritingSpaces(sequence: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}[H" + sequence)
+        #expect(terminal.screen[0].first?.isWritten == false)
+    }
+
+    @Test func keepsWrittenSpacesInTheScrollback() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("a \u{1B}[K\r\nb  \r\n")
+        #expect(terminal.scrollback.map(\.count) == [2, 3])
+    }
+
     @Test func keepsTheWrapOfEachLineThatScrollsOffTheScreen() {
         var terminal = Terminal(columns: 2, rows: 2)
         terminal.receive("a a \u{1B}[2S")
-        #expect(scrollback(terminal) == ["a ", "a"])
+        #expect(scrollback(terminal) == ["a ", "a "])
         #expect(terminal.scrollback.map(\.isWrapped) == [true, false])
     }
 

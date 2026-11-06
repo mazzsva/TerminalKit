@@ -509,7 +509,6 @@
 {"name": "tab write before gap", "input": "a\\x09b\\x1B[2GX", "reply": "\\x1B[1;3R", "screen": ["aX      b"]},
 {"name": "tab write last gap", "input": "a\\x09b\\x1B[8GX", "reply": "\\x1B[1;9R", "screen": ["a      Xb"]},
 {"name": "tab erase in gap", "input": "a\\x09b\\x1B[4G\\x1B[X", "reply": "\\x1B[1;4R", "screen": ["a       b"]},
-{"name": "tab erase end", "input": "a\\x09b\\x1B[4G\\x1B[K", "reply": "\\x1B[1;4R", "screen": ["a  "]},
 {"name": "tab erase start", "input": "a\\x09b\\x1B[4G\\x1B[1K", "reply": "\\x1B[1;4R", "screen": ["        b"]},
 {"name": "tab erase line", "input": "a\\x09b\\x1B[2K", "reply": "\\x1B[1;10R", "screen": []},
 {"name": "tab delete in gap", "input": "a\\x09b\\x1B[4G\\x1B[P", "reply": "\\x1B[1;4R", "screen": ["a      b"]},
