@@ -70,7 +70,7 @@ func mouseEvent(
 ) throws -> NSEvent {
     let point = CGPoint(
         x: TerminalContentView.padding + column * view.cellSize.width,
-        y: TerminalContentView.padding + (CGFloat(row) + 0.5) * view.cellSize.height
+        y: TerminalContentView.topPadding + (CGFloat(row) + 0.5) * view.cellSize.height
     )
     return try #require(
         NSEvent.mouseEvent(

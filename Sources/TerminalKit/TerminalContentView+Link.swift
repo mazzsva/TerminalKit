@@ -166,7 +166,7 @@ extension TerminalContentView {
     func link(at event: NSEvent) -> Link? {
         let location = convert(event.locationInWindow, from: nil)
         return link(
-            atRow: Int(floor((location.y - Self.padding) / cellSize.height)),
+            atRow: Int(floor((location.y - Self.topPadding) / cellSize.height)),
             column: Int(floor((location.x - Self.padding) / cellSize.width))
         )
     }
@@ -192,7 +192,7 @@ extension TerminalContentView {
         hoveredLink =
             modifierFlags.contains(.command)
             ? link(
-                atRow: Int(floor((location.y - Self.padding) / cellSize.height)),
+                atRow: Int(floor((location.y - Self.topPadding) / cellSize.height)),
                 column: Int(floor((location.x - Self.padding) / cellSize.width))
             ) : nil
         hoveredLinkRevision = session.revision

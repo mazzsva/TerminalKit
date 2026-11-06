@@ -2,13 +2,15 @@ import AppKit
 import TerminalCore
 
 final class TerminalContentView: NSView {
-    static let padding: CGFloat = 4
+    static let padding: CGFloat = 10
+    static let topPadding: CGFloat = 7
+    static let bottomPadding: CGFloat = 10
     static let minimumColumns = 10
     static let minimumRows = 2
     static let maximumColumns = 1_000
     static let maximumRows = 1_000
     static let cursorThickness: CGFloat = 2
-    static let defaultFont = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+    static let defaultFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
 
     let session: TerminalSession
 
@@ -488,8 +490,8 @@ final class TerminalContentView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.foreground]
         let graphemes = terminal.graphemes
         let lineCount = terminal.scrollback.count + terminal.rows
-        let firstRow = max(Int((dirtyRect.minY - Self.padding) / cellSize.height) - 1, 0)
-        let lastRow = min(Int((dirtyRect.maxY - Self.padding) / cellSize.height), lineCount - 1)
+        let firstRow = max(Int((dirtyRect.minY - Self.topPadding) / cellSize.height) - 1, 0)
+        let lastRow = min(Int((dirtyRect.maxY - Self.topPadding) / cellSize.height), lineCount - 1)
         let rows = firstRow ..< max(lastRow + 1, firstRow)
         var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor, VisualOrder?)] = []
         for row in rows {
@@ -578,7 +580,7 @@ final class TerminalContentView: NSView {
                 y: cursor.minY
             )
             colors.background.withAlphaComponent(1).setFill()
-            CGRect(origin: origin, size: size).fill()
+            CGRect(origin: origin, size: CGSize(width: size.width, height: max(size.height, cursor.height))).fill()
             text.draw(at: origin)
             return
         }
@@ -619,7 +621,10 @@ final class TerminalContentView: NSView {
     }
 
     private static func cellSize(of font: NSFont) -> CGSize {
-        CGSize(
+        guard font != defaultFont else {
+            return CGSize(width: 7, height: 15)
+        }
+        return CGSize(
             width: ("M" as NSString).size(withAttributes: [.font: font]).width,
             height: ceil(font.ascender - font.descender + font.leading)
         )
@@ -660,7 +665,7 @@ final class TerminalContentView: NSView {
         let font = fonts.font(for: style)
         let index = fonts.index(for: style)
         let color = style.isFaint ? foreground.withAlphaComponent(0.42) : foreground
-        let top = Self.padding + CGFloat(row) * cellSize.height
+        let top = Self.topPadding + CGFloat(row) * cellSize.height
         let baseline = top + font.ascender
         context.setFillColor(color.cgColor)
         context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
@@ -727,7 +732,7 @@ final class TerminalContentView: NSView {
 
     func fit(to size: CGSize) {
         let columns = (size.width - 2 * Self.padding) / cellSize.width
-        let rows = (size.height - 2 * Self.padding) / cellSize.height
+        let rows = (size.height - Self.topPadding - Self.bottomPadding) / cellSize.height
         let canSize = columns >= CGFloat(Self.minimumColumns) && rows >= CGFloat(Self.minimumRows)
         if canSize, session.sizingView == nil {
             session.sizingView = self
@@ -743,15 +748,14 @@ final class TerminalContentView: NSView {
             fittedColumns = session.terminal.columns
         }
         let lineCount = session.terminal.scrollback.count + session.terminal.rows
-        setFrameSize(
-            CGSize(width: size.width, height: max(size.height, CGFloat(lineCount) * cellSize.height + 2 * Self.padding))
-        )
+        let height = CGFloat(lineCount) * cellSize.height + Self.topPadding + Self.bottomPadding
+        setFrameSize(CGSize(width: size.width, height: max(size.height, height)))
     }
 
     func rect(row: Int, columns: Range<Int>) -> CGRect {
         CGRect(
             x: Self.padding + CGFloat(columns.lowerBound) * cellSize.width,
-            y: Self.padding + CGFloat(row) * cellSize.height,
+            y: Self.topPadding + CGFloat(row) * cellSize.height,
             width: CGFloat(columns.count) * cellSize.width,
             height: cellSize.height
         )

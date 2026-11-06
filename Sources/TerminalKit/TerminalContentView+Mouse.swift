@@ -122,7 +122,7 @@ extension TerminalContentView {
     func mousePosition(of event: NSEvent) -> Terminal.Position {
         let terminal = session.terminal
         let location = convert(event.locationInWindow, from: nil)
-        let row = Int((location.y - Self.padding) / cellSize.height) - terminal.scrollback.count
+        let row = Int((location.y - Self.topPadding) / cellSize.height) - terminal.scrollback.count
         let column = Int((location.x - Self.padding) / cellSize.width)
         let limit = session.terminal.usesSGRMouseEncoding ? Int.max : 222
         return Terminal.Position(

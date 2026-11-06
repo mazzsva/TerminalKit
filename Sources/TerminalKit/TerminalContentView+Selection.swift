@@ -87,7 +87,7 @@ extension TerminalContentView {
         let row = terminal.scrollback.count + cursor.row
         let cell = { (location: CGPoint) in
             (
-                row: Int((location.y - Self.padding) / self.cellSize.height),
+                row: Int((location.y - Self.topPadding) / self.cellSize.height),
                 column: Int(floor((location.x - Self.padding) / self.cellSize.width))
             )
         }
@@ -166,7 +166,7 @@ extension TerminalContentView {
     private func selectionPoint(at location: CGPoint) -> Selection.Point {
         let terminal = session.terminal
         let lineCount = terminal.scrollback.count + terminal.rows
-        let row = min(max(Int((location.y - Self.padding) / cellSize.height), 0), lineCount - 1)
+        let row = min(max(Int((location.y - Self.topPadding) / cellSize.height), 0), lineCount - 1)
         let x = (location.x - Self.padding) / cellSize.width
         var column = min(max(Int(x.rounded()), 0), terminal.columns)
         let line = line(at: row, in: terminal)

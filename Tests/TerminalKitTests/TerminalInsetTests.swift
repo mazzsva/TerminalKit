@@ -182,5 +182,6 @@ private func toolbarWindow(running script: String) -> (TerminalScrollView, NSWin
 private func visibleRows(in scrollView: TerminalScrollView) -> Int {
     let insets = scrollView.contentView.contentInsets
     let height = scrollView.contentSize.height - insets.top - insets.bottom
-    return Int((height - 2 * TerminalContentView.padding) / scrollView.terminalView.cellSize.height)
+    let margins = TerminalContentView.topPadding + TerminalContentView.bottomPadding
+    return Int((height - margins) / scrollView.terminalView.cellSize.height)
 }

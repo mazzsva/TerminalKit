@@ -349,7 +349,7 @@ private func findView(running script: String, columns: Int = 40) async throws ->
         x: 0,
         y: 0,
         width: 2 * TerminalContentView.padding + (CGFloat(columns) + 0.5) * view.cellSize.width,
-        height: 2 * TerminalContentView.padding + 10.5 * view.cellSize.height
+        height: TerminalContentView.topPadding + TerminalContentView.bottomPadding + 10.5 * view.cellSize.height
     )
     scrollView.layoutSubtreeIfNeeded()
     try session.start()

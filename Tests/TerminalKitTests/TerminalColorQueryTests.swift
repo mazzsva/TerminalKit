@@ -284,9 +284,9 @@ struct TerminalChangedColorTests {
             after: "\\033]4;1;#102030;200;#405060\\a\\033[41m  \\033[48;5;200m  \\033[mX"
         )
         defer { view.session.terminate() }
-        let y = view.cellSize.height / 2
-        let first = CGPoint(x: view.cellSize.width, y: y)
-        let second = CGPoint(x: view.cellSize.width * 3, y: y)
+        let y = TerminalContentView.topPadding + view.cellSize.height / 2
+        let first = CGPoint(x: TerminalContentView.padding + view.cellSize.width, y: y)
+        let second = CGPoint(x: TerminalContentView.padding + view.cellSize.width * 3, y: y)
         #expect(try isColor(at: first, of: view, red: 0x10, green: 0x20, blue: 0x30))
         #expect(try isColor(at: second, of: view, red: 0x40, green: 0x50, blue: 0x60))
     }
@@ -317,7 +317,10 @@ struct TerminalChangedColorTests {
     @Test func drawsTheChangedForeground() async throws {
         let view = try await view(after: "\\033]10;#102030\\a\\033[7m  \\033[mX")
         defer { view.session.terminate() }
-        let point = CGPoint(x: view.cellSize.width, y: view.cellSize.height / 2)
+        let point = CGPoint(
+            x: TerminalContentView.padding + view.cellSize.width,
+            y: TerminalContentView.topPadding + view.cellSize.height / 2
+        )
         #expect(try isColor(at: point, of: view, red: 0x10, green: 0x20, blue: 0x30))
     }
 
@@ -340,7 +343,10 @@ struct TerminalChangedColorTests {
     }
 
     private func firstCell(of view: TerminalContentView) -> CGPoint {
-        CGPoint(x: TerminalContentView.padding + view.cellSize.width / 2, y: 8 + view.cellSize.height / 2)
+        CGPoint(
+            x: TerminalContentView.padding + view.cellSize.width / 2,
+            y: TerminalContentView.topPadding + view.cellSize.height / 2
+        )
     }
 
     @Test func drawsBoldTextWithTheDefaultForegroundInTheBoldColor() async throws {
@@ -403,7 +409,7 @@ struct TerminalChangedColorTests {
             head: .init(line: 0, column: 8)
         )
         #expect(window.firstResponder === view)
-        let point = CGPoint(x: 4 + view.cellSize.width * 5.5, y: 4 + view.cellSize.height / 2)
+        let point = CGPoint(x: 10 + view.cellSize.width * 5.5, y: 7 + view.cellSize.height / 2)
         #expect(try isColor(at: point, of: view, red: 0x10, green: 0x20, blue: 0x30))
     }
 

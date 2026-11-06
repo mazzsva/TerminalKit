@@ -209,7 +209,7 @@ struct TerminalLinkTests {
         scrollView.layoutSubtreeIfNeeded()
         let view = scrollView.terminalView
         view.currentModifierFlags = { .command }
-        let row = Int((view.visibleRect.midY - TerminalContentView.padding) / view.cellSize.height)
+        let row = Int((view.visibleRect.midY - TerminalContentView.topPadding) / view.cellSize.height)
         window.mouseLocation = view.convert(view.rect(row: row, columns: 1 ..< 2).center, to: nil)
         view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
         #expect(view.hoveredLink?.url == URL(string: "https://\(row + 1).com"))
