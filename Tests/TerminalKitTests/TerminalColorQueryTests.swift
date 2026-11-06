@@ -377,7 +377,7 @@ struct TerminalChangedColorTests {
         #expect(color.redComponent < 0.01)
     }
 
-    @Test func fillsAnInverseDefaultCellWithTheBackgroundAlpha() async throws {
+    @Test func blendsAnInverseDefaultCellWithTheBackgroundAlpha() async throws {
         let session = TerminalSession(running: "printf '\\033[7m  \\033[?25lX'; sleep 30")
         let view = TerminalContentView(session: session)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
@@ -389,6 +389,32 @@ struct TerminalChangedColorTests {
         await session.waitForText("X")
         let color = try pixel(at: firstCell(of: view), of: view)
         #expect(abs(color.alphaComponent - 0.75) < 0.02)
+    }
+
+    @Test func usesTheForegroundWhenThePaletteHasNoBoldColor() {
+        var palette = TerminalPalette(
+            foreground: Color(.sRGB, red: 1, green: 0, blue: 0),
+            background: Color(.sRGB, red: 0, green: 0, blue: 0),
+            cursor: Color(.sRGB, red: 1, green: 1, blue: 1),
+            selection: Color(.sRGB, red: 1, green: 1, blue: 1),
+            ansiColors: []
+        )
+        #expect(palette.bold == palette.foreground)
+        palette.foreground = Color(.sRGB, red: 0, green: 1, blue: 0)
+        #expect(palette.bold == palette.foreground)
+    }
+
+    @Test(arguments: ["31", "38;5;1", "38;2;180;85;71"])
+    func keepsAnExplicitForegroundForBoldText(parameter: String) async throws {
+        let session = TerminalSession(running: "printf '\\033[?25l\\033[1;7;\(parameter)m  \\033[mX'; sleep 30")
+        let view = TerminalContentView(session: session)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        session.sizingView = view
+        defer { session.terminate() }
+        try session.start()
+        await session.waitForText("X")
+        let color = try pixel(at: firstCell(of: view), of: view)
+        #expect(color.redComponent > 0.5 && color.greenComponent < 0.45)
     }
 
     @Test func swapsTheChangedColorsInReverseVideo() async throws {
