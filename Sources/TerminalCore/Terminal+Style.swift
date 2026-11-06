@@ -81,7 +81,7 @@ extension Terminal {
                     isFaint = true
                 case 3:
                     isItalic = true
-                case 4, 21:
+                case 4:
                     isUnderlined = true
                 case 7:
                     isInverse = true

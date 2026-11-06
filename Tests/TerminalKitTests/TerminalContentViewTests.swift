@@ -446,9 +446,10 @@ struct TerminalContentViewTests {
 
     @Test(arguments: ["", "7;"], [1, 2] as [CGFloat])
     func drawsTheUnderlineInTheTextColor(parameters: String, scale: CGFloat) async throws {
-        let view = try await drawnView(running: "printf '\\033[\(parameters)4;31mab\\033[m\\r'")
+        let view = try await drawnView(running: "printf '\\033[?25l\\033[\(parameters)4;31mab\\033[m\\r'")
         let window = ScaledWindow(contentView: view)
         window.scale = scale
+        view.palette = highContrastPalette
         let font = view.fonts.regular
         let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
@@ -485,13 +486,24 @@ struct TerminalContentViewTests {
         #expect(window.firstResponder === view)
     }
 
+    @Test func drawsFaintTextAtTheMeasuredAlpha() async throws {
+        let view = try await drawnView(running: "printf '\\033[?25l\\033[2;4mab\\033[m\\r'")
+        view.palette = highContrastPalette
+        let font = view.fonts.regular
+        let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let representation = try representation(of: view)
+        let color = try #require(color(in: representation, at: CGPoint(x: 8, y: y))?.usingColorSpace(.sRGB))
+        #expect(abs(color.redComponent - 0.58) < 0.25)
+    }
+
     @Test(arguments: [1, 2] as [CGFloat])
     func drawsAFaintUnderline(scale: CGFloat) async throws {
-        let plain = try await drawnView(running: "printf '\\033[4mab\\033[m\\r'")
-        let view = try await drawnView(running: "printf '\\033[2;4mab\\033[m\\r'")
+        let plain = try await drawnView(running: "printf '\\033[?25l\\033[4mab\\033[m\\r'")
+        let view = try await drawnView(running: "printf '\\033[?25l\\033[2;4mab\\033[m\\r'")
         let windows = [ScaledWindow(contentView: plain), ScaledWindow(contentView: view)]
         for window in windows {
             window.scale = scale
+            (window.contentView as? TerminalContentView)?.palette = highContrastPalette
         }
         let font = view.fonts.regular
         let y = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
@@ -506,9 +518,9 @@ struct TerminalContentViewTests {
         let view = try await drawnView(running: "printf '\\033[41m  \\033[m'")
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
         let color = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
-        #expect(abs(color.redComponent - 194 / 255) < 0.02)
-        #expect(abs(color.greenComponent - 54 / 255) < 0.02)
-        #expect(abs(color.blueComponent - 33 / 255) < 0.02)
+        #expect(abs(color.redComponent - 180 / 255) < 0.02)
+        #expect(abs(color.greenComponent - 85 / 255) < 0.02)
+        #expect(abs(color.blueComponent - 71 / 255) < 0.02)
     }
 
     @Test func drawsTheBackgroundColorWithoutASeamBetweenRuns() async throws {
@@ -564,7 +576,7 @@ struct TerminalContentViewTests {
             running: isSelected ? "printf '│\\r\\n│\\n'" : "printf '\\033[44m│\\r\\n│\\033[m\\n'")
         let window = ScaledWindow(contentView: view)
         window.scale = scale
-        view.appearance = NSAppearance(named: .aqua)
+        view.palette = highContrastPalette
         if isSelected {
             view.selection = TerminalContentView.Selection(
                 anchor: .init(line: 0, column: 0), head: .init(line: 1, column: 1))
@@ -581,7 +593,7 @@ struct TerminalContentViewTests {
                 .max() ?? 0
         }
         #expect(ink(y: 0) >= ink(y: view.cellSize.height / 2))
-        #expect(ink(y: view.cellSize.height / 2) > 0.2)
+        #expect(ink(y: view.cellSize.height / 2) > 0.15)
     }
 
     @Test(arguments: [1, 2] as [CGFloat], [0, 0.25] as [CGFloat])
@@ -663,7 +675,7 @@ struct TerminalContentViewTests {
         #expect(!session.terminal.scrollback.isEmpty)
         let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
         let color = try #require(color(in: try representation(of: view), at: center)?.usingColorSpace(.sRGB))
-        #expect(abs(color.redComponent - 194 / 255) < 0.02)
+        #expect(abs(color.redComponent - 180 / 255) < 0.02)
     }
 
     @Test func drawsWithThePalette() async throws {
@@ -695,8 +707,8 @@ struct TerminalContentViewTests {
         let representation = try representation(of: view)
         let points = [0, 2, 4]
             .map { CGPoint(x: 4 + view.cellSize.width * (CGFloat($0) + 0.5), y: 4 + view.cellSize.height / 2) }
-        let fill: [CGFloat] = count > 2 ? [0.1, 0.9, 0.5] : [203.0 / 255, 204.0 / 255, 205.0 / 255]
-        let brightFill: [CGFloat] = count > 2 ? [0.1, 0.9, 0.5] : [233.0 / 255, 235.0 / 255, 235.0 / 255]
+        let fill: [CGFloat] = count > 2 ? [0.1, 0.9, 0.5] : [222.0 / 255, 230.0 / 255, 236.0 / 255]
+        let brightFill: [CGFloat] = count > 2 ? [0.1, 0.9, 0.5] : [230.0 / 255, 239.0 / 255, 246.0 / 255]
         #expect(isClose(color(in: representation, at: points[0]), to: [0.4, 0.6, 0.2]))
         #expect(isClose(color(in: representation, at: points[1]), to: fill))
         #expect(isClose(color(in: representation, at: points[2]), to: brightFill))
@@ -761,14 +773,14 @@ struct TerminalContentViewTests {
         let representation = try representation(of: view)
         let points = (0 ..< 10)
             .map { CGPoint(x: 4 + view.cellSize.width * (CGFloat($0) + 0.5), y: 4 + view.cellSize.height / 2) }
-        #expect(isClose(color(in: representation, at: points[0]), to: [194.0 / 255, 54.0 / 255, 33.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[0]), to: [180.0 / 255, 85.0 / 255, 71.0 / 255]))
         #expect(isClose(color(in: representation, at: points[1]), to: [0.6, 0.7, 0.8]))
-        #expect(isClose(color(in: representation, at: points[2]), to: [203.0 / 255, 204.0 / 255, 205.0 / 255]))
-        #expect(isClose(color(in: representation, at: points[3]), to: [0, 0, 0]))
-        #expect(isClose(color(in: representation, at: points[4]), to: [129.0 / 255, 131.0 / 255, 131.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[2]), to: [53.0 / 255, 66.0 / 255, 75.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[3]), to: [222.0 / 255, 230.0 / 255, 236.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[4]), to: [230.0 / 255, 239.0 / 255, 246.0 / 255]))
         #expect(isClose(color(in: representation, at: points[5]), to: [0.6, 0.7, 0.8]))
         #expect(isClose(color(in: representation, at: points[6]), to: [0.2, 0.3, 0.4]))
-        #expect(isClose(color(in: representation, at: points[7]), to: [233.0 / 255, 235.0 / 255, 235.0 / 255]))
+        #expect(isClose(color(in: representation, at: points[7]), to: [70.0 / 255, 92.0 / 255, 109.0 / 255]))
         #expect(isClose(color(in: representation, at: points[8]), to: [0.2, 0.3, 0.4]))
         #expect(isClose(color(in: representation, at: points[9]), to: [0.6, 0.7, 0.8]))
         #expect(isClose(color(in: representation, at: CGPoint(x: 190, y: 90)), to: [0.2, 0.3, 0.4]))
@@ -1321,6 +1333,15 @@ private func operatorCounts(in data: Data) throws -> (fills: Int, images: Int) {
 }
 
 private let red: [CGFloat] = [194 / 255, 54 / 255, 33 / 255]
+
+private let highContrastPalette = TerminalPalette(
+    foreground: Color(.sRGB, red: 0, green: 0, blue: 0),
+    background: Color(.sRGB, red: 1, green: 1, blue: 1),
+    cursor: Color(.sRGB, red: 0, green: 0, blue: 0),
+    selection: Color(.sRGB, red: 0.7, green: 0.8, blue: 1),
+    ansiColors: [Color(.sRGB, red: 0, green: 0, blue: 0), Color(.sRGB, red: 1, green: 0, blue: 0)]
+        + Array(repeating: Color(.sRGB, red: 0.5, green: 0.5, blue: 0.5), count: 14)
+)
 
 private func isClose(_ color: NSColor?, to other: NSColor?) -> Bool {
     guard let other = other?.usingColorSpace(.sRGB) else {

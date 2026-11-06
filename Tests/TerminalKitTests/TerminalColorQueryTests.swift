@@ -8,13 +8,25 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct TerminalColorQueryTests {
+    @Test func reportsTheStandardPaletteAsTerminalAppReportsClearDark() throws {
+        let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        let colors = try #require(view.reportedColors)
+        #expect(colors.foreground == gray(0xE6CE))
+        #expect(colors.background == Terminal.RGB(red: 0x213D, green: 0x2743, blue: 0x33E7))
+        #expect(colors.cursor == gray(0x9D2C))
+        #expect(colors.selection == Terminal.RGB(red: 0x3370, green: 0x4E03, blue: 0x5EBA))
+        #expect(colors.bold == gray(0xF165))
+        #expect(colors.ansi[1] == Terminal.RGB(red: 0xB480, green: 0x55F1, blue: 0x47F9))
+    }
+
     @Test(arguments: [(NSAppearance.Name.aqua, UInt16(0x0000), UInt16(0xFFFF)), (.darkAqua, 0xFFFF, 0x1E1E)])
-    func reportsTheStandardPaletteInTheAppearanceOfTheView(
+    func reportsASemanticPaletteInTheAppearanceOfTheView(
         appearance: NSAppearance.Name,
         foreground: UInt16,
         background: UInt16
     ) {
         let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        view.palette = semanticPalette
         view.appearance = NSAppearance(named: appearance)
         #expect(view.reportedColors?.foreground == gray(foreground))
         #expect(view.reportedColors?.background == gray(background))
@@ -22,6 +34,7 @@ struct TerminalColorQueryTests {
 
     @Test func reportsTheAppearanceOfTheWindow() {
         let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        view.palette = semanticPalette
         #expect(view.reportedColors != nil)
         let window = NSWindow(contentView: view)
         window.appearance = NSAppearance(named: .darkAqua)
@@ -46,7 +59,7 @@ struct TerminalColorQueryTests {
         #expect(colors.background == Terminal.RGB(red: 0, green: 0, blue: 0xFFFF))
         #expect(colors.cursor == Terminal.RGB(red: 0, green: 0xFFFF, blue: 0))
         #expect(colors.selection == Terminal.RGB(red: 0xFFFF, green: 0xFFFF, blue: 0))
-        #expect(colors.bold == colors.foreground)
+        #expect(colors.bold == gray(0xF165))
         #expect(colors.ansi[1] == Terminal.RGB(red: 0, green: 0xFFFF, blue: 0xFFFF))
         palette.background = Color(nsColor: NSColor(patternImage: NSImage(size: NSSize(width: 1, height: 1))))
         view.palette = palette
@@ -59,6 +72,7 @@ struct TerminalColorQueryTests {
                 "stty raw -echo; printf a; head -c 1 >/dev/null; printf '\\033]11;?\\a\\033[c'; head -c 31 | tr '\\033' E"
         )
         let view = TerminalContentView(session: session)
+        view.palette = semanticPalette
         view.appearance = NSAppearance(named: .aqua)
         session.sizingView = view
         try session.start()
@@ -75,6 +89,7 @@ struct TerminalColorQueryTests {
                 "stty raw -echo; printf a; head -c 1 >/dev/null; printf '\\033]11;?\\a\\033[c'; head -c 31 | tr '\\033' E"
         )
         let view = TerminalContentView(session: session)
+        view.palette = semanticPalette
         view.appearance = NSAppearance(named: .darkAqua)
         session.sizingView = view
         try session.start()
@@ -122,6 +137,14 @@ struct TerminalColorQueryTests {
         #expect(session.lines.contains("E[?1;2c"))
     }
 }
+
+private let semanticPalette = TerminalPalette(
+    foreground: Color(nsColor: .textColor),
+    background: Color(nsColor: .textBackgroundColor),
+    cursor: Color(nsColor: .textColor).opacity(0.5),
+    selection: Color(nsColor: .selectedTextBackgroundColor),
+    ansiColors: TerminalPalette.standard.ansiColors
+)
 
 private func gray(_ white: UInt16) -> Terminal.RGB {
     Terminal.RGB(red: white, green: white, blue: white)
@@ -296,6 +319,70 @@ struct TerminalChangedColorTests {
         defer { view.session.terminate() }
         let point = CGPoint(x: view.cellSize.width, y: view.cellSize.height / 2)
         #expect(try isColor(at: point, of: view, red: 0x10, green: 0x20, blue: 0x30))
+    }
+
+    private func boldView(after output: String) async throws -> TerminalContentView {
+        let session = TerminalSession(running: "printf '\(output)\\033[1;7m  \\033[?25lX'; sleep 30")
+        let view = TerminalContentView(session: session)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.palette = TerminalPalette(
+            foreground: Color(.sRGB, red: 0.2, green: 0.2, blue: 0.2),
+            background: Color(.sRGB, red: 0, green: 0, blue: 0),
+            cursor: Color(.sRGB, red: 1, green: 1, blue: 1),
+            selection: Color(.sRGB, red: 1, green: 1, blue: 1),
+            ansiColors: TerminalPalette.standard.ansiColors,
+            bold: Color(.sRGB, red: 0.8, green: 0.8, blue: 0.8)
+        )
+        session.sizingView = view
+        try session.start()
+        await session.waitForText("X")
+        return view
+    }
+
+    private func firstCell(of view: TerminalContentView) -> CGPoint {
+        CGPoint(x: TerminalContentView.padding + view.cellSize.width / 2, y: 8 + view.cellSize.height / 2)
+    }
+
+    @Test func drawsBoldTextWithTheDefaultForegroundInTheBoldColor() async throws {
+        let view = try await boldView(after: "")
+        defer { view.session.terminate() }
+        let color = try pixel(at: firstCell(of: view), of: view)
+        #expect(abs(color.redComponent - 0.8) < 0.01)
+    }
+
+    @Test func drawsTheChangedBoldColor() async throws {
+        let view = try await boldView(after: "\\033]5;0;#ff0000\\a")
+        defer { view.session.terminate() }
+        let color = try pixel(at: firstCell(of: view), of: view)
+        #expect(color.redComponent > 0.9 && color.greenComponent < 0.2 && color.blueComponent < 0.05)
+    }
+
+    @Test func keepsTheBoldColorWhenTheForegroundChanges() async throws {
+        let view = try await boldView(after: "\\033]10;#ff0000\\a")
+        defer { view.session.terminate() }
+        let color = try pixel(at: firstCell(of: view), of: view)
+        #expect(abs(color.redComponent - 0.8) < 0.01)
+    }
+
+    @Test func usesNoBoldColorInReverseVideo() async throws {
+        let view = try await boldView(after: "\\033[?5h")
+        defer { view.session.terminate() }
+        let color = try pixel(at: firstCell(of: view), of: view)
+        #expect(color.redComponent < 0.01)
+    }
+
+    @Test func fillsAnInverseDefaultCellWithTheBackgroundAlpha() async throws {
+        let session = TerminalSession(running: "printf '\\033[7m  \\033[?25lX'; sleep 30")
+        let view = TerminalContentView(session: session)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.palette.foreground = Color(.sRGB, red: 1, green: 1, blue: 1)
+        view.palette.background = Color(.sRGB, red: 0, green: 0, blue: 0).opacity(0.5)
+        session.sizingView = view
+        defer { session.terminate() }
+        try session.start()
+        await session.waitForText("X")
+        let color = try pixel(at: firstCell(of: view), of: view)
+        #expect(abs(color.alphaComponent - 0.75) < 0.02)
     }
 
     @Test func swapsTheChangedColorsInReverseVideo() async throws {

@@ -111,6 +111,8 @@ final class TerminalContentView: NSView {
         let background: NSColor
         let cursor: NSColor
         let selection: NSColor
+        let bold: NSColor
+        let backgroundAlpha: CGFloat
         let ansiColors: [NSColor]
         private let changedColors: [UInt8: NSColor]
         private let cache = ColorCache()
@@ -135,10 +137,16 @@ final class TerminalContentView: NSView {
         }
 
         func colors(for style: Terminal.Style) -> (foreground: NSColor, background: NSColor?) {
-            let foreground = color(style.foreground) ?? self.foreground
+            let indexed = color(style.foreground)
+            let foreground = indexed ?? (style.isBold ? bold : self.foreground)
             let background = color(style.background)
-            return style.isInverse
-                ? (background ?? self.background.withAlphaComponent(1), foreground) : (foreground, background)
+            guard style.isInverse else {
+                return (foreground, background)
+            }
+            return (
+                background ?? self.background.withAlphaComponent(1),
+                indexed == nil ? foreground.withAlphaComponent(backgroundAlpha) : foreground
+            )
         }
 
         init(
@@ -154,6 +162,8 @@ final class TerminalContentView: NSView {
                 changes.background.map { NSColor($0, alpha: paletteBackground.alphaComponent) } ?? paletteBackground
             foreground = isReversed ? currentBackground.withAlphaComponent(1) : currentForeground
             background = isReversed ? currentForeground : currentBackground
+            backgroundAlpha = paletteBackground.alphaComponent
+            bold = isReversed ? foreground : changes.bold.map { NSColor($0) } ?? NSColor(palette.bold)
             let cursor = changes.cursor.map { NSColor($0, alpha: paletteCursor.alphaComponent) } ?? paletteCursor
             self.cursor =
                 isReversed && cursor.terminalRGB == background.terminalRGB
@@ -171,10 +181,6 @@ final class TerminalContentView: NSView {
                 }
             }
             self.changedColors = changedColors
-            if isReversed {
-                ansiColors.swapAt(0, 7)
-                ansiColors.swapAt(8, 15)
-            }
             self.ansiColors = ansiColors
         }
     }
@@ -267,6 +273,7 @@ final class TerminalContentView: NSView {
                 let background = colors.background.terminalRGB,
                 let cursor = colors.cursor.terminalRGB,
                 let selection = colors.selection.terminalRGB,
+                let bold = colors.bold.terminalRGB,
                 ansi.count == colors.ansiColors.count
             else {
                 reportedColors = nil
@@ -277,7 +284,7 @@ final class TerminalContentView: NSView {
                 background: background,
                 cursor: cursor,
                 selection: selection,
-                bold: foreground,
+                bold: bold,
                 ansi: ansi
             )
         }
@@ -573,7 +580,7 @@ final class TerminalContentView: NSView {
                 x: max(Self.padding, min(cursor.minX, bounds.width - Self.padding - size.width)),
                 y: cursor.minY
             )
-            colors.background.setFill()
+            colors.background.withAlphaComponent(1).setFill()
             CGRect(origin: origin, size: size).fill()
             text.draw(at: origin)
             return
@@ -655,7 +662,7 @@ final class TerminalContentView: NSView {
         }
         let font = fonts.font(for: style)
         let index = fonts.index(for: style)
-        let color = style.isFaint ? foreground.withAlphaComponent(0.5) : foreground
+        let color = style.isFaint ? foreground.withAlphaComponent(0.42) : foreground
         let top = Self.padding + CGFloat(row) * cellSize.height
         let baseline = top + font.ascender
         context.setFillColor(color.cgColor)

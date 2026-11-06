@@ -39,10 +39,10 @@ struct StyleTests {
         #expect(style("1;9;29") == Terminal.Style(isBold: true))
     }
 
-    @Test func treatsDoubleUnderlineAsUnderline() {
+    @Test func ignoresDoubleUnderline() {
         var style = Terminal.Style()
         style.apply([21])
-        #expect(style.isUnderlined)
+        #expect(!style.isUnderlined)
     }
 
     @Test func ignoresUnknownParameters() {
