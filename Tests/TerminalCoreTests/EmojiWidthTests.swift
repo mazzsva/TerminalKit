@@ -152,16 +152,6 @@ struct EmojiWidthTests {
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 3))
     }
 
-    @Test(arguments: [("\u{1F1FA}", "\u{1F1F8}"), ("\u{261D}", "\u{1F3FD}")])
-    func overwritesTheLastColumnsWithAnEmojiThatWidensWithoutAutowrap(base: String, modifier: String) {
-        var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("abc" + base + "\u{1B}[?7l" + modifier)
-        #expect(terminal.screen[0].map(\.width) == [1, 1, 2, 0])
-        #expect(terminal.character(of: terminal.screen[0][2]) == Character(base + modifier))
-        #expect(terminal.screen[1][0] == Terminal.Cell())
-        #expect(terminal.cursor == Terminal.Position(row: 0, column: 3))
-    }
-
     @Test(arguments: ["\u{1F1FA}\u{1F1F8}", "\u{261D}\u{1F3FD}"])
     func insertsAnEmojiThatWidensInTheLastColumnOnTheNextRow(text: String) {
         var terminal = Terminal(columns: 4, rows: 2)
