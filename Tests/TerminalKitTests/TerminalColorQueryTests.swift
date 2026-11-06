@@ -118,3 +118,76 @@ struct TerminalColorQueryTests {
 private func gray(_ white: UInt16) -> Terminal.RGB {
     Terminal.RGB(red: white, green: white, blue: white)
 }
+
+@MainActor
+struct TerminalWindowReportTests {
+    @Test func reportsNoWindowAsHidden() {
+        let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        view.frame = NSRect(x: 0, y: 0, width: 300, height: 197)
+        #expect(view.windowReport == Terminal.WindowReport(width: 300, height: 197))
+    }
+
+    @Test func reportsTheWindowFromTheTopOfTheVisibleScreen() throws {
+        let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        let window = NSWindow(
+            contentRect: NSRect(x: 100, y: 100, width: 300, height: 197),
+            styleMask: .titled,
+            backing: .buffered,
+            defer: true
+        )
+        window.contentView = view
+        let hidden = view.windowReport
+        #expect(!hidden.isVisible)
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        let screen = try #require(window.screen)
+        #expect(
+            view.windowReport
+                == Terminal.WindowReport(
+                    isVisible: true,
+                    x: Int(window.frame.minX),
+                    y: Int(screen.visibleFrame.maxY - window.frame.maxY),
+                    width: 300,
+                    height: 197
+                )
+        )
+    }
+
+    @Test func reportsTheScrollViewSize() {
+        let scrollView = TerminalScrollView(session: TerminalSession(running: "exit"))
+        scrollView.frame = NSRect(x: 0, y: 0, width: 300, height: 197)
+        scrollView.terminalView.frame = NSRect(x: 0, y: 0, width: 300, height: 5_000)
+        #expect(scrollView.terminalView.windowReport == Terminal.WindowReport(width: 300, height: 197))
+    }
+
+    @Test func reportsHiddenAfterTheViewIsGone() async throws {
+        let session = TerminalSession(
+            running:
+                "stty raw -echo; printf a; head -c 1 >/dev/null; printf '\\033[11t\\033[c'; head -c 11 | tr '\\033' E"
+        )
+        let view = TerminalContentView(session: session)
+        let window = NSWindow(contentView: view)
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        session.sizingView = view
+        try session.start()
+        await session.waitForText("a")
+        #expect(session.terminal.windowReport.isVisible)
+        session.sizingView = nil
+        session.send("x")
+        await session.waitForExit()
+        #expect(session.lines.contains { $0.contains("E[2tE[?1;2c") })
+    }
+
+    @Test func answersTheWindowQueriesFromTheView() async throws {
+        let session = TerminalSession(
+            running: "stty raw -echo; printf '\\033[14t\\033[18t\\033[c'; head -c 26 | tr '\\033' E"
+        )
+        let view = TerminalContentView(session: session)
+        view.frame = NSRect(x: 0, y: 0, width: 300, height: 197)
+        session.sizingView = view
+        try session.start()
+        await session.waitForExit()
+        #expect(session.lines.contains { $0.contains("E[4;197;300tE[8;") })
+    }
+}

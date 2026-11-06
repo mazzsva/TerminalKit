@@ -11,6 +11,22 @@ package struct Terminal: Sendable {
         }
     }
 
+    package struct WindowReport: Equatable, Sendable {
+        package var isVisible = false
+        package var x = 0
+        package var y = 0
+        package var width = 0
+        package var height = 0
+
+        package init(isVisible: Bool = false, x: Int = 0, y: Int = 0, width: Int = 0, height: Int = 0) {
+            self.isVisible = isVisible
+            self.x = x
+            self.y = y
+            self.width = width
+            self.height = height
+        }
+    }
+
     package struct RGB: Equatable, Sendable {
         package var red: UInt16
         package var green: UInt16
@@ -55,6 +71,7 @@ package struct Terminal: Sendable {
     package internal(set) var currentDirectory: URL?
     package private(set) var mouseTracking = MouseTracking.off
     package var reportedColors: [RGB] = []
+    package var windowReport = WindowReport()
     package private(set) var usesSGRMouseEncoding = false
     package private(set) var modifyOtherKeys = 0
 
@@ -359,6 +376,12 @@ package struct Terminal: Sendable {
             setKeyboardFlags(sequence)
             return
         }
+        if sequence.privateMarker == ">", sequence.final == "c" {
+            if sequence.parameters.count <= 1, sequence.parameter(at: 0, default: 0) == 0 {
+                replies += "\u{1B}[>1;95;0c".utf8
+            }
+            return
+        }
         if sequence.privateMarker == ">",
             sequence.final == "m" && [nil, 4].contains(sequence.parameters.first)
                 || sequence.final == "n" && sequence.parameters.first == 4
@@ -426,7 +449,7 @@ package struct Terminal: Sendable {
             scrollRegionUp(count)
         case "T":
             scrollDown(count, in: scrollRegion)
-        case "c" where sequence.parameter(at: 0, default: 0) == 0:
+        case "c" where sequence.parameters.count <= 1 && sequence.parameter(at: 0, default: 0) == 0:
             replies += "\u{1B}[?1;2c".utf8
         case "h", "l":
             for mode in sequence.parameters {
@@ -442,6 +465,10 @@ package struct Terminal: Sendable {
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
             setScrollRegion(top: count - 1, bottom: min(sequence.parameter(at: 1, default: rows), rows))
+        case "t":
+            reportWindow(sequence.parameter(at: 0, default: 0))
+        case "x":
+            reportTerminalParameters(sequence.parameter(at: 0, default: 0))
         default:
             break
         }
@@ -807,6 +834,7 @@ package struct Terminal: Sendable {
         terminal.title = title
         terminal.bellCount = bellCount
         terminal.reportedColors = reportedColors
+        terminal.windowReport = windowReport
         terminal.graphemes = graphemes
         terminal.scrollback = scrollback
         scrollback = []
@@ -1060,6 +1088,27 @@ package struct Terminal: Sendable {
             replies += "\u{1B}[\(cursor.row - topLimit + 1);\(cursor.column + 1)R".utf8
         default:
             break
+        }
+    }
+
+    private mutating func reportWindow(_ request: Int) {
+        switch request {
+        case 11:
+            replies += "\u{1B}[\(windowReport.isVisible ? 1 : 2)t".utf8
+        case 13:
+            replies += "\u{1B}[3;\(windowReport.x);\(windowReport.y)t".utf8
+        case 14:
+            replies += "\u{1B}[4;\(windowReport.height);\(windowReport.width)t".utf8
+        case 18:
+            replies += "\u{1B}[8;\(rows);\(columns)t".utf8
+        default:
+            break
+        }
+    }
+
+    private mutating func reportTerminalParameters(_ request: Int) {
+        if request <= 1 {
+            replies += "\u{1B}[\(request + 2);1;1;112;112;1;0x".utf8
         }
     }
 

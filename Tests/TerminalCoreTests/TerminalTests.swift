@@ -1479,7 +1479,10 @@ struct TerminalTests {
         var terminal = Terminal(columns: 1, rows: 1)
         #expect(terminal.receive("\u{1B}[c") == "\u{1B}[?1;2c")
         #expect(terminal.receive("\u{1B}[0c") == "\u{1B}[?1;2c")
-        #expect(terminal.receive("\u{1B}[1c\u{1B}[>c") == "")
+        #expect(terminal.receive("\u{1B}[1c\u{1B}[0;0c") == "")
+        #expect(terminal.receive("\u{1B}[>c") == "\u{1B}[>1;95;0c")
+        #expect(terminal.receive("\u{1B}[>0c") == "\u{1B}[>1;95;0c")
+        #expect(terminal.receive("\u{1B}[>1c\u{1B}[>0;0c") == "")
     }
 
     @Test func countsTheBells() {
@@ -1801,4 +1804,21 @@ private func lines(_ terminal: Terminal) -> [String] {
 
 private func scrollback(_ terminal: Terminal) -> [String] {
     terminal.scrollback.map { String($0.map(terminal.character(of:))) }
+}
+
+struct WindowReportTests {
+    @Test func reportsTheWindowFields() {
+        var terminal = Terminal(columns: 40, rows: 12)
+        terminal.windowReport = Terminal.WindowReport(isVisible: true, x: 12, y: 34, width: 56, height: 78)
+        #expect(terminal.receive("\u{1B}[11t") == "\u{1B}[1t")
+        #expect(terminal.receive("\u{1B}[13t") == "\u{1B}[3;12;34t")
+        #expect(terminal.receive("\u{1B}[14t") == "\u{1B}[4;78;56t")
+        #expect(terminal.receive("\u{1B}[18t") == "\u{1B}[8;12;40t")
+    }
+
+    @Test func keepsTheWindowReportAfterAReset() {
+        var terminal = Terminal(columns: 40, rows: 12)
+        terminal.windowReport = Terminal.WindowReport(isVisible: true, x: 12, y: 34, width: 56, height: 78)
+        #expect(terminal.receive("\u{1B}c\u{1B}[13t") == "\u{1B}[3;12;34t")
+    }
 }
