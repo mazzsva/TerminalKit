@@ -39,9 +39,9 @@ struct TerminalAppRecordingTests {
         let reply = terminal.receive(bytes(recording.input) + Array("\u{1B}[6n".utf8))
         #expect(escaped(reply) == recording.reply)
         #expect(terminal.title == recording.title ?? "")
-        #expect(text(terminal.screen, of: terminal) == recording.screen)
+        #expect(scalars(text(terminal.screen, of: terminal)) == scalars(recording.screen))
         let history = terminal.scrollback + terminal.normalScreenLines + terminal.screen
-        #expect(text(history, of: terminal) == recording.history ?? recording.screen)
+        #expect(scalars(text(history, of: terminal)) == scalars(recording.history ?? recording.screen))
     }
 
     func terminalLikeTheRecordedWindow() -> Terminal {
@@ -67,6 +67,10 @@ struct TerminalAppRecordingTests {
 
     func rgb(_ red: UInt16, _ green: UInt16, _ blue: UInt16) -> Terminal.RGB {
         Terminal.RGB(red: red, green: green, blue: blue)
+    }
+
+    func scalars(_ lines: [String]) -> [[Unicode.Scalar]] {
+        lines.map { Array($0.unicodeScalars) }
     }
 
     func bytes(_ text: String) -> [UInt8] {

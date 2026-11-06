@@ -47,7 +47,7 @@ package struct Terminal: Sendable {
     }
 
     private static let tabWidth = 8
-    private static let maximumScalarsPerCell = 16
+    private static let maximumBytesPerCell = 1_024
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
     private static let maximumKeyboardFlagsDepth = 8
@@ -97,7 +97,7 @@ package struct Terminal: Sendable {
     private var parser = EscapeSequenceParser()
     private var isWrapPending = false
     private var isTextRunClipped = false
-    private var isAfterPrint = false
+    private var isLastCharacterDropped = false
     private var style = Style()
     private var characterSets: [Unicode.Scalar] = ["B", "B", "B", "B"]
     private var activeCharacterSet = 0
@@ -122,6 +122,7 @@ package struct Terminal: Sendable {
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
         isTextRunClipped = false
+        isLastCharacterDropped = false
         if columns != self.columns {
             guard var normalScreen else {
                 let (lines, anchors) = reflow(
@@ -283,7 +284,11 @@ package struct Terminal: Sendable {
             guard let action = parser.advance(scalar) else {
                 continue
             }
-            if case .print = action {} else { isTextRunClipped = false }
+            if case .print = action {
+            } else {
+                isTextRunClipped = false
+                isLastCharacterDropped = false
+            }
             switch action {
             case .print(let scalar):
                 let characterSet = characterSets[activeCharacterSet]
@@ -343,7 +348,11 @@ package struct Terminal: Sendable {
             default:
                 break
             }
-            if case .print = action {} else { isTextRunClipped = false }
+            if case .print = action {
+            } else {
+                isTextRunClipped = false
+                isLastCharacterDropped = false
+            }
         }
         return replies
     }
@@ -424,7 +433,6 @@ package struct Terminal: Sendable {
             moveCursor(row: min(topLimit + count - 1, bottomLimit), column: sequence.parameter(at: 1, default: 1) - 1)
         case "d":
             cursor.row = min(topLimit + count - 1, bottomLimit)
-            isAfterPrint = false
         case "J":
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
@@ -476,25 +484,20 @@ package struct Terminal: Sendable {
     }
 
     private mutating func print(_ scalar: Unicode.Scalar) {
-        guard scalar.isASCII || scalar.width > 0 else {
-            if !combine(scalar), scalar.properties.generalCategory == .spacingMark {
-                place(scalar)
-            }
-            return
+        let width = scalar.width
+        if width == 0 {
+            combine(scalar)
+        } else {
+            place(scalar, width: width)
         }
-        if !scalar.isASCII, scalar.properties.isEmoji, isAfterPrint, combine(scalar) {
-            return
-        }
-        place(scalar)
     }
 
-    private mutating func place(_ scalar: Unicode.Scalar) {
+    private mutating func place(_ scalar: Unicode.Scalar, width: Int = 1) {
         guard scalar != " " else {
             place(.writtenSpace(style: style))
             return
         }
-        let width = columns > 1 && !scalar.isASCII ? max(scalar.width, 1) : 1
-        place(Cell(scalar: scalar, style: style, width: UInt8(width)))
+        place(Cell(scalar: scalar, style: style, width: columns > 1 ? UInt8(width) : 1))
     }
 
     private mutating func place(_ cell: Cell) {
@@ -502,6 +505,7 @@ package struct Terminal: Sendable {
         if !usesAutowrap {
             guard !isTextRunClipped, cursor.column + width <= columns else {
                 isTextRunClipped = true
+                isLastCharacterDropped = true
                 return
             }
             isWrapPending = false
@@ -537,7 +541,6 @@ package struct Terminal: Sendable {
         } else {
             cursor.column += width
         }
-        isAfterPrint = true
     }
 
     private mutating func clearWideCharacter(at column: Int) {
@@ -552,16 +555,16 @@ package struct Terminal: Sendable {
         }
     }
 
-    private mutating func combine(_ scalar: Unicode.Scalar) -> Bool {
-        var column = isWrapPending || isTextRunClipped ? cursor.column : cursor.column - 1
-        if isTextRunClipped, screen[cursor.row][cursor.column].isBlank {
-            return true
+    private mutating func combine(_ scalar: Unicode.Scalar) {
+        guard !isLastCharacterDropped else {
+            return
         }
+        var column = isWrapPending || isTextRunClipped ? cursor.column : cursor.column - 1
         if column > 0, screen[cursor.row][column].width == 0 {
             column -= 1
         }
         guard column >= 0 else {
-            return false
+            return
         }
         let target = screen[cursor.row][column]
         if target.isTab || target.isTabGap {
@@ -569,60 +572,21 @@ package struct Terminal: Sendable {
                 if target.isTabGap {
                     screen[cursor.row][column] = Cell(scalar: scalar, style: target.style)
                 }
-                return true
+                return
             }
             breakTab(at: column, row: cursor.row)
         }
         var text = graphemes.character(of: screen[cursor.row][column])
-        guard text.unicodeScalars.count < Self.maximumScalarsPerCell,
-            scalar.properties.generalCategory != .spacingMark || text.unicodeScalars.first?.width != 0
-        else {
-            return false
+        guard text.utf8.count + UTF8.width(scalar) <= Self.maximumBytesPerCell else {
+            return
         }
         text.unicodeScalars.append(scalar)
-        guard text.count == 1 else {
-            return false
-        }
         if graphemes.needsCompaction(for: text) {
             compactGraphemes()
         }
         let cell = graphemes.cell(screen[cursor.row][column], with: text)
-        guard graphemes.character(of: cell).utf8.elementsEqual(text.utf8) else {
-            return false
-        }
-        screen[cursor.row][column] = cell
-        if scalar.width > 0, let base = text.unicodeScalars.first,
-            !scalar.properties.isEmojiModifier || base.properties.isEmojiModifierBase
-        {
-            widen(column)
-        }
-        return true
-    }
-
-    private mutating func widen(_ column: Int) {
-        guard screen[cursor.row][column].width == 1, columns > 1 else {
-            return
-        }
-        guard !isWrapPending else {
-            var cell = screen[cursor.row][column]
-            cell.width = 2
-            screen[cursor.row][column] = .padding
-            place(cell)
-            return
-        }
-        guard column + 1 < columns else {
-            return
-        }
-        if usesInsertMode {
-            insertCharacters(1)
-        }
-        clearWideCharacter(at: column + 1)
-        screen[cursor.row][column].width = 2
-        screen[cursor.row][column + 1] = Cell(style: screen[cursor.row][column].style, width: 0)
-        if column + 2 == columns {
-            isWrapPending = usesAutowrap
-        } else {
-            cursor.column += 1
+        if graphemes.character(of: cell).utf8.elementsEqual(text.utf8) {
+            screen[cursor.row][column] = cell
         }
     }
 
@@ -655,7 +619,6 @@ package struct Terminal: Sendable {
 
     private mutating func lineFeed() {
         isWrapPending = false
-        isAfterPrint = false
         if cursor.row == scrollRegion.upperBound - 1 {
             scrollRegionUp(1)
         } else if cursor.row < rows - 1 {
@@ -782,7 +745,6 @@ package struct Terminal: Sendable {
 
     private mutating func reverseLineFeed() {
         isWrapPending = false
-        isAfterPrint = false
         if cursor.row == scrollRegion.lowerBound {
             scrollDown(1, in: scrollRegion)
         } else {
@@ -800,13 +762,11 @@ package struct Terminal: Sendable {
 
     private mutating func carriageReturn() {
         isWrapPending = false
-        isAfterPrint = false
         cursor.column = 0
     }
 
     private mutating func moveCursor(row: Int, column: Int) {
         isWrapPending = false
-        isAfterPrint = false
         cursor = Position(row: min(max(row, 0), rows - 1), column: min(max(column, 0), columns - 1))
     }
 
@@ -918,7 +878,6 @@ package struct Terminal: Sendable {
 
     private mutating func moveForward(tabStops count: Int) {
         isWrapPending = false
-        isAfterPrint = false
         for _ in 0 ..< min(count, columns) {
             cursor.column = tabStops[(cursor.column + 1)...].firstIndex(of: true) ?? columns - 1
         }
@@ -1041,7 +1000,6 @@ package struct Terminal: Sendable {
 
     private mutating func homeCursor() {
         cursor = Position(row: topLimit, column: 0)
-        isAfterPrint = false
     }
 
     private mutating func enterAlternateScreen() {

@@ -188,43 +188,45 @@ struct TerminalTests {
         #expect(cells.map(terminal.character(of:)).joined() == cluster)
     }
 
-    @Test func dropsTheMarksAfterSixteenScalars() {
+    @Test func dropsTheMarksAfterTheByteLimit() {
         var terminal = Terminal(columns: 2, rows: 1)
         terminal.receive("a" + String(repeating: "\u{301}", count: 50_000) + "b")
-        #expect(terminal.character(of: terminal.screen[0][0]).unicodeScalars.count == 16)
+        #expect(terminal.character(of: terminal.screen[0][0]).utf8.count == 1_023)
         #expect(terminal.character(of: terminal.screen[0][1]) == "b")
     }
 
-    @Test func ignoresMarksWithoutAPreviousCharacter() {
+    @Test func dropsAMarkWithoutAPreviousCharacter() {
         var terminal = Terminal(columns: 2, rows: 1)
-        terminal.receive("\u{301}a\u{200B}")
-        #expect(lines(terminal) == ["a "])
+        terminal.receive("\u{301}a\u{301}")
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["a\u{301}", " "])
     }
 
-    @Test func keepsSpacingMarksThatDoNotCombine() {
+    @Test func placesEachSpacingMarkInItsOwnCell() {
         var terminal = Terminal(columns: 6, rows: 1)
         terminal.receive("\u{1019}\u{103C}\u{1014}\u{103A}\u{1019}\u{102C}\u{1038}")
         #expect(
             terminal.screen[0].map(terminal.character(of:)) == [
-                "\u{1019}\u{103C}", "\u{1014}\u{103A}", "\u{1019}", "\u{102C}", "\u{1038}", " ",
+                "\u{1019}", "\u{103C}", "\u{1014}\u{103A}", "\u{1019}", "\u{102C}", "\u{1038}",
             ])
-        #expect(terminal.screen[0].map(\.width) == [1, 1, 1, 1, 1, 1])
-        #expect(terminal.cursor == Terminal.Position(row: 0, column: 5))
     }
 
     @Test func combinesAMarkWithASpacingMarkInItsOwnCell() {
         var terminal = Terminal(columns: 3, rows: 1)
-        terminal.receive("\u{1015}\u{1031}\u{102B}\u{103A}")
-        #expect(terminal.screen[0].map(terminal.character(of:)) == ["\u{1015}\u{1031}", "\u{102B}\u{103A}", " "])
-        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+        terminal.receive("\u{1015}\u{102B}\u{103A}")
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["\u{1015}", "\u{102B}\u{103A}", " "])
     }
 
     @Test(arguments: ["\u{915}\u{93E}", "\u{B95}\u{BC6}\u{BBE}"])
-    func combinesSpacingMarksThatJoin(character: String) {
+    func keepsSpacingMarksThatJoinInOtherTerminalsInTheirOwnCells(character: String) {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive(character)
+        #expect(terminal.cursor.column == character.unicodeScalars.count)
+    }
+
+    @Test func keepsMarksThatDoNotJoinAsOneCharacterInOneCell() {
         var terminal = Terminal(columns: 3, rows: 1)
-        terminal.receive(character + "x")
-        #expect(terminal.screen[0].map(terminal.character(of:)) == [character, "x", " "])
-        #expect(terminal.cursor == Terminal.Position(row: 0, column: 2))
+        terminal.receive("a\u{1160}\u{2066}x")
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["a\u{1160}\u{2066}", "x", " "])
     }
 
     @Test func keepsASpacingMarkWithoutAPreviousCharacter() {

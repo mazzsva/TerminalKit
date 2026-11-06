@@ -53,19 +53,16 @@ struct GraphemeTests {
         let expected = text.map(String.init)
         #expect(shown.count == expected.count)
         #expect(zip(shown, expected).allSatisfy { $1.unicodeScalars.starts(with: $0.unicodeScalars) })
-        #expect(zip(shown, expected).filter { $0 == $1 }.count >= 60)
+        let complete = zip(shown, expected).filter { $0 == $1 }.count
+        #expect(complete >= 60)
         #expect(terminal.graphemes.count <= 64)
     }
 
-    @Test func keepsAnEmojiInItsOwnCellWhenEveryCharacterIsInUse() {
+    @Test func dropsAMarkWhenEveryCharacterIsInUse() {
         var terminal = Terminal(columns: 10, rows: 2)
         terminal.graphemes = Terminal.Graphemes(capacity: 64)
-        terminal.receive(clusters(count: 100) + "\r\n\u{1F44D}\u{1F3FD}\u{1F1FA}\u{1F1F8}x")
-        #expect(terminal.screen[1].prefix(7).map(\.width) == [2, 0, 2, 0, 1, 1, 1])
-        #expect(
-            terminal.screen[1].prefix(7).map(terminal.character(of:)) == [
-                "\u{1F44D}", " ", "\u{1F3FD}", " ", "\u{1F1FA}", "\u{1F1F8}", "x",
-            ])
+        terminal.receive(clusters(count: 100) + "\r\na\u{301}x")
+        #expect(terminal.screen[1].prefix(2).map(terminal.character(of:)) == ["a", "x"])
     }
 
     @Test func waitsLongerAfterACompactionThatFreesNothing() {

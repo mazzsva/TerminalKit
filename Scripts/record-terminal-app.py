@@ -96,10 +96,35 @@ def probe(window, paths):
             f'tell application "Terminal" to return (contents of {tab}) & (ASCII character 1) & (history of {tab}) & (ASCII character 1) & (custom title of {tab})'
         ).split("\x01")
 
+    def record_widths(path):
+        scalars = [value for value in range(0x80, 0x110000) if not 0xD800 <= value <= 0xDFFF]
+        widths = {}
+        for start in range(0, len(scalars), 1000):
+            chunk = scalars[start:start + 1000]
+            write(b"".join(b"\r\x1b[Ka" + chr(value).encode() + PROBE for value in chunk) + SYNC)
+            reply, synced = read_to_sync(60)
+            columns = [int(column) for column in re.findall(rb"\x1b\[\d+;(\d+)R", reply)]
+            if not synced or len(columns) != len(chunk):
+                raise RuntimeError(f"no reply to U+{chunk[0]:X}")
+            widths.update({value: column - 2 for value, column in zip(chunk, columns)})
+        write(RESET + SYNC)
+        read_to_sync(2)
+        lines = []
+        first = 0x80
+        for value in range(0x81, 0x110001):
+            if widths.get(value, widths[first]) != widths[first] or value == 0x110000:
+                lines.append(f"{first:X} {value - 1:X} {widths[first]}\n")
+                first = value
+        with open(path, "w") as file:
+            file.writelines(lines)
+
     original = termios.tcgetattr(terminal)
     tty.setraw(terminal)
     try:
         for path in paths:
+            if path.endswith(".txt"):
+                record_widths(path)
+                continue
             with open(path) as file:
                 recordings = json.load(file)
             for index, recording in enumerate(recordings):
@@ -189,4 +214,5 @@ if sys.argv[1:2] == ["--probe"]:
     open(done, "w").close()
 else:
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    record(sys.argv[1:] or sorted(glob.glob(os.path.join(root, "Tests/TerminalCoreTests/Recordings/*.json"))))
+    recordings = os.path.join(root, "Tests/TerminalCoreTests/Recordings")
+    record(sys.argv[1:] or sorted(glob.glob(os.path.join(recordings, "*.json"))) + [os.path.join(recordings, "widths.txt")])

@@ -10,5 +10,3 @@ int terminalkit_spawn_in_terminal(
     char *const arguments[],
     char *const environment[]
 );
-
-int terminalkit_character_width(uint32_t scalar);
