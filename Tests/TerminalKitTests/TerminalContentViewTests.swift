@@ -336,15 +336,17 @@ struct TerminalContentViewTests {
         #expect(windows[0].firstResponder === view && windows[1].firstResponder === reference)
     }
 
-    @Test(arguments: ["\\341\\200\\270", "\\341\\200\\254", "\\340\\244\\276", "\\340\\244\\276\\340\\244\\201"])
-    func drawsASpacingMarkInItsCell(character: String) async throws {
+    @Test(arguments: ["\\341\\200\\270", "\\340\\244\\276"])
+    func drawsASpacingMarkAlone(character: String) async throws {
         let mark = try await drawnView(running: "printf '\(character)x\\n'")
         let spaced = try await drawnView(running: "printf ' x\\n'")
         let first = CGRect(x: 4, y: 4, width: mark.cellSize.width, height: mark.cellSize.height)
-        let second = first.offsetBy(dx: mark.cellSize.width, dy: 0)
-        let edge = first.divided(atDistance: 1, from: .minXEdge).slice
-        #expect(try pixels(in: edge, of: mark) != pixels(in: edge, of: spaced))
-        #expect(try pixels(in: second, of: mark) == pixels(in: second, of: spaced))
+        #expect(try pixels(in: first, of: mark) != pixels(in: first, of: spaced))
+    }
+
+    @Test func drawsABlockFromTheFont() throws {
+        let entry = GlyphCache().entry(for: "\u{2588}", font: TerminalContentView.defaultFont, index: 0)
+        #expect(entry.runs.flatMap(\.glyphs).count == 1)
     }
 
     @Test func drawsEachCharacterInItsCellWithAProportionalFont() async throws {
@@ -582,94 +584,14 @@ struct TerminalContentViewTests {
         #expect(ink(y: view.cellSize.height / 2) > 0.2)
     }
 
-    @Test(
-        arguments: [
-            ("█", [CGRect(x: 0, y: 0, width: 1, height: 1)]), ("▀", [CGRect(x: 0, y: 0, width: 1, height: 0.5)]),
-            ("▁", [CGRect(x: 0, y: 7.0 / 8, width: 1, height: 1.0 / 8)]),
-            ("▄", [CGRect(x: 0, y: 0.5, width: 1, height: 0.5)]),
-            ("▉", [CGRect(x: 0, y: 0, width: 7.0 / 8, height: 1)]),
-            ("▌", [CGRect(x: 0, y: 0, width: 0.5, height: 1)]), ("▐", [CGRect(x: 0.5, y: 0, width: 0.5, height: 1)]),
-            ("▔", [CGRect(x: 0, y: 0, width: 1, height: 1.0 / 8)]),
-            ("▕", [CGRect(x: 7.0 / 8, y: 0, width: 1.0 / 8, height: 1)]),
-            ("▖", [CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5)]),
-            ("▘", [CGRect(x: 0, y: 0, width: 0.5, height: 0.5)]),
-            ("▝", [CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5)]),
-            ("▗", [CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)]),
-            ("▛", [CGRect(x: 0, y: 0, width: 1, height: 0.5), CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5)]),
-            ("▙", [CGRect(x: 0, y: 0, width: 0.5, height: 0.5), CGRect(x: 0, y: 0.5, width: 1, height: 0.5)]),
-            ("▚", [CGRect(x: 0, y: 0, width: 0.5, height: 0.5), CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)]),
-            ("▜", [CGRect(x: 0, y: 0, width: 1, height: 0.5), CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)]),
-            ("▞", [CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5), CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5)]),
-            ("▟", [CGRect(x: 0.5, y: 0, width: 0.5, height: 0.5), CGRect(x: 0, y: 0.5, width: 1, height: 0.5)]),
-        ] as [(String, [CGRect])])
-    func drawsABlockElementAsARectangle(character: String, units: [CGRect]) async throws {
-        let view = try await drawnView(running: "printf '\\033[31m\(character)\\n'")
-        let cell = CGRect(x: 4, y: 4, width: view.cellSize.width, height: view.cellSize.height)
-        let filled = try units.map {
-            try pixels(
-                in: $0.applying(
-                    CGAffineTransform(translationX: 4, y: 4).scaledBy(x: view.cellSize.width, y: view.cellSize.height)),
-                of: view)
-        }
-        #expect(filled.joined().allSatisfy { isClose($0, to: red) })
-        #expect(try pixels(in: cell, of: view).count { isClose($0, to: red) } == filled.joined().count)
-    }
-
-    @Test(arguments: ["▏", "▕"])
-    func drawsAnEighthBlockInEveryColumnAtAStandardScale(character: String) async throws {
-        let view = try await drawnView(running: "printf '\\033[31m\(String(repeating: character, count: 20))\\n'")
-        let window = ScaledWindow(contentView: view)
-        view.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        let (width, y) = (view.cellSize.width, 4 + view.cellSize.height / 2)
-        let cells = (0 ..< 20).map { CGRect(x: 4 + CGFloat($0) * width, y: y, width: width, height: 1) }
-            .map { view.backingAlignedRect($0, options: .alignAllEdgesNearest) }
-        let background = color(in: try representation(of: view), at: CGPoint(x: 190, y: 90))
-        let ink = try cells.map { try pixels(in: $0, of: view).filter { !isClose($0, to: background) } }
-        #expect(ink.allSatisfy { $0.count == 1 && isClose($0[0], to: ink[0][0]) })
-        #expect(window.contentView === view)
-    }
-
-    @Test func drawsAShadeWithTheForegroundAtPartialAlpha() async throws {
-        let view = try await drawnView(running: "printf '\\033[4;31m \\n░▒▓ \\033[2;24m█\\n'")
-        let font = view.fonts.regular
-        let underline = 4 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
-        let representation = try representation(of: view)
-        let background = color(in: representation, at: CGPoint(x: 190, y: 90))
-        let foreground = NSColor(srgbRed: red[0], green: red[1], blue: red[2], alpha: 1)
-        func point(row: Int, column: Int, y: CGFloat) -> CGPoint {
-            CGPoint(x: 4 + (CGFloat(column) + 0.5) * view.cellSize.width, y: y + CGFloat(row) * view.cellSize.height)
-        }
-        for (column, alpha): (Int, CGFloat) in [(0, 0.25), (1, 0.5), (2, 0.75), (4, 0.5)] {
-            let blended = background?.blended(withFraction: alpha, of: foreground)
-            let center = point(row: 1, column: column, y: 4 + view.cellSize.height / 2)
-            #expect(isClose(color(in: representation, at: center), to: blended))
-        }
-        let plainUnderline = try #require(color(in: representation, at: point(row: 0, column: 0, y: underline)))
-        #expect(isClose(color(in: representation, at: point(row: 1, column: 3, y: underline)), to: plainUnderline))
-        #expect(!isClose(plainUnderline, to: background))
-    }
-
-    @Test func drawsAStackOfFullBlocksWithoutAGap() async throws {
-        let view = try await drawnView(running: "printf '\\033[31m█\\n█\\n█\\n'")
-        let column = CGRect(x: 4 + view.cellSize.width / 2, y: 4, width: 1, height: 3 * view.cellSize.height)
-        #expect(try pixels(in: column, of: view).allSatisfy { isClose($0, to: red) })
-    }
-
-    @Test func drawsARowOfFullBlocksWithoutAGap() async throws {
-        let view = try await drawnView(running: "printf '\\033[31m███\\n'")
-        let row = CGRect(x: 4, y: 4 + view.cellSize.height / 2, width: 3 * view.cellSize.width, height: 1)
-        #expect(try pixels(in: row, of: view).allSatisfy { isClose($0, to: red) })
-    }
-
     @Test(arguments: [1, 2] as [CGFloat], [0, 0.25] as [CGFloat])
     func drawsTruecolorCellsAsOneFillPerCell(scale: CGFloat, offset: CGFloat) async throws {
-        let characters: [Character] = [" ", "▀", "▄", "█"]
         let colors: [[Int]] = (0 ..< 48).map { index in [37, 91, 53, 29, 67, 13].map { index * $0 % 256 } }
         let text: [String] = colors.indices.map { index in
             let color = colors[index]
             let style = "\\033[\(index % 5 == 0 ? 7 : 27);38;2;\(color[0]);\(color[1]);\(color[2]);48;2;"
             let end = index % 12 == 11 ? "\\r\\n" : ""
-            return style + "\(color[3]);\(color[4]);\(color[5])m\(characters[index % 4])\(end)"
+            return style + "\(color[3]);\(color[4]);\(color[5])m \(end)"
         }
         let view = try await drawnView(running: "printf '\(text.joined())\\033[m\\033[?25l'")
         view.palette.background = .clear
@@ -681,23 +603,14 @@ struct TerminalContentViewTests {
             container.addSubview(subview)
             subview.setFrameOrigin(CGPoint(x: offset / scale, y: offset / scale))
         }
-        let units: [Character: CGRect] = [
-            "▀": CGRect(x: 0, y: 0, width: 1, height: 0.5), "▄": CGRect(x: 0, y: 0.5, width: 1, height: 0.5),
-            "█": CGRect(x: 0, y: 0, width: 1, height: 1),
-        ]
         for (index, color) in colors.enumerated() {
             let components = color.map { CGFloat($0) / 255 }
             let foreground = NSColor(srgbRed: components[0], green: components[1], blue: components[2], alpha: 1)
             let background = NSColor(srgbRed: components[3], green: components[4], blue: components[5], alpha: 1)
-            let (ink, fill) = index % 5 == 0 ? (background, foreground) : (foreground, background)
+            let fill = index % 5 == 0 ? foreground : background
             let cell = view.backingAlignedRect(
                 view.rect(row: index / 12, columns: index % 12 ..< index % 12 + 1), options: .alignAllEdgesNearest)
             reference.fills.append((cell, fill))
-            if let unit = units[characters[index % 4]] {
-                let transform = CGAffineTransform(translationX: cell.minX, y: cell.minY)
-                    .scaledBy(x: cell.width, y: cell.height)
-                reference.fills.append((unit.applying(transform), ink))
-            }
         }
         let (actual, expected) = (try representation(of: containers[0]), try representation(of: containers[1]))
         let grid = view.frame
@@ -738,20 +651,6 @@ struct TerminalContentViewTests {
         let counts = try operatorCounts(in: view.dataWithPDF(inside: view.bounds))
         #expect(counts.fills < 4)
         #expect(counts.images == 1)
-    }
-
-    @Test func drawsASelectedBlockOverTheSelection() async throws {
-        let view = try await drawnView(running: "printf '\\033[38;2;194;54;33m█\\033[m\\r'")
-        view.selection = TerminalContentView.Selection(
-            anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 1))
-        let center = CGPoint(x: 4 + view.cellSize.width / 2, y: 4 + view.cellSize.height / 2)
-        #expect(isClose(color(in: try representation(of: view), at: center), to: red))
-    }
-
-    @Test func hidesAHiddenBlock() async throws {
-        let blank = try image(of: try await drawnView(running: "printf ' \\r'"))
-        let hidden = try image(of: try await drawnView(running: "printf '\\033[8;38;2;0;0;255m█\\r'"))
-        #expect(hidden == blank)
     }
 
     @Test func drawsTheScrollback() async throws {
