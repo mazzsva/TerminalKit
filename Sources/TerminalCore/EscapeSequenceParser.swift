@@ -162,6 +162,8 @@ struct EscapeSequenceParser: Sendable {
             state = .ignoredControlSequence
         case "<" where parameters.isEmpty && privateMarker == nil, "=" where parameters.isEmpty && privateMarker == nil:
             privateMarker = scalar
+        case " " ... "/" where privateMarker == "?" || privateMarker == ">":
+            state = .ground
         case " ", "!":
             collect(scalar)
             state = .controlSequenceIntermediate

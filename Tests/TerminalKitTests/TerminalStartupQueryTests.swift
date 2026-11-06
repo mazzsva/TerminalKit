@@ -17,6 +17,6 @@ struct TerminalStartupQueryTests {
         view.appearance = NSAppearance(named: .darkAqua)
         session.sizingView = view
         try session.start()
-        #expect(await session.linesAfterExit().contains("E[?0uE]11;rgb:1e1e/1e1e/1e1eE[?1;2c"))
+        #expect(await session.linesAfterExit().contains("pE[?0uE]11;rgb:1e1e/1e1e/1e1eE[?1;2c"))
     }
 }
