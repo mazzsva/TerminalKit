@@ -14,9 +14,8 @@ struct TerminalStartupQueryTests {
                 """
         )
         let view = TerminalContentView(session: session)
-        view.appearance = NSAppearance(named: .darkAqua)
         session.sizingView = view
         try session.start()
-        #expect(await session.linesAfterExit().contains("pE[?0uE]11;rgb:1e1e/1e1e/1e1eE[?1;2c"))
+        #expect(await session.linesAfterExit().contains("pE[?0uE]11;rgb:213d/2743/33e7E[?1;2c"))
     }
 }
