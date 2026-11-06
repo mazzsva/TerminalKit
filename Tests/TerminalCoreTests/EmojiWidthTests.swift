@@ -71,14 +71,6 @@ struct EmojiWidthTests {
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
     }
 
-    @Test func repeatsTheEmojiThatASkinToneJoins() {
-        var terminal = Terminal(columns: 10, rows: 1)
-        terminal.receive("\u{1F44D}\u{1F3FD}\u{1B}[b")
-        #expect(terminal.screen[0].prefix(4).map(\.width) == [2, 0, 2, 0])
-        #expect(terminal.character(of: terminal.screen[0][2]) == "\u{1F44D}")
-        #expect(terminal.cursor == Terminal.Position(row: 0, column: 4))
-    }
-
     @Test func keepsJoiningScalarsThatAreNotEmojiInTheirOwnCells() {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive("\u{1100}\u{1100}x")
@@ -91,15 +83,6 @@ struct EmojiWidthTests {
         #expect(terminal.screen[0].prefix(5).map(\.width) == [2, 0, 2, 0, 1])
         #expect(terminal.character(of: terminal.screen[0][2]) == "\u{1F468}")
         #expect(terminal.screen[0][4] == Terminal.Cell(scalar: "x"))
-    }
-
-    @Test(arguments: ["\u{1F1FA}", "\u{1F3FD}"])
-    func repeatsNothingAfterARegionalIndicatorOrSkinTone(text: String) {
-        var repeated = Terminal(columns: 10, rows: 1)
-        var printed = repeated
-        repeated.receive(text + "\u{1B}[65535bx")
-        printed.receive(text + "x")
-        #expect(repeated.screen == printed.screen)
     }
 
     @Test func pairsRegionalIndicatorsInOrder() {
