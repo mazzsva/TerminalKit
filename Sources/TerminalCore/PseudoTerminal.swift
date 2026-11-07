@@ -47,9 +47,13 @@ package final class PseudoTerminal: Sendable {
         environment: [String: String],
         currentDirectoryURL: URL? = nil,
         columns: Int,
-        rows: Int
+        rows: Int,
+        pixelWidth: Int = 0,
+        pixelHeight: Int = 0
     ) throws(POSIXError) {
-        let (primary, secondary) = try Self.openTerminal(columns: columns, rows: rows)
+        let (primary, secondary) = try Self.openTerminal(
+            columns: columns, rows: rows, pixelWidth: pixelWidth, pixelHeight: pixelHeight
+        )
         do {
             processIdentifier = try Self.spawn(
                 executableURL: executableURL,
@@ -122,12 +126,12 @@ package final class PseudoTerminal: Sendable {
         }
     }
 
-    package func resize(columns: Int, rows: Int) {
+    package func resize(columns: Int, rows: Int, pixelWidth: Int = 0, pixelHeight: Int = 0) {
         queue.async { [weak self] in
             guard let self, !readSource.isCancelled else {
                 return
             }
-            var size = winsize(columns: columns, rows: rows)
+            var size = winsize(columns: columns, rows: rows, pixelWidth: pixelWidth, pixelHeight: pixelHeight)
             _ = ioctl(fileDescriptor, TIOCSWINSZ, &size)
         }
     }
@@ -242,7 +246,12 @@ package final class PseudoTerminal: Sendable {
         wakeUp.finish()
     }
 
-    package static func openTerminal(columns: Int, rows: Int) throws(POSIXError) -> (primary: Int32, secondary: Int32) {
+    package static func openTerminal(
+        columns: Int,
+        rows: Int,
+        pixelWidth: Int = 0,
+        pixelHeight: Int = 0
+    ) throws(POSIXError) -> (primary: Int32, secondary: Int32) {
         var primary = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC)
         var retries = 0
         while primary == -1, errno == ENXIO || errno == redriveOpenError, retries < maximumOpenRetries {
@@ -264,7 +273,7 @@ package final class PseudoTerminal: Sendable {
             close(primary)
             throw POSIXError(error)
         }
-        var size = winsize(columns: columns, rows: rows)
+        var size = winsize(columns: columns, rows: rows, pixelWidth: pixelWidth, pixelHeight: pixelHeight)
         _ = ioctl(secondary, TIOCSWINSZ, &size)
         var attributes = termios()
         if tcgetattr(secondary, &attributes) == 0 {
@@ -339,8 +348,13 @@ extension PseudoTerminal.Termination {
 }
 
 extension winsize {
-    fileprivate init(columns: Int, rows: Int) {
-        self.init(ws_row: UInt16(clamping: rows), ws_col: UInt16(clamping: columns), ws_xpixel: 0, ws_ypixel: 0)
+    fileprivate init(columns: Int, rows: Int, pixelWidth: Int, pixelHeight: Int) {
+        self.init(
+            ws_row: UInt16(clamping: rows),
+            ws_col: UInt16(clamping: columns),
+            ws_xpixel: UInt16(clamping: pixelWidth),
+            ws_ypixel: UInt16(clamping: pixelHeight)
+        )
     }
 }
 
