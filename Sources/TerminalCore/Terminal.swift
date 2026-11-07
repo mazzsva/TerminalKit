@@ -47,8 +47,6 @@ package struct Terminal: Sendable {
     }
 
     private static let maximumBytesPerCell = 1_024
-    private static let maximumScrollback = 10_000
-    private static let scrollbackTrimCount = 1_000
     private static let maximumKeyboardFlagsDepth = 8
     private static let maximumRepeatCount = 1_000_000
 
@@ -631,15 +629,6 @@ package struct Terminal: Sendable {
                 previousLine = line
             }
             scrollback.append(keptLine)
-        }
-        trimScrollback()
-    }
-
-    private mutating func trimScrollback() {
-        if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
-            removedScrollbackCount += scrollback.count - Self.maximumScrollback
-            scrollback.removeFirst(scrollback.count - Self.maximumScrollback)
-            graphemes.resetCompactionInterval()
         }
     }
 

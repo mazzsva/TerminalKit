@@ -241,19 +241,17 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.minY == 0)
     }
 
-    @Test func keepsThePositionWhenOldLinesAreRemoved() async throws {
-        let (scrollView, session) = try await scrollView(running: "seq 1 10500; read line; seq 1 2000")
-        await session.waitForText("10500")
+    @Test func movesToTheTopWhenTheScrollbackIsErased() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 500; read line; printf '\\033[3J'; seq 1 200")
+        await session.waitForText("500")
         scrollView.layoutSubtreeIfNeeded()
         let view = scrollView.terminalView
-        view.scroll(CGPoint(x: 0, y: 7 + 5_000 * view.cellSize.height))
-        let firstLine = { session.terminal.scrollback[Int(scrollView.contentView.bounds.minY / view.cellSize.height)] }
-        let line = firstLine()
+        view.scroll(CGPoint(x: 0, y: 7 + 300 * view.cellSize.height))
         session.send(Array("\r".utf8))
         await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         #expect(session.terminal.removedScrollbackCount > 0)
-        #expect(firstLine() == line)
+        #expect(scrollView.contentView.bounds.minY < view.cellSize.height)
     }
 
     @Test(arguments: ["", "\\033[?1049h"])

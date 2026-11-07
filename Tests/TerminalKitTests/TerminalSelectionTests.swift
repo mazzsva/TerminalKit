@@ -218,8 +218,8 @@ struct TerminalSelectionTests {
         #expect(view.selectedText == word)
     }
 
-    @Test func selectsAWordInTheTrimmedScrollback() async throws {
-        let view = try await view(running: "seq 1 12000")
+    @Test func selectsAWordAfterTheScrollbackIsErased() async throws {
+        let view = try await view(running: "seq 1 12000; printf '\\033[3J'")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 2))
         let removed = view.session.terminal.removedScrollbackCount
         let head = Selection.Point(line: removed, column: "\(removed + 1)".count)
@@ -376,13 +376,13 @@ struct TerminalSelectionTests {
         #expect(view.selection == Selection(anchor: .init(line: 1, column: 3), head: .init(line: 1, column: 3)))
     }
 
-    @Test func extendsTheTrimmedSelectionWithAShiftClick() async throws {
-        let view = try await view(running: "seq 1 12000")
+    @Test func extendsTheSelectionWithAShiftClickAfterTheScrollbackIsErased() async throws {
+        let view = try await view(running: "seq 1 12000; printf '\\033[3J'")
         let firstLine = view.session.terminal.removedScrollbackCount
         #expect(firstLine > 0)
-        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: firstLine + 100, column: 2))
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 10, column: 1, in: view, modifierFlags: .shift))
-        #expect(view.selection?.anchor == .init(line: firstLine + 100, column: 2))
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: firstLine + 5, column: 2))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 1, in: view, modifierFlags: .shift))
+        #expect(view.selection?.anchor == .init(line: firstLine + 5, column: 2))
     }
 
     @Test func extendsFromTheFartherEndOfABackwardSelectionWithAShiftClick() throws {
