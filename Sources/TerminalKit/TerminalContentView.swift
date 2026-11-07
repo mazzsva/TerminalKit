@@ -516,10 +516,11 @@ final class TerminalContentView: NSView {
         let firstRow = max(Int((dirtyRect.minY - Self.topPadding) / cellSize.height) - 1, 0)
         let lastRow = min(Int((dirtyRect.maxY - Self.topPadding) / cellSize.height), lineCount - 1)
         let rows = firstRow ..< max(lastRow + 1, firstRow)
-        var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor, VisualOrder?)] = []
+        var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor, VisualOrder?, JoinedCells?)] = []
         for row in rows {
             let line = line(at: row, in: terminal)
             let order = Self.visualOrder(of: line, graphemes: graphemes)
+            let joined = Self.joinedCells(in: line, graphemes: graphemes, order: order)
             let selected = selection?
                 .columns(inLine: terminal.removedScrollbackCount + row, count: max(line.count, terminal.columns))
             var pixels = [UInt32](repeating: 0, count: line.count)
@@ -541,7 +542,7 @@ final class TerminalContentView: NSView {
                 drawsBlinkingText = drawsBlinkingText || style.isBlinking && !style.isHidden && hasInk
                 let drawsText = selected != nil || hasInk
                 if drawsText {
-                    runs.append((line, row, columns, style, foreground, order))
+                    runs.append((line, row, columns, style, foreground, order, joined))
                 }
             }
             let frame = rect(row: row, columns: 0 ..< line.count)
@@ -569,10 +570,10 @@ final class TerminalContentView: NSView {
                 }
             }
         }
-        for (line, row, columns, style, foreground, order) in runs {
+        for (line, row, columns, style, foreground, order, joined) in runs {
             drawText(
                 line, columns: columns, row: row, style: style, foreground: foreground, graphemes: graphemes,
-                order: order)
+                order: order, joined: joined)
         }
 
         if drawsBlinkingText, blinkTask == nil {
@@ -637,15 +638,25 @@ final class TerminalContentView: NSView {
             cursor.fill(using: .sourceOver)
         }
         let line = terminal.screen[terminal.cursor.row]
-        let style = line[terminal.cursor.column].style
+        let order = Self.visualOrder(of: line, graphemes: graphemes)
+        let joined = Self.joinedCells(in: line, graphemes: graphemes, order: order)
+        let columns = joined?.expanded(cursorColumns) ?? cursorColumns
+        var style = line[columns.lowerBound].style
+        style.isUnderlined = line[cursorColumns.lowerBound].style.isUnderlined
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        if columns != cursorColumns {
+            NSBezierPath(rect: cursor).setClip()
+        }
         drawText(
             line,
-            columns: cursorColumns,
+            columns: columns,
             row: terminal.scrollback.count + terminal.cursor.row,
             style: style,
             foreground: colors.colors(for: style).foreground,
             graphemes: graphemes,
-            order: Self.visualOrder(of: line, graphemes: graphemes)
+            order: order,
+            joined: joined
         )
     }
 
@@ -687,6 +698,7 @@ final class TerminalContentView: NSView {
         foreground: NSColor,
         graphemes: Terminal.Graphemes,
         order: VisualOrder? = nil,
+        joined: JoinedCells? = nil,
         ignoresBlink: Bool = false
     ) {
         guard !style.isHidden, ignoresBlink || !(style.isBlinking && isBlinkingTextHidden),
@@ -713,7 +725,10 @@ final class TerminalContentView: NSView {
             positions.removeAll(keepingCapacity: true)
         }
         for column in columns where line[column].isText && !line[column].isSpace {
-            let character = graphemes.character(of: line[column])
+            if joined?.headsOfFollowers[column] != nil {
+                continue
+            }
+            let character = joined?.heads[column]?.text ?? graphemes.character(of: line[column])
             let visual = order?.columns[column] ?? column
             let entry = fonts.glyphs.entry(
                 for: character, font: font, index: index, isMirrored: order?.isReversed[column] == true)

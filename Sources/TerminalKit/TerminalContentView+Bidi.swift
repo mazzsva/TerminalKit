@@ -42,7 +42,8 @@ extension TerminalContentView {
                 units[units.count - 1].columns = last.columns.lowerBound ..< column + 1
                 continue
             }
-            let character = line[column].isSpace ? " " : graphemes.character(of: line[column])
+            let character =
+                line[column].isSpace ? " " : withoutDirectionalControls(graphemes.character(of: line[column]))
             units.append((length, column ..< column + 1))
             text.append(character)
             length += character.utf16.count
@@ -69,9 +70,16 @@ extension TerminalContentView {
         return order
     }
 
+    private static func withoutDirectionalControls(_ text: String) -> String {
+        let scalars = text.unicodeScalars.filter {
+            !("\u{202A}" ... "\u{202E}").contains($0) && !("\u{2066}" ... "\u{2069}").contains($0)
+        }
+        return scalars.isEmpty ? " " : String(String.UnicodeScalarView(scalars))
+    }
+
     private static func isRightToLeft(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.value {
-        case 0x0590 ... 0x08FF, 0xFB1D ... 0xFDFF, 0xFE70 ... 0xFEFF, 0x1_0800 ... 0x1_0FFF, 0x1_E800 ... 0x1_EFFF:
+        case 0x0590 ... 0x08FF, 0xFB1D ... 0xFDFF, 0xFE70 ... 0xFEFC, 0x1_0800 ... 0x1_0FFF, 0x1_E800 ... 0x1_EFFF:
             return true
         default:
             return false

@@ -63,12 +63,14 @@ extension TerminalContentView: NSTextFinderClient {
             let lowerBound = row == start.row ? start.column : 0
             let upperBound = row == end.row ? end.column : line.count
             let order = Self.visualOrder(of: line, graphemes: graphemes)
+            let joined = Self.joinedCells(in: line, graphemes: graphemes, order: order)
+            let found = joined?.expanded(lowerBound ..< upperBound) ?? lowerBound ..< upperBound
             for (columns, style) in Self.runs(in: line) {
-                let clipped = columns.clamped(to: lowerBound ..< upperBound)
+                let clipped = columns.clamped(to: found)
                 if !clipped.isEmpty {
                     drawText(
                         line, columns: clipped, row: row, style: style, foreground: .black, graphemes: graphemes,
-                        order: order, ignoresBlink: true)
+                        order: order, joined: joined, ignoresBlink: true)
                 }
             }
         }
