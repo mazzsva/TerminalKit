@@ -502,6 +502,49 @@ struct TerminalContentViewTests {
         #expect(window.firstResponder === view)
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func blinksTheTextAndKeepsTheBackground() async throws {
+        let view = try await drawnView(running: "printf '\\033[?25l\\033[5;4;41m\u{2588}\\033[m'")
+        let window = ScaledWindow(contentView: view)
+        view.palette.ansiColors[1] = Color(.sRGB, red: 1, green: 0, blue: 0)
+        view.palette.foreground = Color(.sRGB, red: 0, green: 0, blue: 1)
+        let rect = view.rect(row: 0, columns: 0 ..< 1)
+        let font = view.fonts.regular
+        let underline = rect.minY + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        func shown(at y: CGFloat) throws -> NSColor {
+            let drawn = color(in: try representation(of: view), at: CGPoint(x: rect.midX, y: y))
+            return try #require(drawn?.usingColorSpace(.sRGB))
+        }
+        #expect(!view.isBlinkingTextHidden)
+        #expect(try shown(at: rect.midY).blueComponent > 0.5)
+        #expect(try shown(at: underline).blueComponent > 0.2)
+        while !view.isBlinkingTextHidden {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        for y in [rect.midY, underline] {
+            let hidden = try shown(at: y)
+            #expect(hidden.redComponent > 0.5)
+            #expect(hidden.blueComponent < 0.2)
+        }
+        while view.isBlinkingTextHidden {
+            view.needsDisplay = true
+            view.displayIfNeeded()
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(try shown(at: rect.midY).blueComponent > 0.5)
+        #expect(window.contentView === view)
+    }
+
+    @Test(arguments: ["\\033[5;41m     ", "\\033[5;8mx"])
+    func doesNotWakeForBlinkingCellsWithNoInk(cells: String) async throws {
+        let view = try await drawnView(running: "printf '\\033[?25l\(cells)\\033[m'")
+        let window = ScaledWindow(contentView: view)
+        _ = try representation(of: view)
+        try await Task.sleep(for: TerminalContentView.blinkInterval * 2)
+        #expect(!view.isBlinkingTextHidden)
+        #expect(window.contentView === view)
+    }
+
     @Test func drawsFaintTextAtTheMeasuredAlpha() async throws {
         let view = try await drawnView(running: "printf '\\033[?25l\\033[2m\u{2588}\\033[m'")
         view.palette = highContrastPalette

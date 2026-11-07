@@ -39,6 +39,29 @@ struct StyleTests {
         #expect(style("1;9;29") == Terminal.Style(isBold: true))
     }
 
+    @Test func setsAndClearsTheBlink() {
+        var style = Terminal.Style()
+        style.apply([5])
+        #expect(style.isBlinking)
+        style.apply([25])
+        #expect(!style.isBlinking)
+        style.apply([5])
+        style.apply([0])
+        #expect(!style.isBlinking)
+    }
+
+    @Test func savesTheBlinkWithTheCursor() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[5m\u{1B}7\u{1B}[m\u{1B}8x")
+        #expect(terminal.screen[0][0].style.isBlinking)
+    }
+
+    @Test func ignoresRapidBlink() {
+        var style = Terminal.Style()
+        style.apply([6])
+        #expect(!style.isBlinking)
+    }
+
     @Test func ignoresDoubleUnderline() {
         var style = Terminal.Style()
         style.apply([21])
@@ -132,8 +155,8 @@ struct StyleTests {
 
     @Test func readsTheUnderlineColorValuesAsSeparateParameters() {
         #expect(style("4;58;2;255;0;0") == Terminal.Style())
-        #expect(style("58;5;2") == Terminal.Style(isFaint: true))
-        #expect(style("4;58;5;2;59") == Terminal.Style(isFaint: true, isUnderlined: true))
+        #expect(style("58;5;2") == Terminal.Style(isFaint: true, isBlinking: true))
+        #expect(style("4;58;5;2;59") == Terminal.Style(isFaint: true, isUnderlined: true, isBlinking: true))
     }
 
     @Test func joinsTheDigitsAroundAColon() {
