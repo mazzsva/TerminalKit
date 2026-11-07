@@ -12,6 +12,14 @@ extension Terminal {
             self.isWrapped = isWrapped
         }
 
+        var fill: Cell? {
+            last.flatMap { !$0.isContent && !$0.isBlank ? $0 : nil }
+        }
+
+        var textCount: Int {
+            (lastIndex(where: \.isContent) ?? -1) + 1
+        }
+
         package func columnCount(at column: Int) -> Int {
             guard self[column].isTab else {
                 return Swift.max(Int(self[column].width), 1)

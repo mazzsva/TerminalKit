@@ -65,12 +65,22 @@ struct TerminalTests {
         #expect(terminal.screen[0].map(\.width) == [1, 1, 1, 1])
     }
 
-    @Test func blanksAWideCharacterThatAResizeCuts() {
+    @Test func keepsTheCellsPastTheColumnsOnTheAlternateScreen() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{1B}[?1049hab中")
         terminal.resize(columns: 3, rows: 1)
-        #expect(lines(terminal) == ["ab "])
-        #expect(terminal.screen[0].map(\.width) == [1, 1, 1])
+        terminal.resize(columns: 4, rows: 1)
+        #expect(terminal.character(of: terminal.screen[0][2]) == "中")
+        #expect(terminal.screen[0].map(\.width) == [1, 1, 2, 0])
+    }
+
+    @Test func movesTheCellsPastTheColumnsWhenItErases() {
+        var terminal = Terminal(columns: 6, rows: 1)
+        terminal.receive("\u{1B}[?1049habcdef")
+        terminal.resize(columns: 3, rows: 1)
+        terminal.receive("\u{1B}[2G\u{1B}[K")
+        terminal.resize(columns: 6, rows: 1)
+        #expect(lines(terminal) == ["adef  "])
     }
 
     @Test func marksTheLinesThatWrap() {
@@ -597,12 +607,21 @@ struct TerminalTests {
         #expect(terminal.character(of: terminal.scrollback[0][1]) == "\t")
     }
 
-    @Test func replacesATabWithSpacesInAReflow() {
+    @Test func movesATabThatDoesNotFitToTheNextRow() {
         var terminal = Terminal(columns: 20, rows: 3)
-        terminal.receive("a\tb\r\nx")
+        terminal.receive("abcdef\tb\r\nx")
+        terminal.resize(columns: 7, rows: 3)
+        #expect(terminal.screen[0].isWrapped)
+        #expect(terminal.screen[1].columnCount(at: 0) == 2)
+        #expect(lines(terminal)[1].hasSuffix("b    "))
+    }
+
+    @Test func keepsTheWidthOfATabThatIsWiderThanTheColumns() {
+        var terminal = Terminal(columns: 20, rows: 3)
+        terminal.receive("\u{1B}[3g\u{1B}[15G\u{1B}H\ra\tb")
         terminal.resize(columns: 5, rows: 3)
-        #expect(lines(terminal) == ["a    ", "   b ", "x    "])
-        #expect(!terminal.screen[0].contains { terminal.character(of: $0) == "\t" })
+        terminal.resize(columns: 20, rows: 3)
+        #expect(lines(terminal).first == "a             b     ")
     }
 
     @Test func movesToTheNextTabStop() {
@@ -629,11 +648,20 @@ struct TerminalTests {
         #expect(lines(terminal) == ["z       y       x   "])
     }
 
-    @Test func addsTabStopsToNewColumns() {
+    @Test func keepsTheTabStopsOnAResize() {
         var terminal = Terminal(columns: 10, rows: 1)
-        terminal.receive("\u{1B}[3g")
+        terminal.receive("\u{1B}[3g\u{1B}[6G\u{1B}H\r")
+        terminal.resize(columns: 4, rows: 1)
         terminal.resize(columns: 20, rows: 1)
-        terminal.receive("\tx")
+        terminal.receive("\tx\ty")
+        #expect(lines(terminal) == ["     x             y"])
+    }
+
+    @Test func usesTheDefaultTabStopsBeyondTheColumnsAfterAReset() {
+        var terminal = Terminal(columns: 10, rows: 1)
+        terminal.receive("\u{1B}[3g\u{1B}c")
+        terminal.resize(columns: 20, rows: 1)
+        terminal.receive("\t\tx")
         #expect(lines(terminal) == ["                x   "])
     }
 
@@ -929,7 +957,127 @@ struct TerminalTests {
         terminal.receive("ab\r\ncd")
         terminal.resize(columns: 3, rows: 3)
         #expect(lines(terminal) == ["ab ", "cd ", "   "])
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+    }
+
+    @Test func keepsThePendingWrapInAResize() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("abc")
+        terminal.resize(columns: 5, rows: 2)
+        terminal.receive("d")
+        #expect(lines(terminal) == ["abc  ", "d    "])
+        #expect(terminal.screen[0].isWrapped)
+    }
+
+    @Test func movesACursorPastTheTextToTheNextRow() {
+        var terminal = Terminal(columns: 10, rows: 3)
+        terminal.receive("ab\r\ncd\u{1B}[1;5H")
+        terminal.resize(columns: 8, rows: 3)
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
+    }
+
+    @Test func movesACursorAboveTheScreenToTheLastRow() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("a\r\nb\r\ncd\u{1B}[1;2H")
+        terminal.resize(columns: 4, rows: 1)
+        #expect(lines(terminal) == ["cd  "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+    }
+
+    @Test func movesTheCursorToTheHeadOfAWideCharacter() {
+        var terminal = Terminal(columns: 5, rows: 2)
+        terminal.receive("中\u{1B}[1;2H")
+        terminal.resize(columns: 5, rows: 1)
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
+    }
+
+    @Test func movesTheCursorToTheHeadOfATab() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive("a\tb\u{1B}[1;4H")
+        terminal.resize(columns: 9, rows: 2)
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+    }
+
+    @Test func removesOnlyTheRowsWithTextAtTheTop() {
+        var terminal = Terminal(columns: 2, rows: 4)
+        terminal.receive("a\r\nb\r\nc\u{1B}[H")
+        terminal.resize(columns: 2, rows: 2)
+        #expect(scrollback(terminal) == ["a"])
+    }
+
+    @Test func returnsTheScrollbackWhenTheRowsGrow() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("a\r\nb\r\nc\r\nd")
+        terminal.resize(columns: 2, rows: 3)
+        #expect(lines(terminal) == ["b ", "c ", "d "])
+        #expect(scrollback(terminal) == ["a"])
+    }
+
+    @Test func movesEachSavedCursorByTheRowChange() {
+        var terminal = Terminal(columns: 4, rows: 4)
+        terminal.receive("\u{1B}[2;2H\u{1B}7")
+        terminal.resize(columns: 4, rows: 6)
+        terminal.receive("\u{1B}8")
+        #expect(terminal.cursor == Terminal.Position(row: 3, column: 1))
+    }
+
+    @Test func keepsTheScrollRegionOnAResize() {
+        var terminal = Terminal(columns: 2, rows: 4)
+        terminal.receive("\u{1B}[2;3r")
+        terminal.resize(columns: 2, rows: 6)
+        terminal.receive("\u{1B}[3;1Ha\r\nb")
+        #expect(lines(terminal) == ["  ", "a ", "b ", "  ", "  ", "  "])
+    }
+
+    @Test func doesNothingWhenTheScrollRegionIsBelowTheScreen() {
+        var terminal = Terminal(columns: 2, rows: 6)
+        terminal.receive("\u{1B}[5;6r\u{1B}[Ha\r\nb")
+        terminal.resize(columns: 2, rows: 2)
+        let screen = terminal.screen
+        terminal.receive("\u{1B}[S\u{1B}[T")
+        #expect(terminal.screen == screen)
+        #expect(terminal.scrollback.isEmpty)
+    }
+
+    @Test func rewrapsEveryLineWhenOnlyTheRowsChange() {
+        var terminal = Terminal(columns: 3, rows: 4)
+        terminal.receive("abc")
+        terminal.resize(columns: 5, rows: 4)
+        terminal.receive("d\u{1B}[4;1H")
+        terminal.resize(columns: 5, rows: 3)
+        terminal.receive("\u{1B}[2;1He")
+        #expect(lines(terminal) == ["abcd ", "e    ", "     "])
+    }
+
+    @Test func unwrapsTheRowWhenItDeletesCharacters() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("abcde\u{1B}[1;1H\u{1B}[P")
+        #expect(!terminal.screen[0].isWrapped)
+    }
+
+    @Test func extendsTheEraseColorToTheNewWidth() {
+        var terminal = Terminal(columns: 3, rows: 2)
+        terminal.receive("a\u{1B}[41m\u{1B}[K\u{1B}[m\r\nb")
+        terminal.resize(columns: 5, rows: 2)
+        #expect(terminal.screen[0].map(\.style.background) == [.default] + Array(repeating: .indexed(1), count: 4))
+        #expect(terminal.screen[1][4].style.background == .default)
+    }
+
+    @Test func blanksTheSecondHalfPastTheColumnsWhenItWritesTheHead() {
+        var terminal = Terminal(columns: 10, rows: 1)
+        terminal.receive("\u{1B}[?1049h\u{1B}[1;9H中")
+        terminal.resize(columns: 9, rows: 1)
+        terminal.receive("\u{1B}[1;9Hx")
+        terminal.resize(columns: 10, rows: 1)
+        terminal.receive("\u{1B}[1;10Hy")
+        #expect(lines(terminal) == ["        xy"])
+    }
+
+    @Test func reportsAnOriginRowAboveTheScrollRegionAsUnsigned() {
+        var terminal = Terminal(columns: 2, rows: 6)
+        terminal.receive("\u{1B}[5;6r\u{1B}[?6h")
+        terminal.resize(columns: 2, rows: 3)
+        #expect(terminal.receive(Array("\u{1B}[6n".utf8)) == Array("\u{1B}[18446744073709551615;2R".utf8))
     }
 
     @Test func reflowsLinesWhenTheScreenGetsNarrower() {
@@ -990,7 +1138,7 @@ struct TerminalTests {
 
     @Test func keepsTheWrappedLinesWhenOnlyTheRowsChange() {
         var terminal = Terminal(columns: 3, rows: 3)
-        terminal.receive("abcdef")
+        terminal.receive("abcde")
         terminal.resize(columns: 3, rows: 2)
         #expect(terminal.screen.map(\.isWrapped) == [true, false])
     }
@@ -1006,22 +1154,22 @@ struct TerminalTests {
     @Test func keepsAPositionOnTheSecondHalfOfAWideCharacter() {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive("abcdefgh中")
-        let (lines, positions) = Terminal.reflow(
+        let (lines, cursor) = Terminal.reflow(
             terminal.screen,
             columns: 1,
-            positions: [Terminal.Position(row: 0, column: 9)]
+            cursor: Terminal.Position(row: 0, column: 9)
         )
         #expect(lines.count == 9)
-        #expect(positions == [Terminal.Position(row: 8, column: 0)])
+        #expect(cursor == Terminal.Position(row: 8, column: 0))
     }
 
-    @Test func keepsTheCursorLineForTheShell() {
-        var terminal = Terminal(columns: 10, rows: 3)
+    @Test func reflowsTheCursorLine() {
+        var terminal = Terminal(columns: 10, rows: 4)
         terminal.receive("$ echo 0123456789")
-        terminal.resize(columns: 5, rows: 3)
-        #expect(lines(terminal) == ["$ ech", "34567", "     "])
-        #expect(terminal.screen.map(\.isWrapped) == [false, false, false])
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 4))
+        terminal.resize(columns: 5, rows: 4)
+        #expect(lines(terminal) == ["$ ech", "o 012", "34567", "89   "])
+        #expect(terminal.screen.map(\.isWrapped) == [true, true, true, false])
+        #expect(terminal.cursor == Terminal.Position(row: 3, column: 2))
     }
 
     @Test(arguments: [(3, "\u{1B}[?47h")])
@@ -1072,7 +1220,8 @@ struct TerminalTests {
         var terminal = Terminal(columns: 10, rows: 3)
         terminal.receive(String(repeating: "J", count: 45) + "$ ")
         terminal.resize(columns: 5, rows: 3)
-        #expect(scrollback(terminal) == Array(repeating: "JJJJJ", count: 4))
+        #expect(scrollback(terminal) == Array(repeating: "JJJJJ", count: 7))
+        #expect(lines(terminal) == ["JJJJJ", "JJJJJ", "$    "])
     }
 
     @Test func keepsTheSavedCursorOnItsCharacter() {
@@ -1083,12 +1232,28 @@ struct TerminalTests {
         #expect(lines(terminal) == ["56789", "abcX ", "     "])
     }
 
-    @Test func cancelsThePendingWrapOnTheAlternateScreen() {
+    @Test func keepsThePendingWrapOnTheAlternateScreen() {
         var terminal = Terminal(columns: 5, rows: 3)
         terminal.receive("\u{1B}[?1049habcde")
         terminal.resize(columns: 8, rows: 3)
         terminal.receive("f")
-        #expect(lines(terminal).first == "abcdf   ")
+        #expect(lines(terminal).prefix(2) == ["abcde   ", "f       "])
+    }
+
+    @Test func addsTheNewRowsOfTheAlternateScreenAtTheTop() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("\u{1B}[?1049ha\r\nb\u{1B}[H")
+        terminal.resize(columns: 2, rows: 3)
+        #expect(lines(terminal) == ["  ", "a ", "b "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
+    }
+
+    @Test func removesTheTopRowsOfTheAlternateScreen() {
+        var terminal = Terminal(columns: 2, rows: 3)
+        terminal.receive("\u{1B}[?1049ha\r\nb\r\nc\u{1B}[H")
+        terminal.resize(columns: 2, rows: 2)
+        #expect(lines(terminal) == ["b ", "c "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
     }
 
     @Test func keepsTheCursorLineWhenTheScreenGetsShorter() {
@@ -1170,7 +1335,7 @@ struct TerminalTests {
         #expect(lines(terminal) == ["ac", "  "])
     }
 
-    @Test(arguments: [(8, ["abcX    ", "        ", "        "]), (2, ["aX", "  ", "  "])])
+    @Test(arguments: [(8, ["abcX    ", "        ", "        "]), (2, ["aXcd", "    ", "    "])])
     func cancelsTheSavedPendingWrapOnTheAlternateScreen(columns: Int, lines expected: [String]) {
         var terminal = Terminal(columns: 4, rows: 3)
         terminal.receive("\u{1B}[?1049habcd\u{1B}7")
@@ -1762,14 +1927,14 @@ struct TerminalTests {
     @Test func keepsTheScreenInTheScrollbackOnEraseInDisplay() {
         var terminal = Terminal(columns: 2, rows: 3)
         terminal.receive("a\r\nb\u{1B}[2J\u{1B}[2J")
-        #expect(terminal.scrollback.count == 3)
+        #expect(terminal.scrollback.count == 6)
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
     }
 
-    @Test func keepsNothingWhenItErasesABlankScreen() {
+    @Test func keepsTheRowsWhenItErasesABlankScreen() {
         var terminal = Terminal(columns: 2, rows: 3)
         terminal.receive("\u{1B}[2J")
-        #expect(terminal.scrollback.isEmpty)
+        #expect(terminal.scrollback.count == 3)
     }
 
     @Test func keepsNothingOnEraseInDisplayOnTheAlternateScreen() {
@@ -1785,9 +1950,9 @@ struct TerminalTests {
     }
 
     @Test func keepsTheLinesThatAResizeRemoves() {
-        var terminal = Terminal(columns: 1, rows: 3)
+        var terminal = Terminal(columns: 2, rows: 3)
         terminal.receive("a\r\nb\r\nc")
-        terminal.resize(columns: 1, rows: 1)
+        terminal.resize(columns: 2, rows: 1)
         #expect(scrollback(terminal) == ["a", "b"])
     }
 
@@ -1796,6 +1961,39 @@ struct TerminalTests {
         terminal.receive("a\r\nb\r\nc\u{1B}[?1049h")
         terminal.resize(columns: 1, rows: 1)
         #expect(scrollback(terminal) == ["a", "b"])
+    }
+
+    @Test func survivesRandomOutputAndResizes() {
+        let fragments = [
+            "abc", "\r\n", "\t", "中", "e\u{301}", "\u{8}", "\u{1B}[H", "\u{1B}[5;9H", "\u{1B}[99;99H", "\u{1B}[2J",
+            "\u{1B}[3J",
+            "\u{1B}[J", "\u{1B}[1J", "\u{1B}[K", "\u{1B}[1K", "\u{1B}[2K", "\u{1B}[2L", "\u{1B}[2M", "\u{1B}[2S",
+            "\u{1B}[2T",
+            "\u{1B}[2@", "\u{1B}[2P", "\u{1B}[5X", "\u{1B}M", "\u{1B}D", "\u{1B}7", "\u{1B}8", "\u{1B}#8",
+            "\u{1B}[3;8r", "\u{1B}[8;20r",
+            "\u{1B}[r", "\u{1B}[?6h", "\u{1B}[?6l", "\u{1B}[?7l", "\u{1B}[?7h", "\u{1B}[?47h", "\u{1B}[?47l",
+            "\u{1B}[?1049h",
+            "\u{1B}[?1049l", "\u{1B}[3g", "\u{1B}H", "\u{1B}[!p", "\u{1B}c", "\u{1B}[41m", "\u{1B}[m", "\u{1B}[3b",
+            "\u{1B}[6n",
+            String(repeating: "K", count: 45),
+        ]
+        var state: UInt64 = 0x1234_5678
+        func next(_ limit: Int) -> Int {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int((state >> 33) % UInt64(limit))
+        }
+        var terminal = Terminal(columns: 20, rows: 8)
+        for _ in 0 ..< 20_000 {
+            if next(8) == 0 {
+                terminal.resize(columns: next(50) + 1, rows: next(25) + 1)
+            } else {
+                terminal.receive(fragments[next(fragments.count)])
+            }
+            #expect(terminal.screen.count == terminal.rows)
+            #expect(terminal.screen.allSatisfy { $0.count >= terminal.columns })
+            #expect((0 ..< terminal.rows).contains(terminal.cursor.row))
+            #expect((0 ..< terminal.columns).contains(terminal.cursor.column))
+        }
     }
 
     @Test func limitsTheScrollback() {

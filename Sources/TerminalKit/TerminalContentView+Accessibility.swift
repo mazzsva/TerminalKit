@@ -283,7 +283,7 @@ extension TerminalContentView {
         let frame =
             start.row == end.row
             ? rect(row: start.row, columns: start.column ..< endColumn)
-            : rect(row: start.row, columns: start.column ..< session.terminal.columns)
+            : rect(row: start.row, columns: min(start.column, session.terminal.columns) ..< session.terminal.columns)
                 .union(rect(row: end.row, columns: 0 ..< endColumn))
         return window.convertToScreen(convert(frame, to: nil))
     }
