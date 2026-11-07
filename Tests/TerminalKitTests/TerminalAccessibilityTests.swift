@@ -104,13 +104,13 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityLine(for: 99) == 2)
     }
 
-    @Test func followsTheTrimmedScrollback() async throws {
-        let view = try await accessibleView(running: "seq 1 12000", rows: 2)
+    @Test func followsTheErasedScrollback() async throws {
+        let view = try await accessibleView(running: "seq 1 12000; printf '\\033[3J'", rows: 2)
         let terminal = view.session.terminal
         #expect(terminal.removedScrollbackCount > 0)
         let text = try #require(view.accessibilityValue() as? String)
         #expect(text.hasPrefix("\(terminal.removedScrollbackCount + 1)\n"))
-        #expect(text.hasSuffix("11999\n12000\n"))
+        #expect(text.hasSuffix("12000\n"))
 
         view.selection = TerminalContentView.Selection(
             anchor: .init(line: 0, column: 0), head: .init(line: terminal.removedScrollbackCount + 1, column: 1))

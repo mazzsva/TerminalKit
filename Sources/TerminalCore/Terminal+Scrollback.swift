@@ -145,27 +145,6 @@ extension Terminal {
             relaidCount = 0
         }
 
-        mutating func removeFirst(keepingAtMost maximum: Int) -> Int {
-            var removedParagraphs = 0
-            while removedParagraphs < paragraphs.count - 1, count - rowStart(of: removedParagraphs) > maximum {
-                removedParagraphs += 1
-            }
-            guard removedParagraphs > 0 else {
-                return 0
-            }
-            let removedRows = rowStart(of: removedParagraphs)
-            let removedLines = paragraphs[removedParagraphs].start
-            lines.removeFirst(removedLines)
-            paragraphs.removeFirst(removedParagraphs)
-            rowEnds.removeFirst(removedParagraphs)
-            for index in paragraphs.indices {
-                paragraphs[index].start -= removedLines
-                rowEnds[index] -= removedRows
-            }
-            relaidCount = Swift.max(relaidCount - removedParagraphs, 0)
-            return removedRows
-        }
-
         mutating func removeLast(coveringRows rows: Int, columns: Int) -> [Line] {
             var first = paragraphs.count
             var coveredRows = 0
