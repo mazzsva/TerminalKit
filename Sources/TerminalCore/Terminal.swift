@@ -524,40 +524,11 @@ package struct Terminal: Sendable {
             return
         }
         text.unicodeScalars.append(scalar)
-        if graphemes.needsCompaction(for: text) {
-            compactGraphemes()
-        }
-        let cell = graphemes.cell(screen[cursor.row][column], with: text)
-        if graphemes.character(of: cell).utf8.elementsEqual(text.utf8) {
-            screen[cursor.row][column] = cell
-        }
+        screen[cursor.row][column] = graphemes.cell(screen[cursor.row][column], with: text)
     }
 
     package func character(of cell: Cell) -> String {
         graphemes.character(of: cell)
-    }
-
-    private mutating func compactGraphemes() {
-        var used = Array(repeating: false, count: graphemes.count)
-        scrollback.markGraphemes(into: &used)
-        Graphemes.markIndices(in: screen, into: &used)
-        if let normalScreen {
-            Graphemes.markIndices(in: normalScreen.lines, into: &used)
-        }
-        if let alternateScreen {
-            Graphemes.markIndices(in: alternateScreen.lines, into: &used)
-        }
-        let newIndices = graphemes.compact(keeping: used)
-        scrollback.remapGraphemes(with: newIndices)
-        Graphemes.remapIndices(in: &screen, with: newIndices)
-        if var normalScreen {
-            Graphemes.remapIndices(in: &normalScreen.lines, with: newIndices)
-            self.normalScreen = normalScreen
-        }
-        if var alternateScreen {
-            Graphemes.remapIndices(in: &alternateScreen.lines, with: newIndices)
-            self.alternateScreen = alternateScreen
-        }
     }
 
     private mutating func lineFeed() {
@@ -1065,7 +1036,6 @@ package struct Terminal: Sendable {
             normalScreen?.lines = Array(repeating: Self.blankLine(columns: columns), count: rows)
             removedScrollbackCount += scrollback.count
             scrollback.removeAll()
-            graphemes.resetCompactionInterval()
         default:
             break
         }
