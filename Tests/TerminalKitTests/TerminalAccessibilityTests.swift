@@ -117,6 +117,24 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilitySelectedTextRange().location == 0)
     }
 
+    @Test func readsNewTextAfterTheRowsReturnFromTheScrollback() async throws {
+        let session = TerminalSession(running: "seq 1 30; printf ready; read x; printf '\\033[1;1HOVER'; read x")
+        session.resize(columns: 10, rows: 12)
+        let view = TerminalContentView(session: session)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        try session.start()
+        await session.waitForText("ready")
+        session.resize(columns: 10, rows: 6)
+        _ = view.accessibilityValue()
+        session.resize(columns: 10, rows: 12)
+        session.send("\r")
+        await session.waitForText("OVER")
+        session.resize(columns: 10, rows: 6)
+        #expect((view.accessibilityValue() as? String)?.contains("OVER") == true)
+        session.send("\r")
+        await session.waitForExit()
+    }
+
     @Test func updatesTheTextAfterNewOutput() async throws {
         let session = TerminalSession(running: "printf a; read x; printf b")
         session.resize(columns: 10, rows: 1)

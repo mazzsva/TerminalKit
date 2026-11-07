@@ -14,20 +14,20 @@ extension TerminalContentView {
         let rows: [NSRange]
         let lines: [NSRange]
         let lineOfRow: [Int]
-        private let widthChangeCount: Int
+        private let resizeCount: Int
         private let firstLine: Int
         private let scrollback: [Row]
 
         init(
             _ terminal: Terminal,
             revision: Int,
-            widthChangeCount: Int = 0,
+            resizeCount: Int = 0,
             reusing previous: AccessibilityText? = nil
         ) {
             self.revision = revision
-            self.widthChangeCount = widthChangeCount
+            self.resizeCount = resizeCount
             firstLine = terminal.removedScrollbackCount
-            let reusable = previous?.widthChangeCount == widthChangeCount ? previous : nil
+            let reusable = previous?.resizeCount == resizeCount ? previous : nil
             let graphemes = terminal.graphemes
             scrollback = terminal.scrollback.indices.map { index in
                 let line = terminal.scrollback[index]
@@ -138,7 +138,7 @@ extension TerminalContentView {
         let text = AccessibilityText(
             session.terminal,
             revision: session.revision,
-            widthChangeCount: session.widthChangeCount,
+            resizeCount: session.resizeCount,
             reusing: cachedAccessibilityText
         )
         cachedAccessibilityText = text
