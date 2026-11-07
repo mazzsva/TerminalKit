@@ -46,6 +46,10 @@ extension Terminal {
             content != 0x20 && content != 0 && content != Self.tabGapContent
         }
 
+        var isContent: Bool {
+            isWritten || isTabGap || width == 0
+        }
+
         package var isText: Bool {
             width > 0 && self != .padding && content != Self.tabGapContent
         }
