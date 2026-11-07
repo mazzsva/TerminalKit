@@ -46,7 +46,6 @@ package struct Terminal: Sendable {
         var usesOriginMode = false
     }
 
-    private static let tabWidth = 8
     private static let maximumBytesPerCell = 1_024
     private static let maximumScrollback = 10_000
     private static let scrollbackTrimCount = 1_000
@@ -104,7 +103,9 @@ package struct Terminal: Sendable {
     private var lastCharacter: Unicode.Scalar? = " "
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
-    private var tabStops: [Bool]
+    private var hasScrollRegion = false
+    private var hasMovedCursorForFullRow = false
+    private var tabStops = TabStops()
     var replies: [UInt8] = []
     private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
     private var alternateScreen: (lines: [Line], savedCursor: SavedCursor)?
@@ -116,166 +117,97 @@ package struct Terminal: Sendable {
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
         scrollRegion = 0 ..< rows
-        tabStops = Self.defaultTabStops(0 ..< columns)
     }
 
     package mutating func resize(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
         isTextRunClipped = false
         isLastCharacterDropped = false
-        if columns != self.columns {
-            guard var normalScreen else {
-                let (lines, anchors) = reflow(
-                    screen,
-                    keeping: [(cursor, isWrapPending), (savedCursor.position, false)],
-                    columns: columns,
-                    rows: rows
-                )
-                screen = lines
-                (cursor, isWrapPending) = anchors[0]
-                savedCursor.position = anchors[1].position
-                setSize(columns: columns, rows: rows)
-                return
-            }
-            let saved = normalScreen.savedCursor
-            let (lines, anchors) = reflow(
-                normalScreen.lines,
-                keeping: [(normalScreen.cursor, false), (saved.position, false)],
-                columns: columns,
-                rows: rows
-            )
-            normalScreen.lines = lines
-            normalScreen.cursor = anchors[0].position
-            normalScreen.savedCursor.position = anchors[1].position
-            self.normalScreen = normalScreen
-        }
-        let removedRows = max(cursor.row + 1 - rows, 0)
-        if normalScreen == nil {
-            keepInScrollback(screen.prefix(removedRows))
-            savedCursor.position.row = min(max(savedCursor.position.row - removedRows, 0), rows - 1)
-        }
-        screen = Self.resized(screen, columns: columns, rows: rows, removingFirst: removedRows)
+        let rowChange = rows - self.rows
         if var normalScreen {
-            let removedNormalRows = max(normalScreen.cursor.row + 1 - rows, 0)
-            keepInScrollback(normalScreen.lines.prefix(removedNormalRows))
-            normalScreen.lines = Self.resized(
-                normalScreen.lines,
-                columns: columns,
-                rows: rows,
-                removingFirst: removedNormalRows
-            )
-            normalScreen.cursor.row -= removedNormalRows
-            normalScreen.savedCursor.position.row = min(
-                max(normalScreen.savedCursor.position.row - removedNormalRows, 0),
-                rows - 1
-            )
+            normalScreen.lines =
+                relaidScreen(
+                    normalScreen.lines, usedRows: normalScreen.lines.count, cursor: nil, columns: columns, rows: rows
+                )
+                .screen
+            normalScreen.savedCursor.position.row += rowChange
             self.normalScreen = normalScreen
+            screen = Self.resizedAlternateScreen(screen, columns: columns, rows: rows)
+            cursor = Position(row: min(cursor.row, rows - 1), column: min(cursor.column, columns - 1))
+        } else {
+            let usedRows =
+                !scrollback.isEmpty || cursor.row == self.rows - 1
+                ? self.rows : (screen.lastIndex { $0.contains(where: \.isWritten) } ?? -1) + 1
+            (screen, cursor) = relaidScreen(screen, usedRows: usedRows, cursor: cursor, columns: columns, rows: rows)
         }
-        let keepsPendingWrap = isWrapPending && columns == self.columns
-        setSize(columns: columns, rows: rows)
-        moveCursor(row: cursor.row - removedRows, column: cursor.column)
-        isWrapPending = keepsPendingWrap
-    }
-
-    private mutating func setSize(columns: Int, rows: Int) {
-        tabStops =
-            columns > self.columns
-            ? tabStops + Self.defaultTabStops(self.columns ..< columns) : Array(tabStops.prefix(columns))
+        if var alternateScreen {
+            alternateScreen.lines = Self.resizedAlternateScreen(alternateScreen.lines, columns: columns, rows: rows)
+            alternateScreen.savedCursor.position.row += rowChange
+            self.alternateScreen = alternateScreen
+        }
+        savedCursor.position.row += rowChange
         self.columns = columns
         self.rows = rows
-        scrollRegion = 0 ..< rows
+        if !hasScrollRegion {
+            scrollRegion = 0 ..< rows
+        }
     }
 
-    private mutating func reflow(
+    private mutating func relaidScreen(
         _ screen: [Line],
-        keeping anchors: [(position: Position, isWrapPending: Bool)],
+        usedRows: Int,
+        cursor: Position?,
         columns: Int,
         rows: Int
-    ) -> (screen: [Line], anchors: [(position: Position, isWrapPending: Bool)]) {
-        let oldLines = scrollback + screen
-        let positions =
-            anchors.map {
-                Position(
-                    row: scrollback.count + min(max($0.position.row, 0), screen.count - 1),
-                    column: min(max($0.position.column, 0), self.columns - 1)
-                )
-            }
-            + [Position(row: scrollback.count, column: 0)]
-        var groupStart = positions[0].row
-        while groupStart > scrollback.count, oldLines[groupStart - 1].isWrapped {
-            groupStart -= 1
+    ) -> (screen: [Line], cursor: Position) {
+        let storedCursor = cursor.flatMap {
+            $0.row < usedRows ? Position(row: scrollback.count + $0.row, column: $0.column) : nil
         }
-        var groupEnd = positions[0].row
-        while groupEnd < oldLines.count - 1, oldLines[groupEnd].isWrapped {
-            groupEnd += 1
-        }
-        var lines: [Line] = []
-        var mapped = positions
-        for (part, reflows) in [
-            (0 ..< groupStart, true), (groupStart ..< groupEnd + 1, false), (groupEnd + 1 ..< oldLines.count, true),
-        ] {
-            let indices = positions.indices.filter { part.contains(positions[$0].row) }
-            if reflows {
-                let (partLines, partPositions) = Self.reflow(
-                    Array(oldLines[part]),
-                    columns: columns,
-                    positions: indices.map {
-                        Position(row: positions[$0].row - part.lowerBound, column: positions[$0].column)
-                    }
-                )
-                for (index, position) in zip(indices, partPositions) {
-                    mapped[index] = Position(row: lines.count + position.row, column: position.column)
-                }
-                lines += partLines
+        var (lines, target) = Self.reflow(scrollback + screen.prefix(usedRows), columns: columns, cursor: storedCursor)
+        scrollback = []
+        var column = target?.column ?? 0
+        if let cursor, usedRows == self.rows, (lines.last?.textCount ?? 0) >= columns {
+            if cursor.row == self.rows - 1 || hasMovedCursorForFullRow {
+                lines[lines.count - 1].isWrapped = true
+                lines.append(Line())
+                hasMovedCursorForFullRow = false
             } else {
-                for index in indices {
-                    mapped[index] = Position(
-                        row: lines.count + positions[index].row - part.lowerBound,
-                        column: min(positions[index].column, columns - 1)
-                    )
-                }
-                lines += oldLines[part]
-                    .map { line in
-                        var line = Self.fitted(line, columns: columns)
-                        line.isWrapped = false
-                        return line
-                    }
+                column += 1
+                hasMovedCursorForFullRow = true
+            }
+        } else {
+            hasMovedCursorForFullRow = false
+        }
+        var top = max(lines.count - rows, 0)
+        var row = 0
+        if let cursor {
+            row = target?.row ?? lines.count + cursor.row - usedRows + (cursor.column > 0 ? 1 : 0)
+            if target == nil {
+                top = max(top, min(row - rows + 1, lines.count - usedRows + self.rows - 2 * rows))
+                lines += Array(repeating: Line(), count: max(top - lines.count, 0))
             }
         }
-        let firstRow = mapped[mapped.count - 1].row
-        var newScreen = Array(lines[firstRow...])
-        var newScrollback = Array(lines[..<firstRow])
-        var newAnchors = zip(anchors, mapped)
-            .map { anchor, position in
-                let row = position.row - firstRow
-                guard anchor.isWrapPending else {
-                    return (position: Position(row: row, column: position.column), isWrapPending: false)
-                }
-                return position.column + 1 < columns
-                    ? (Position(row: row, column: position.column + 1), false)
-                    : (Position(row: row, column: columns - 1), true)
-            }
-        let cursorRow = newAnchors.first?.position.row ?? 0
-        while newScreen.count > rows, newScreen.count - 1 > cursorRow, let last = newScreen.last, !last.isWrapped,
-            last.allSatisfy(\.isBlank)
-        {
-            newScreen.removeLast()
+        keepInScrollback(lines[..<top])
+        var newScreen = lines[top...].map { Self.padded($0, columns: columns) }
+        guard cursor != nil else {
+            return (newScreen, Position(row: 0, column: 0))
         }
-        let movedRows = min(max(newScreen.count - rows, 0), cursorRow)
-        newScrollback += newScreen.prefix(movedRows)
-        newScreen = Array(newScreen.dropFirst(movedRows).prefix(rows))
-        newScreen += Array(repeating: Line(), count: rows - newScreen.count)
-        for index in newAnchors.indices {
-            newAnchors[index].position.row = min(max(newAnchors[index].position.row - movedRows, 0), rows - 1)
+        newScreen += Array(repeating: Self.blankLine(columns: columns), count: rows - newScreen.count)
+        if row < top {
+            row = top + rows - 1
+        } else if row >= top + rows {
+            row = top + rows - 1
+            column = newScreen[rows - 1].textCount + 1
         }
-        scrollback = newScrollback
-        trimScrollback()
-        let paddedScreen = newScreen.map { line in
-            var line = line
-            line.append(contentsOf: repeatElement(Cell(), count: columns - line.count))
-            return line
-        }
-        return (paddedScreen, newAnchors)
+        return (newScreen, Position(row: row - top, column: min(column, columns - 1)))
+    }
+
+    private static func resizedAlternateScreen(_ screen: [Line], columns: Int, rows: Int) -> [Line] {
+        let lines =
+            rows < screen.count
+            ? Array(screen.suffix(rows))
+            : Array(repeating: blankLine(columns: columns), count: rows - screen.count) + screen
+        return lines.map { padded($0, columns: columns) }
     }
 
     package mutating func receive(_ bytes: [UInt8]) -> [UInt8] {
@@ -316,7 +248,7 @@ package struct Terminal: Sendable {
             case .escape(intermediates: "", final: "c"):
                 reset()
             case .escape(intermediates: "", final: "H"):
-                tabStops[cursor.column] = true
+                tabStops.set(true, at: cursor.column)
             case .escape(intermediates: "", final: "M"):
                 reverseLineFeed()
             case .execute("\u{E}"):
@@ -432,7 +364,7 @@ package struct Terminal: Sendable {
         case "H", "f":
             moveCursor(row: min(topLimit + count - 1, bottomLimit), column: sequence.parameter(at: 1, default: 1) - 1)
         case "d":
-            cursor.row = min(topLimit + count - 1, bottomLimit)
+            cursor.row = min(topLimit + count - 1, bottomLimit, rows - 1)
         case "J":
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
@@ -457,7 +389,7 @@ package struct Terminal: Sendable {
         case "S":
             scrollRegionUp(count)
         case "T":
-            scrollDown(count, in: scrollRegion)
+            scrollDown(count, in: scrollRegion.clamped(to: 0 ..< rows))
         case "c" where sequence.parameters.count <= 1 && sequence.parameter(at: 0, default: 0) == 0:
             replies += "\u{1B}[?1;2c".utf8
         case "h", "l":
@@ -548,7 +480,7 @@ package struct Terminal: Sendable {
         switch screen[cursor.row][column].width {
         case 0 where column > 0:
             screen[cursor.row][column - 1] = writtenBlank
-        case 2 where column + 1 < columns:
+        case 2 where column + 1 < screen[cursor.row].count:
             screen[cursor.row][column + 1] = writtenBlank
         default:
             break
@@ -635,7 +567,7 @@ package struct Terminal: Sendable {
             breakTab(at: columns - count, row: cursor.row)
         }
         screen[cursor.row].insert(contentsOf: repeatElement(writtenBlank, count: count), at: cursor.column)
-        screen[cursor.row].removeLast(count)
+        screen[cursor.row].removeLast(screen[cursor.row].count - columns)
         for column in [cursor.column, cursor.column + count, columns] {
             blankBrokenWideCharacter(at: column, row: cursor.row)
         }
@@ -646,15 +578,17 @@ package struct Terminal: Sendable {
         breakTab(at: cursor.column, row: cursor.row)
         breakTab(at: cursor.column + count - 1, row: cursor.row)
         screen[cursor.row].removeSubrange(cursor.column ..< cursor.column + count)
-        screen[cursor.row].append(contentsOf: repeatElement(blank, count: count))
+        screen[cursor.row].isWrapped = false
+        screen[cursor.row].append(contentsOf: repeatElement(blank, count: max(columns - screen[cursor.row].count, 0)))
         blankBrokenWideCharacter(at: cursor.column, row: cursor.row)
     }
 
     private mutating func blankBrokenWideCharacter(at column: Int, row: Int) {
-        if column > 0, screen[row][column - 1].width == 2, column == columns || screen[row][column].width != 0 {
+        let count = screen[row].count
+        if column > 0, screen[row][column - 1].width == 2, column == count || screen[row][column].width != 0 {
             screen[row][column - 1] = writtenBlank
         }
-        if column < columns, screen[row][column].width == 0, column == 0 || screen[row][column - 1].width != 2 {
+        if column < count, screen[row][column].width == 0, column == 0 || screen[row][column - 1].width != 2 {
             screen[row][column] = writtenBlank
         }
     }
@@ -663,7 +597,7 @@ package struct Terminal: Sendable {
         guard scrollRegion.contains(cursor.row) else {
             return
         }
-        scrollDown(count, in: cursor.row ..< scrollRegion.upperBound)
+        scrollDown(count, in: cursor.row ..< min(scrollRegion.upperBound, rows))
     }
 
     private mutating func deleteLines(_ count: Int) {
@@ -674,7 +608,7 @@ package struct Terminal: Sendable {
             scrollRegionUp(count)
             return
         }
-        scrollUp(count, in: cursor.row ..< scrollRegion.upperBound)
+        scrollUp(count, in: cursor.row ..< min(scrollRegion.upperBound, rows))
         unwrapLine(before: cursor.row)
     }
 
@@ -683,6 +617,7 @@ package struct Terminal: Sendable {
             return
         }
         scrollRegion = top ..< bottom
+        hasScrollRegion = top > 0 || bottom < rows
         moveCursor(row: topLimit, column: 0)
     }
 
@@ -709,13 +644,17 @@ package struct Terminal: Sendable {
     }
 
     private mutating func scrollRegionUp(_ count: Int) {
-        if scrollRegion.lowerBound == 0, normalScreen == nil {
-            keepInScrollback(screen.prefix(min(count, scrollRegion.count)))
+        let region = scrollRegion.clamped(to: 0 ..< rows)
+        if region.lowerBound == 0, normalScreen == nil {
+            keepInScrollback(screen.prefix(min(count, region.count)))
         }
-        scrollUp(count, in: scrollRegion)
+        scrollUp(count, in: region)
     }
 
     private mutating func scrollUp(_ count: Int, in region: Range<Int>) {
+        guard !region.isEmpty else {
+            return
+        }
         let count = min(count, region.count)
         screen.removeSubrange(region.lowerBound ..< region.lowerBound + count)
         screen.insert(contentsOf: blankLines(count), at: region.upperBound - count)
@@ -728,6 +667,9 @@ package struct Terminal: Sendable {
     }
 
     private mutating func scrollDown(_ count: Int, in region: Range<Int>) {
+        guard !region.isEmpty else {
+            return
+        }
         let count = min(count, region.count)
         screen.removeSubrange(region.upperBound - count ..< region.upperBound)
         screen.insert(contentsOf: blankLines(count), at: region.lowerBound)
@@ -746,7 +688,7 @@ package struct Terminal: Sendable {
     private mutating func reverseLineFeed() {
         isWrapPending = false
         if cursor.row == scrollRegion.lowerBound {
-            scrollDown(1, in: scrollRegion)
+            scrollDown(1, in: scrollRegion.clamped(to: 0 ..< rows))
         } else {
             cursor.row = cursor.row == 0 ? rows - 1 : cursor.row - 1
         }
@@ -757,7 +699,7 @@ package struct Terminal: Sendable {
     }
 
     private var bottomLimit: Int {
-        usesOriginMode ? scrollRegion.upperBound - 1 : rows - 1
+        usesOriginMode ? min(scrollRegion.upperBound, rows) - 1 : rows - 1
     }
 
     private mutating func carriageReturn() {
@@ -819,7 +761,10 @@ package struct Terminal: Sendable {
     }
 
     private mutating func fillScreen() {
-        screen = Array(repeating: Line(repeatElement(Cell(scalar: "E"), count: columns)), count: rows)
+        for row in screen.indices {
+            screen[row].replaceSubrange(0 ..< columns, with: repeatElement(Cell(scalar: "E"), count: columns))
+            blankBrokenWideCharacter(at: columns, row: row)
+        }
         unwrapLine(before: 0)
     }
 
@@ -830,10 +775,11 @@ package struct Terminal: Sendable {
         usesApplicationCursorKeys = false
         usesOriginMode = false
         usesReverseVideo = false
-        tabStops = Self.defaultTabStops(0 ..< columns)
+        tabStops = TabStops()
         isCursorVisible = true
         cursorShape = .block
         scrollRegion = 0 ..< rows
+        hasScrollRegion = false
         style = Style()
         characterSets = ["B", "B", "B", "B"]
         activeCharacterSet = 0
@@ -868,7 +814,7 @@ package struct Terminal: Sendable {
             start += 1
         }
         var end = column + 1
-        while end < columns, screen[row][end].isTabGap {
+        while end < screen[row].count, screen[row][end].isTabGap {
             end += 1
         }
         for index in start ..< end {
@@ -879,7 +825,7 @@ package struct Terminal: Sendable {
     private mutating func moveForward(tabStops count: Int) {
         isWrapPending = false
         for _ in 0 ..< min(count, columns) {
-            cursor.column = tabStops[(cursor.column + 1)...].firstIndex(of: true) ?? columns - 1
+            cursor.column = (cursor.column + 1 ..< columns).first(where: tabStops.contains) ?? columns - 1
         }
     }
 
@@ -915,7 +861,7 @@ package struct Terminal: Sendable {
     private mutating func moveBackward(tabStops count: Int) {
         var column = cursor.column
         for _ in 0 ..< min(count, columns) {
-            column = tabStops[..<column].lastIndex(of: true) ?? 0
+            column = (0 ..< column).last(where: tabStops.contains) ?? 0
         }
         moveCursor(row: cursor.row, column: column)
     }
@@ -923,16 +869,12 @@ package struct Terminal: Sendable {
     private mutating func clearTabStops(_ mode: Int) {
         switch mode {
         case 0:
-            tabStops[cursor.column] = false
+            tabStops.set(false, at: cursor.column)
         case 3:
-            tabStops = Array(repeating: false, count: columns)
+            tabStops.removeAll()
         default:
             break
         }
-    }
-
-    private static func defaultTabStops(_ columns: Range<Int>) -> [Bool] {
-        columns.map { $0 % tabWidth == 0 }
     }
 
     private mutating func setCursorShape(_ shape: Int) {
@@ -999,7 +941,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func homeCursor() {
-        cursor = Position(row: topLimit, column: 0)
+        cursor = Position(row: min(topLimit, rows - 1), column: 0)
     }
 
     private mutating func enterAlternateScreen() {
@@ -1008,7 +950,7 @@ package struct Terminal: Sendable {
         }
         normalScreen = (screen, cursor, savedCursor)
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
-        if let alternateScreen, alternateScreen.lines.count == rows, alternateScreen.lines.first?.count == columns {
+        if let alternateScreen {
             screen = alternateScreen.lines
         }
         savedCursor = alternateScreen?.savedCursor ?? SavedCursor()
@@ -1019,7 +961,9 @@ package struct Terminal: Sendable {
             return
         }
         alternateScreen = (screen, savedCursor)
-        screen = normalScreen.lines
+        screen =
+            normalScreen.lines
+            + Array(repeating: Self.blankLine(columns: columns), count: rows - normalScreen.lines.count)
         savedCursor = normalScreen.savedCursor
         self.normalScreen = nil
     }
@@ -1055,7 +999,7 @@ package struct Terminal: Sendable {
         case 5:
             replies += "\u{1B}[0n".utf8
         case 6:
-            replies += "\u{1B}[\(cursor.row - topLimit + 1);\(cursor.column + 1)R".utf8
+            replies += "\u{1B}[\(UInt(bitPattern: cursor.row - topLimit + 1));\(cursor.column + 1)R".utf8
         default:
             break
         }
@@ -1111,7 +1055,7 @@ package struct Terminal: Sendable {
             screen.replaceSubrange(0 ..< cursor.row, with: blankLines(cursor.row))
             eraseInLine(1)
         case 2:
-            if normalScreen == nil, screen.contains(where: { $0.contains(where: \.isWritten) }) {
+            if normalScreen == nil {
                 keepInScrollback(screen[...])
             }
             unwrapLine(before: 0)
@@ -1129,14 +1073,28 @@ package struct Terminal: Sendable {
     private mutating func eraseInLine(_ mode: Int) {
         switch mode {
         case 0:
-            erase(cursor.column ..< columns, row: cursor.row, with: blank)
+            removeCells(cursor.column ..< columns)
         case 1:
             erase(0 ..< cursor.column + 1, row: cursor.row, with: writtenBlank)
         case 2:
-            erase(0 ..< columns, row: cursor.row, with: blank)
+            removeCells(0 ..< columns)
         default:
             break
         }
+    }
+
+    private mutating func removeCells(_ range: Range<Int>) {
+        let overflow = screen[cursor.row].count - columns
+        guard overflow > 0 else {
+            erase(range, row: cursor.row, with: blank)
+            return
+        }
+        breakTab(at: range.lowerBound, row: cursor.row)
+        breakTab(at: range.upperBound - 1, row: cursor.row)
+        screen[cursor.row].removeSubrange(range)
+        screen[cursor.row].append(contentsOf: repeatElement(blank, count: max(columns - screen[cursor.row].count, 0)))
+        screen[cursor.row].isWrapped = false
+        blankBrokenWideCharacter(at: range.lowerBound, row: cursor.row)
     }
 
     private mutating func erase(_ range: Range<Int>, row: Int, with cell: Cell) {
@@ -1162,20 +1120,12 @@ package struct Terminal: Sendable {
         Array(repeating: Line(repeatElement(blank, count: columns)), count: count)
     }
 
-    private static func resized(_ screen: [Line], columns: Int, rows: Int, removingFirst removedRows: Int)
-        -> [Line]
-    {
-        let lines = screen.dropFirst(removedRows).prefix(rows)
-            .map { fitted($0, columns: columns) }
-        return lines + Array(repeating: blankLine(columns: columns), count: rows - lines.count)
-    }
-
-    private static func fitted(_ line: Line, columns: Int) -> Line {
-        var line = Line(line.prefix(columns), isWrapped: line.isWrapped)
-        line.append(contentsOf: repeatElement(Cell(), count: max(columns - line.count, 0)))
-        if line[columns - 1].width == 2 {
-            line[columns - 1] = Cell()
+    private static func padded(_ line: Line, columns: Int) -> Line {
+        guard line.count < columns else {
+            return line
         }
+        var line = line
+        line.append(contentsOf: repeatElement(line.fill ?? Cell(), count: columns - line.count))
         return line
     }
 

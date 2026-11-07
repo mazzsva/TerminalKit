@@ -71,6 +71,25 @@ struct TerminalContentViewTests {
         #expect(session.terminal.columns == 60)
     }
 
+    @Test func drawsAndCopiesAScreenWithCellsPastTheColumns() async throws {
+        let session = TerminalSession(running: "printf '\\033[?1049h%035d\\r\\n%035d' 0 0; read line")
+        let view = TerminalContentView(session: session)
+        let window = NSWindow(contentRect: .zero, styleMask: [], backing: .buffered, defer: false)
+        window.contentView = view
+        view.fit(to: cells(40.5, 5.5, in: view))
+        try session.start()
+        await session.waitForText("00000")
+        view.fit(to: cells(20.5, 5.5, in: view))
+        _ = try image(of: view)
+        view.selectAll(nil)
+        #expect(view.selectedText?.isEmpty == false)
+        #expect(view.accessibilityValue() != nil)
+        #expect(view.accessibilityFrame(for: NSRange(location: 25, length: 20)) != .zero)
+        #expect(session.terminal.screen[0].count == 40)
+        session.send("\r")
+        await session.waitForExit()
+    }
+
     @Test func keepsTheScrollbackWhenTheViewCollapses() async throws {
         let session = TerminalSession(running: "seq -f 'line %g abcdefghijklmnopqrstuvwxyz' 1 2000")
         let view = TerminalContentView(session: session)
