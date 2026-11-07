@@ -11,6 +11,13 @@ struct TerminalAppRecordingTests {
         var screen: [String]
         var history: [String]?
         var title: String?
+        var steps: [Step]?
+
+        struct Step: Decodable, Sendable {
+            var columns: Int
+            var rows: Int
+            var input: String?
+        }
 
         var testDescription: String {
             name
@@ -36,12 +43,28 @@ struct TerminalAppRecordingTests {
     @Test(arguments: recordings)
     func matchesTerminalApp(recording: Recording) {
         var terminal = terminalLikeTheRecordedWindow()
-        let reply = terminal.receive(bytes(recording.input) + Array("\u{1B}[6n".utf8))
+        let reply = play(recording, in: &terminal)
         #expect(escaped(reply) == recording.reply)
         #expect(terminal.title == recording.title ?? "")
         #expect(scalars(text(terminal.screen, of: terminal)) == scalars(recording.screen))
         let history = terminal.scrollback + terminal.normalScreenLines + terminal.screen
         #expect(scalars(text(history, of: terminal)) == scalars(recording.history ?? recording.screen))
+    }
+
+    func play(_ recording: Recording, in terminal: inout Terminal) -> [UInt8] {
+        guard let steps = recording.steps else {
+            return terminal.receive(bytes(recording.input) + Array("\u{1B}[6n".utf8))
+        }
+        var reply = terminal.receive(bytes(recording.input))
+        for step in steps {
+            terminal.resize(columns: step.columns, rows: step.rows)
+            terminal.windowReport = Terminal.WindowReport(
+                width: step.columns * 7 + 20,
+                height: step.rows * 15 + 17
+            )
+            reply += terminal.receive(bytes(step.input ?? ""))
+        }
+        return reply + terminal.receive(Array("\u{1B}[6n".utf8))
     }
 
     func terminalLikeTheRecordedWindow() -> Terminal {
@@ -62,6 +85,8 @@ struct TerminalAppRecordingTests {
                 rgb(0xE64A, 0xEF7A, 0xF63D),
             ]
         )
+        _ = terminal.receive(
+            Array("\u{1B}[3g\u{1B}[9G\u{1B}H\u{1B}[17G\u{1B}H\u{1B}[25G\u{1B}H\u{1B}[33G\u{1B}H\u{1B}[H".utf8))
         return terminal
     }
 
