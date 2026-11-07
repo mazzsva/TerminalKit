@@ -14,7 +14,7 @@ Native macOS terminal view for SwiftUI, built on AppKit.
 
 ## Quality gates
 
-- **Tests:** 880 [Swift Testing](https://github.com/swiftlang/swift-testing) tests cover every layer, and many run real programs in pseudo terminals. One test plays byte streams recorded from Terminal.app and compares the screen, the replies, and the title. `Scripts/record-terminal-app.py` records them again in a test window of its own.
+- **Tests:** 900 [Swift Testing](https://github.com/swiftlang/swift-testing) tests cover every layer, and many run real programs in pseudo terminals. One test plays byte streams recorded from Terminal.app and compares the screen, the replies, and the title. `Scripts/record-terminal-app.py` records them again in a test window of its own.
 - **CI:** GitHub Actions lints and runs the full suite on every pull request that is ready for review.
 - **Accessibility:** VoiceOver reads the terminal as a text area and gets a notification when the output changes.
 
