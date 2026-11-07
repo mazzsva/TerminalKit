@@ -787,7 +787,8 @@ final class TerminalContentView: NSView {
         if canSize, session.sizingView === self {
             session.resize(
                 columns: Int(min(columns, CGFloat(Self.maximumColumns))),
-                rows: Int(min(rows, CGFloat(Self.maximumRows)))
+                rows: Int(min(rows, CGFloat(Self.maximumRows))),
+                cellSize: cellSize
             )
         }
         if session.terminal.columns != fittedColumns {
