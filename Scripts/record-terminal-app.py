@@ -1,9 +1,9 @@
 #!/usr/bin/python3 -I
-import fcntl, glob, json, os, re, select, struct, subprocess, sys, termios, tempfile, time, tty
+import fcntl, glob, json, os, re, select, signal, struct, subprocess, sys, termios, tempfile, time, tty
 
 COLUMNS = 40
 ROWS = 12
-TIME_LIMIT = 1800
+TIME_LIMIT = 3600
 SYNC = b"\x1b[>c"
 PROBE = b"\x1b[6n"
 SYNC_REPLY = b"\x1b[>1;95;0c"
@@ -32,13 +32,6 @@ def format_recordings(recordings):
     return f"[\n{lines}\n]\n"
 
 
-def osascript(script):
-    result = subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip())
-    return result.stdout.rstrip("\n")
-
-
 def text_lines(text):
     lines = text.split("\n")
     while lines and not lines[-1]:
@@ -46,30 +39,64 @@ def text_lines(text):
     return lines
 
 
-def probe(window, paths):
-    tab = f"tab 1 of window id {window}"
+def terminal_processes():
+    output = subprocess.run(["/bin/ps", "-axo", "pid=,comm="], capture_output=True, text=True, check=True).stdout
+    return {int(line.split()[0]) for line in output.splitlines() if line.endswith("/Terminal")}
+
+
+def host_process():
+    process = os.getpid()
+    while process > 1:
+        output = subprocess.run(["/bin/ps", "-o", "ppid=,comm=", "-p", str(process)], capture_output=True, text=True)
+        parent, command = output.stdout.strip().split(None, 1)
+        if command.endswith("/Terminal"):
+            return process
+        process = int(parent)
+    raise RuntimeError("no Terminal.app process")
+
+
+def probe(state, paths):
+    process = host_process()
+    with open(os.path.join(state, "existing")) as file:
+        if process in json.load(file):
+            raise RuntimeError("this is not a separate Terminal.app process")
+    with open(os.path.join(state, "process"), "w") as file:
+        file.write(str(process))
+
+    def events(*arguments):
+        result = subprocess.run(
+            [os.path.join(state, "events"), str(process), *map(str, arguments)], capture_output=True, timeout=60
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"{arguments}: {result.stderr!r}")
+        return result.stdout.decode()
+
     terminal = os.open("/dev/tty", os.O_RDWR)
+    window = events("find", os.ttyname(0)).strip()
+    events("hide")
 
     def window_size():
         rows, columns, _, _ = struct.unpack("4H", fcntl.ioctl(terminal, termios.TIOCGWINSZ, b"\0" * 8))
         return rows, columns
 
-    def set_window_size():
-        osascript(
-            f'tell application "Terminal"\n'
-            f"set number of columns of {tab} to {COLUMNS}\n"
-            f"set number of rows of {tab} to {ROWS}\n"
-            f"end tell"
-        )
-        time.sleep(0.8)
-        if window_size() != (ROWS, COLUMNS):
+    def set_window_size(columns=COLUMNS, rows=ROWS):
+        end = time.time() + 5
+        while window_size() != (rows, columns) and time.time() < end:
+            events("size", window, columns, rows)
+            time.sleep(0.1)
+        time.sleep(0.15)
+        if window_size() != (rows, columns):
             raise RuntimeError(f"window is {window_size()}")
 
     set_window_size()
 
     def write(data):
+        end = time.time() + 60
         while data:
-            data = data[os.write(terminal, data):]
+            if time.time() > end:
+                raise RuntimeError("Terminal.app stopped reading")
+            if select.select([], [terminal], [], 1)[1]:
+                data = data[os.write(terminal, data):]
 
     def read_to_sync(seconds):
         data = b""
@@ -82,19 +109,6 @@ def probe(window, paths):
                     if not select.select([terminal], [], [], 0)[0]:
                         return data, True
         return data, False
-
-    def contents_and_history():
-        for _ in range(4):
-            try:
-                return read_contents_and_history()
-            except RuntimeError:
-                time.sleep(1)
-        return read_contents_and_history()
-
-    def read_contents_and_history():
-        return osascript(
-            f'tell application "Terminal" to return (contents of {tab}) & (ASCII character 1) & (history of {tab}) & (ASCII character 1) & (custom title of {tab})'
-        ).split("\x01")
 
     def record_widths(path):
         scalars = [value for value in range(0x80, 0x110000) if not 0xD800 <= value <= 0xDFFF]
@@ -128,6 +142,8 @@ def probe(window, paths):
             with open(path) as file:
                 recordings = json.load(file)
             for index, recording in enumerate(recordings):
+                with open(os.path.join(state, "current"), "w") as file:
+                    file.write(recording["name"])
                 if index % 200 == 0:
                     with open(path, "w") as file:
                         file.write(format_recordings(recordings))
@@ -136,19 +152,39 @@ def probe(window, paths):
                     write(b"\x07\x1b\\" + RESET + SYNC)
                     if not read_to_sync(2)[1]:
                         raise RuntimeError(f"no reply after reset before {recording['name']}")
-                write(decode(recording["input"]) + PROBE + SYNC)
-                reply, synced = read_to_sync(3)
+                size = (ROWS, COLUMNS)
+                reply = b""
+                for step_index, step in enumerate(recording.get("steps", [])):
+                    write((b"" if step_index else decode(recording["input"])) + SYNC)
+                    part, synced = read_to_sync(15)
+                    if not synced:
+                        raise RuntimeError(f"no reply to {recording['name']}: {part!r}")
+                    reply += part[: -len(SYNC_REPLY)]
+                    size = (step["rows"], step["columns"])
+                    set_window_size(step["columns"], step["rows"])
+                    write(decode(step.get("input", "")) + SYNC)
+                    part, synced = read_to_sync(15)
+                    if not synced:
+                        raise RuntimeError(f"no reply to {recording['name']}: {part!r}")
+                    reply += part[: -len(SYNC_REPLY)]
+                write((b"" if "steps" in recording else decode(recording["input"])) + PROBE + SYNC)
+                part, synced = read_to_sync(15)
+                reply += part
                 if not synced:
                     raise RuntimeError(f"no reply to {recording['name']}: {reply!r}")
-                if window_size() != (ROWS, COLUMNS):
+                if window_size() != size:
                     raise RuntimeError(f"{recording['name']} changed the window to {window_size()}")
-                contents, history, title = contents_and_history()
-                if title != "Terminal":
+                contents, history, title = events("read", window).split("\x01")
+                if title not in ("Terminal", "probe.command"):
                     recording["title"] = title
                 else:
                     recording.pop("title", None)
                 recording["reply"] = encode(reply[: -len(SYNC_REPLY)])
                 recording["screen"] = text_lines(contents)
+                if size != (ROWS, COLUMNS):
+                    write(RESET + SYNC)
+                    read_to_sync(2)
+                    set_window_size()
                 history_lines = text_lines(history)
                 if history_lines != recording["screen"]:
                     recording["history"] = history_lines
@@ -161,57 +197,57 @@ def probe(window, paths):
 
 
 def record(paths):
-    with tempfile.TemporaryDirectory() as folder:
-        done = os.path.join(folder, "done")
-        log = os.path.join(folder, "log")
-        window_file = os.path.join(folder, "window")
-        arguments = " ".join(f"'{os.path.abspath(path)}'" for path in paths)
-        command = (
-            f"unset HISTFILE; exec /usr/bin/python3 -I '{os.path.abspath(__file__)}'"
-            f" --probe '{window_file}' '{done}' '{log}' {arguments}"
+    script = os.path.abspath(__file__)
+    with tempfile.TemporaryDirectory() as state:
+        subprocess.run(
+            ["/usr/bin/swiftc", os.path.join(os.path.dirname(script), "terminal-app-events.swift"), "-o", os.path.join(state, "events")],
+            check=True,
         )
-        reply = osascript(f'tell application "Terminal" to do script "{command}"')
-        owned = re.fullmatch(r"tab 1 of window id (\d+)", reply)
-        tab_count = owned and osascript(f'tell application "Terminal" to count tabs of window id {owned.group(1)}')
-        if tab_count != "1":
-            with open(window_file, "w") as file:
-                file.write("")
-            sys.exit(f"Terminal.app did not open a new window: {reply}")
-        window = owned.group(1)
-        osascript(f'tell application "Terminal" to set visible of window id {window} to false')
-        with open(window_file + ".tmp", "w") as file:
-            file.write(window)
-        os.rename(window_file + ".tmp", window_file)
+        with open(os.path.join(state, "existing"), "w") as file:
+            json.dump(sorted(terminal_processes()), file)
+        command = os.path.join(state, "probe.command")
+        arguments = " ".join(f"'{os.path.abspath(path)}'" for path in paths)
+        with open(command, "w") as file:
+            file.write(f"#!/bin/zsh\nexec /usr/bin/python3 -I '{script}' --probe '{state}' {arguments}\n")
+        os.chmod(command, 0o755)
+        subprocess.run(
+            ["/usr/bin/open", "-n", "-g", "-a", "Terminal", command, "--args", "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO", "-NSAppSleepDisabled", "YES"],
+            check=True,
+        )
+        process_file = os.path.join(state, "process")
+        done = os.path.join(state, "done")
+        end = time.time() + 30
+        while not os.path.exists(process_file) and not os.path.exists(done) and time.time() < end:
+            time.sleep(0.1)
+        if not os.path.exists(process_file):
+            sys.exit(open(done).read() if os.path.exists(done) else "the separate Terminal.app process did not start")
+        with open(process_file) as file:
+            process = int(file.read())
         end = time.time() + TIME_LIMIT
-        try:
-            while not os.path.exists(done) and time.time() < end:
-                time.sleep(0.2)
-        finally:
-            osascript(f'tell application "Terminal" to if exists window id {window} then close window id {window}')
+        while not os.path.exists(done) and time.time() < end and process in terminal_processes():
+            time.sleep(0.2)
+        if process not in terminal_processes():
+            with open(os.path.join(state, "current")) as file:
+                sys.exit(f"Terminal.app crashed at {file.read()}")
+        os.kill(process, signal.SIGTERM)
         if not os.path.exists(done):
-            sys.exit("the recording did not finish")
-        with open(log) as file:
+            with open(os.path.join(state, "current")) as file:
+                sys.exit(f"the recording did not finish, at {file.read()}")
+        with open(done) as file:
             message = file.read()
     if message:
         sys.exit(message)
 
 
 if sys.argv[1:2] == ["--probe"]:
-    window_file, done, log = sys.argv[2:5]
-    while not os.path.exists(window_file):
-        time.sleep(0.05)
-    with open(window_file) as file:
-        window = file.read()
-    if not window:
-        sys.exit()
+    state = sys.argv[2]
     message = ""
     try:
-        probe(window, sys.argv[5:])
+        probe(state, sys.argv[3:])
     except Exception as error:
         message = repr(error)
-    with open(log, "w") as file:
+    with open(os.path.join(state, "done"), "w") as file:
         file.write(message)
-    open(done, "w").close()
 else:
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     recordings = os.path.join(root, "Tests/TerminalCoreTests/Recordings")
