@@ -32,6 +32,7 @@ public final class TerminalSession {
     @ObservationIgnored weak var sizingView: TerminalContentView?
     @ObservationIgnored var isShown = false
     @ObservationIgnored private var isSized = false
+    @ObservationIgnored private var cellSize = CGSize(width: 7, height: 15)
     @ObservationIgnored private var waitingInput: [UInt8]?
 
     @ObservationIgnored private(set) var pseudoTerminal: PseudoTerminal?
@@ -54,7 +55,9 @@ public final class TerminalSession {
             environment: configuration.environment,
             currentDirectoryURL: configuration.currentDirectoryURL,
             columns: terminal.columns,
-            rows: terminal.rows
+            rows: terminal.rows,
+            pixelWidth: pixelWidth(columns: terminal.columns),
+            pixelHeight: pixelHeight(rows: terminal.rows)
         )
         self.pseudoTerminal = pseudoTerminal
         if let waitingInput {
@@ -72,17 +75,34 @@ public final class TerminalSession {
         }
     }
 
-    func resize(columns: Int, rows: Int) {
+    func resize(columns: Int, rows: Int, cellSize: CGSize = CGSize(width: 7, height: 15)) {
         isSized = true
         defer { startIfWaiting() }
-        guard columns != terminal.columns || rows != terminal.rows else {
+        guard columns != terminal.columns || rows != terminal.rows || cellSize != self.cellSize else {
             return
         }
+        self.cellSize = cellSize
         if columns != terminal.columns {
             widthChangeCount += 1
         }
-        terminal.resize(columns: columns, rows: rows)
-        pseudoTerminal?.resize(columns: columns, rows: rows)
+        if columns != terminal.columns || rows != terminal.rows {
+            terminal.resize(columns: columns, rows: rows)
+        }
+        pseudoTerminal?
+            .resize(
+                columns: columns,
+                rows: rows,
+                pixelWidth: pixelWidth(columns: columns),
+                pixelHeight: pixelHeight(rows: rows)
+            )
+    }
+
+    private func pixelWidth(columns: Int) -> Int {
+        Int(CGFloat(columns) * cellSize.width)
+    }
+
+    private func pixelHeight(rows: Int) -> Int {
+        Int(CGFloat(rows) * cellSize.height)
     }
 
     public var hasForegroundProcess: Bool {

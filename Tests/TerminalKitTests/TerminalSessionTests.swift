@@ -247,6 +247,31 @@ struct TerminalSessionTests {
         #expect(session.lines.first == "30 100")
     }
 
+    @Test func reportsThePixelSizeOfTheScreen() async throws {
+        let session = TerminalSession(
+            running: "perl -e 'ioctl(STDIN, 0x40087468, $size = \"\\0\" x 8); print join(\" \", unpack(\"S4\", $size))'"
+        )
+        session.resize(columns: 100, rows: 30, cellSize: CGSize(width: 8, height: 16))
+        try session.start()
+        await session.waitForExit()
+        #expect(session.lines.first == "30 100 800 480")
+    }
+
+    @Test func reportsThePixelSizeAfterTheCellSizeChanges() async throws {
+        let session = TerminalSession(
+            running: """
+                trap 'perl -e "ioctl(STDIN, 0x40087468, \\$s = chr(0) x 8); print join(chr(32), unpack(chr(83).4, \\$s))"; exit' WINCH; \
+                echo ready; while :; do sleep 0.1; done
+                """
+        )
+        session.resize(columns: 100, rows: 30)
+        try session.start()
+        await session.waitForText("ready")
+        session.resize(columns: 100, rows: 30, cellSize: CGSize(width: 8, height: 16))
+        await session.waitForExit()
+        #expect(session.lines.contains("30 100 800 480"))
+    }
+
     @Test func resizesTheProcess() async throws {
         let session = TerminalSession(running: "trap 'stty size; exit' WINCH; echo ready; while :; do sleep 0.1; done")
         try session.start()
