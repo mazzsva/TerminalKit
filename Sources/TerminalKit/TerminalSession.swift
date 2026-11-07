@@ -28,7 +28,7 @@ public final class TerminalSession {
         }
     }
     @ObservationIgnored private(set) var revision = 0
-    @ObservationIgnored private(set) var widthChangeCount = 0
+    @ObservationIgnored private(set) var resizeCount = 0
     @ObservationIgnored weak var sizingView: TerminalContentView?
     @ObservationIgnored var isShown = false
     @ObservationIgnored private var isSized = false
@@ -82,10 +82,8 @@ public final class TerminalSession {
             return
         }
         self.cellSize = cellSize
-        if columns != terminal.columns {
-            widthChangeCount += 1
-        }
         if columns != terminal.columns || rows != terminal.rows {
+            resizeCount += 1
             terminal.resize(columns: columns, rows: rows)
         }
         pseudoTerminal?
