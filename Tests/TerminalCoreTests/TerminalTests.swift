@@ -2140,19 +2140,12 @@ struct TerminalTests {
         #expect(scrollback(terminal).prefix(3) == ["", "abc", "d"])
     }
 
-    @Test func keepsTheLastSavedLineWholeAtTheLimit() {
-        var terminal = Terminal(columns: 5, rows: 1)
-        terminal.receive("a\r\n" + String(repeating: "b", count: 60_000) + "\r\nc")
-        #expect(terminal.scrollback.count == 12_000)
-        #expect(terminal.removedScrollbackCount == 1)
-        #expect(scrollback(terminal).allSatisfy { $0 == "bbbbb" })
-    }
-
-    @Test func limitsTheScrollback() {
+    @Test func keepsEveryLineInTheScrollback() {
         var terminal = Terminal(columns: 5, rows: 1)
         terminal.receive((1 ... 12_000).map { "\($0)\r\n" }.joined())
-        #expect((10_000 ... 11_000).contains(terminal.scrollback.count))
-        #expect(terminal.scrollback.count + terminal.removedScrollbackCount == 12_000)
+        #expect(terminal.scrollback.count == 12_000)
+        #expect(terminal.removedScrollbackCount == 0)
+        #expect(scrollback(terminal).first == "1")
         #expect(scrollback(terminal).last == "12000")
     }
 }

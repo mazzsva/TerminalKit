@@ -33,7 +33,7 @@ struct TerminalInsetTests {
     }
 
     @Test func keepsTheTopBelowTheToolbarWhenOldLinesAreRemoved() async throws {
-        let (scrollView, window) = toolbarWindow(running: "seq 1 10500; read line; seq 1 2000")
+        let (scrollView, window) = toolbarWindow(running: "seq 1 10500; read line; printf '\\033[3J'")
         let view = scrollView.terminalView
         let session = view.session
         try session.start()

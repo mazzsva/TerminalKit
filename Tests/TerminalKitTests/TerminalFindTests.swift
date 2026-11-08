@@ -70,14 +70,14 @@ struct TerminalFindTests {
         #expect((0 ... 5).contains(top))
     }
 
-    @Test func findsTextInTheTrimmedScrollback() async throws {
-        let scrollView = try await findView(running: "seq 1 11500")
+    @Test func findsTextAfterTheScrollbackIsErased() async throws {
+        let scrollView = try await findView(running: "seq 1 11500; printf '\\033[3J'")
         let view = scrollView.terminalView
         #expect(view.session.terminal.removedScrollbackCount > 0)
-        let range = (view.string as NSString).range(of: "\n11000\n")
+        let range = (view.string as NSString).range(of: "\n11499\n")
         #expect(range.location != NSNotFound)
         view.selectedRanges = [NSValue(range: NSRange(location: range.location + 1, length: 5))]
-        #expect(view.selectedText == "11000")
+        #expect(view.selectedText == "11499")
     }
 
     @Test func findsTextOnTheAlternateScreen() async throws {
