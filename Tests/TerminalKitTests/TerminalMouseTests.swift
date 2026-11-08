@@ -27,7 +27,7 @@ struct TerminalMouseTests {
         let window = NSWindow(contentView: view)
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
-        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 2, in: view, modifierFlags: .shift))
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 2, in: view, modifierFlags: .function))
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: -5, in: view))
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 3, in: view, modifierFlags: .control))
         #expect(await session.linesAfterExit().contains("E[<35;2;1ME[<51;4;2M"))
@@ -125,20 +125,21 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains("E[M!\"!E[MA$\"E[M#$\"E[M\"$\"E[MB\"!E[M#\"!"))
     }
 
-    @Test func reportsNoMiddleOrRightButtonWithShift() async throws {
+    @Test func reportsNoMiddleOrRightButtonWithFn() async throws {
         let (view, session) = try await viewReading("head -c 9", modes: "?1003h\\033[?1006h")
         let recorder = MouseEventRecorder()
         view.nextResponder = recorder
         view.otherMouseDown(
-            with: try otherMouseEvent(.otherMouseDown, row: 0, column: 1, in: view, modifierFlags: .shift))
+            with: try otherMouseEvent(.otherMouseDown, row: 0, column: 1, in: view, modifierFlags: .function))
         view.otherMouseDragged(
-            with: try otherMouseEvent(.otherMouseDragged, row: 1, column: 3, in: view, modifierFlags: .shift))
-        view.otherMouseUp(with: try otherMouseEvent(.otherMouseUp, row: 1, column: 3, in: view, modifierFlags: .shift))
-        let event = try mouseEvent(.rightMouseDown, row: 0, column: 1, in: view, modifierFlags: .shift)
+            with: try otherMouseEvent(.otherMouseDragged, row: 1, column: 3, in: view, modifierFlags: .function))
+        view.otherMouseUp(
+            with: try otherMouseEvent(.otherMouseUp, row: 1, column: 3, in: view, modifierFlags: .function))
+        let event = try mouseEvent(.rightMouseDown, row: 0, column: 1, in: view, modifierFlags: .function)
         #expect(menusOpened { view.rightMouseDown(with: event) } == 1)
         view.rightMouseDragged(
-            with: try mouseEvent(.rightMouseDragged, row: 0, column: 1, in: view, modifierFlags: .shift))
-        view.rightMouseUp(with: try mouseEvent(.rightMouseUp, row: 0, column: 1, in: view, modifierFlags: .shift))
+            with: try mouseEvent(.rightMouseDragged, row: 0, column: 1, in: view, modifierFlags: .function))
+        view.rightMouseUp(with: try mouseEvent(.rightMouseUp, row: 0, column: 1, in: view, modifierFlags: .function))
         #expect(
             recorder.types == [.otherMouseDown, .otherMouseDragged, .otherMouseUp, .rightMouseDragged, .rightMouseUp])
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 2, in: view))
@@ -185,15 +186,36 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains("E[<16;1;1M"))
     }
 
-    @Test func selectsWithShiftWhenTheProcessUsesTheMouse() async throws {
+    @Test func selectsWithFnWhenTheProcessUsesTheMouse() async throws {
         let (view, session) = try await viewReading("head -c 1", modes: "?1000h")
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .shift))
-        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 3, in: view, modifierFlags: .shift))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .function))
+        view.mouseDragged(
+            with: try mouseEvent(.leftMouseDragged, row: 0, column: 3, in: view, modifierFlags: .function))
         #expect(view.selection?.head.column == 3)
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 6, in: view, modifierFlags: .shift))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 6, in: view, modifierFlags: .function))
         session.send(Array("a".utf8))
         #expect(view.selection?.anchor.column == 6)
         #expect(await session.linesAfterExit().contains("a"))
+    }
+
+    @Test func extendsTheSelectionWithFnAndShiftWhenTheProcessUsesTheMouse() async throws {
+        let (view, session) = try await viewReading("head -c 1", modes: "?1000h")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .function))
+        view.mouseDragged(
+            with: try mouseEvent(.leftMouseDragged, row: 0, column: 3, in: view, modifierFlags: .function))
+        view.mouseDown(
+            with: try mouseEvent(.leftMouseDown, row: 0, column: 6, in: view, modifierFlags: [.function, .shift]))
+        session.send(Array("a".utf8))
+        #expect(view.selection?.anchor.column == 1)
+        #expect(view.selection?.head.column == 6)
+        #expect(await session.linesAfterExit().contains("a"))
+    }
+
+    @Test func reportsAShiftClickWhenTheProcessUsesTheMouse() async throws {
+        let (view, session) = try await viewReading("head -c 9", modes: "?1000h\\033[?1006h")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .shift))
+        #expect(await session.linesAfterExit().contains { $0.hasPrefix("E[<") && $0.hasSuffix(";2;1M") })
+        #expect(view.selection == nil)
     }
 
     @Test func sendsTheCursorKeysForTheWheelOnTheAlternateScreen() async throws {
@@ -202,6 +224,17 @@ struct TerminalMouseTests {
         view.scrollWheel(with: try scrollWheelEvent(lines: 1))
         view.scrollWheel(with: try scrollWheelEvent(lines: -1))
         #expect(await session.linesAfterExit().contains("E[AE[B"))
+    }
+
+    @Test func scrollsTheViewForTheWheelWithFnOrShiftOnTheAlternateScreen() async throws {
+        let (view, session) = try await viewReading("head -c 3", modes: "?1049h")
+        let recorder = MouseEventRecorder()
+        view.nextResponder = recorder
+        view.scrollWheel(with: try scrollWheelEvent(lines: 1, modifierFlags: .function))
+        view.scrollWheel(with: try scrollWheelEvent(lines: -1, modifierFlags: .shift))
+        view.scrollWheel(with: try scrollWheelEvent(lines: 1))
+        #expect(recorder.types == [.scrollWheel, .scrollWheel])
+        #expect(await session.linesAfterExit().contains("E[A"))
     }
 
     @Test func reportsTheWheel() async throws {
@@ -348,4 +381,5 @@ private final class MouseEventRecorder: NSResponder {
     override func otherMouseDown(with event: NSEvent) { types.append(event.type) }
     override func otherMouseDragged(with event: NSEvent) { types.append(event.type) }
     override func otherMouseUp(with event: NSEvent) { types.append(event.type) }
+    override func scrollWheel(with event: NSEvent) { types.append(event.type) }
 }

@@ -89,10 +89,11 @@ func mouseEvent(
 }
 
 @MainActor
-func scrollWheelEvent(lines: Int32, columns: Int32 = 0) throws -> NSEvent {
+func scrollWheelEvent(lines: Int32, columns: Int32 = 0, modifierFlags: NSEvent.ModifierFlags = []) throws -> NSEvent {
     let event = try #require(
         CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 2, wheel1: lines, wheel2: columns, wheel3: 0)
     )
+    event.flags = CGEventFlags(rawValue: UInt64(modifierFlags.rawValue))
     for field in [
         CGEventField.scrollWheelEventIsContinuous, .scrollWheelEventScrollPhase, .scrollWheelEventMomentumPhase,
     ] {
