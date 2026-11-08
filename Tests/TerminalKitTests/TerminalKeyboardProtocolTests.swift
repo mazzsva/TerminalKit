@@ -6,6 +6,23 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct TerminalKeyboardProtocolTests {
+    @Test func keepsTheFunctionKeysOfTheInputSystemWithTheKittyProtocol() async throws {
+        let session = TerminalSession(
+            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 11 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.setMarkedText(
+            "か",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        view.keyDown(with: try keyDown(NSF5FunctionKey, modifierFlags: .shift))
+        view.unmarkText()
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("1b  5b  31  35  3b  32  7e  e3  81  8b  78"))
+    }
+
     @Test func reportsModifiedReturn() throws {
         #expect(try input(keyDown("\r")) == nil)
         #expect(try input(keyDown("\r", modifierFlags: .shift)) == "\u{1B}[13;2u")

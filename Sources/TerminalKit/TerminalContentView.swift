@@ -491,7 +491,9 @@ final class TerminalContentView: NSView {
         if let event = keyDownEvent,
             let input = (markedText.isEmpty ? encodedInput(event) : nil) ?? event.wordMovementInput
                 ?? event.shiftedPageKeyInput
-                ?? event.terminalInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys)
+                ?? event.terminalInput(
+                    applicationCursorKeys: session.terminal.usesApplicationCursorKeys,
+                    usesKeyMappings: !session.terminal.usesDisambiguatedKeys)
         {
             insertedText = ""
             session.send(input)

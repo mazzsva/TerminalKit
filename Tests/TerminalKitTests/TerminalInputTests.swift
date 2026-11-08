@@ -170,6 +170,84 @@ struct TerminalInputTests {
             try keyDown(NSHelpFunctionKey, modifierFlags: .control).terminalInput() == Array("\u{1B}[2;5~".utf8))
     }
 
+    @Test func sendsTheKeysOfTheTerminalKeyMappings() throws {
+        let mappings: [(Int, NSEvent.ModifierFlags, String)] = [
+            (0xF702, [.shift], "\u{1B}[1;2D"),
+            (0xF702, [.control], "\u{1B}[1;5D"),
+            (0xF702, [.option], "\u{1B}b"),
+            (0xF703, [.shift], "\u{1B}[1;2C"),
+            (0xF703, [.control], "\u{1B}[1;5C"),
+            (0xF703, [.option], "\u{1B}f"),
+            (0xF704, [.numericPad], "\u{1B}OP"),
+            (0xF704, [], "\u{1B}OP"),
+            (0xF704, [.option], "\u{1B}[17~"),
+            (0xF705, [.numericPad], "\u{1B}OQ"),
+            (0xF705, [], "\u{1B}OQ"),
+            (0xF705, [.option], "\u{1B}[18~"),
+            (0xF706, [.numericPad], "\u{1B}OR"),
+            (0xF706, [], "\u{1B}OR"),
+            (0xF706, [.option], "\u{1B}[19~"),
+            (0xF707, [.numericPad], "\u{1B}OS"),
+            (0xF707, [], "\u{1B}OS"),
+            (0xF707, [.option], "\u{1B}[20~"),
+            (0xF708, [.shift], "\u{1B}[25~"),
+            (0xF708, [], "\u{1B}[15~"),
+            (0xF708, [.option], "\u{1B}[21~"),
+            (0xF709, [.shift], "\u{1B}[26~"),
+            (0xF709, [], "\u{1B}[17~"),
+            (0xF709, [.option], "\u{1B}[23~"),
+            (0xF70A, [.shift], "\u{1B}[28~"),
+            (0xF70A, [], "\u{1B}[18~"),
+            (0xF70A, [.option], "\u{1B}[24~"),
+            (0xF70B, [.shift], "\u{1B}[29~"),
+            (0xF70B, [], "\u{1B}[19~"),
+            (0xF70B, [.option], "\u{1B}[25~"),
+            (0xF70C, [.shift], "\u{1B}[31~"),
+            (0xF70C, [], "\u{1B}[20~"),
+            (0xF70C, [.option], "\u{1B}[26~"),
+            (0xF70D, [.shift], "\u{1B}[32~"),
+            (0xF70D, [], "\u{1B}[21~"),
+            (0xF70D, [.option], "\u{1B}[28~"),
+            (0xF70E, [.shift], "\u{1B}[33~"),
+            (0xF70E, [], "\u{1B}[23~"),
+            (0xF70E, [.option], "\u{1B}[29~"),
+            (0xF70F, [.shift], "\u{1B}[34~"),
+            (0xF70F, [], "\u{1B}[24~"),
+            (0xF70F, [.option], "\u{1B}[31~"),
+            (0xF710, [], "\u{1B}[25~"),
+            (0xF710, [.option], "\u{1B}[32~"),
+            (0xF711, [], "\u{1B}[26~"),
+            (0xF711, [.option], "\u{1B}[33~"),
+            (0xF712, [], "\u{1B}[28~"),
+            (0xF712, [.option], "\u{1B}[34~"),
+            (0xF713, [], "\u{1B}[29~"),
+            (0xF714, [], "\u{1B}[31~"),
+            (0xF715, [], "\u{1B}[32~"),
+            (0xF716, [], "\u{1B}[33~"),
+            (0xF717, [], "\u{1B}[34~"),
+            (0xF728, [.shift], "\u{1B}[3;2~"),
+            (0xF728, [], "\u{1B}[3~"),
+            (0xF728, [.control], "\u{1B}[3;5~"),
+            (0xF728, [.option, .control], "\u{1B}\u{1B}[3;5~"),
+        ]
+        for (key, modifierFlags, sequence) in mappings {
+            let event = try keyDown(key, modifierFlags: modifierFlags.union(.function))
+            #expect(event.wordMovementInput ?? event.terminalInput() == Array(sequence.utf8), "\(key) \(modifierFlags)")
+        }
+    }
+
+    @Test func keepsTheModifiersOfFunctionKeysWithTheKittyProtocol() throws {
+        #expect(
+            try keyDown(NSF1FunctionKey, modifierFlags: .option).disambiguatedInput(usesOptionAsMetaKey: false)
+                == Array("\u{1B}[1;3P".utf8))
+        #expect(
+            try keyDown(NSF5FunctionKey, modifierFlags: .shift).disambiguatedInput(usesOptionAsMetaKey: false)
+                == Array("\u{1B}[15;2~".utf8))
+        #expect(
+            try keyDown(NSDeleteFunctionKey, modifierFlags: [.option, .control])
+                .disambiguatedInput(usesOptionAsMetaKey: false) == Array("\u{1B}[3;7~".utf8))
+    }
+
     @Test func sendsModifiedCursorKeysInApplicationMode() throws {
         #expect(
             try keyDown(NSUpArrowFunctionKey, modifierFlags: .shift).terminalInput(applicationCursorKeys: true)
