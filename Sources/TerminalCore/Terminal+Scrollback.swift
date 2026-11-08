@@ -189,14 +189,6 @@ extension Terminal {
             }
         }
 
-        func markGraphemes(into used: inout [Bool]) {
-            Graphemes.markIndices(in: lines, into: &used)
-        }
-
-        mutating func remapGraphemes(with newIndices: [UInt32]) {
-            Graphemes.remapIndices(in: &lines, with: newIndices)
-        }
-
         private func rowStart(of paragraph: Int) -> Int {
             paragraph > 0 ? rowEnds[paragraph - 1] : 0
         }
