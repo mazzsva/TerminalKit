@@ -1078,6 +1078,28 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains("65  1b  5b  44  c3  a9  e3  81  8b"))
     }
 
+    @Test func sendsTheMappedFunctionKeys() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 12 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown(NSDeleteFunctionKey, modifierFlags: [.option, .control]))
+        view.keyDown(with: try keyDown(NSF15FunctionKey, modifierFlags: .option))
+        #expect(await session.linesAfterExit().contains("1b  1b  5b  33  3b  35  7e  1b  5b  33  34  7e"))
+    }
+
+    @Test func sendsTheMappedFunctionKeysWithOptionAsTheMetaKey() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 15 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        view.usesOptionAsMetaKey = true
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown(NSF1FunctionKey, modifierFlags: .option))
+        view.keyDown(with: try keyDown(NSF5FunctionKey, modifierFlags: .shift))
+        view.keyDown(with: try keyDown(NSF12FunctionKey, modifierFlags: .shift))
+        #expect(await session.linesAfterExit().contains("1b  5b  31  37  7e  1b  5b  32  35  7e  1b  5b  33  34  7e"))
+    }
+
     @Test func leavesOptionKeysToTheMarkedText() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 4 | od -An -tx1")
         let view = TerminalContentView(session: session)

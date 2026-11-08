@@ -126,17 +126,22 @@ extension NSEvent {
         return parameter > 1 ? Array("\u{1B}[27;\(parameter);\(number)~".utf8) : nil
     }
 
-    func terminalInput(applicationCursorKeys: Bool = false) -> [UInt8]? {
-        terminalInput(characters: characters, applicationCursorKeys: applicationCursorKeys)
+    func terminalInput(applicationCursorKeys: Bool = false, usesKeyMappings: Bool = true) -> [UInt8]? {
+        terminalInput(
+            characters: characters, applicationCursorKeys: applicationCursorKeys, usesKeyMappings: usesKeyMappings)
     }
 
-    private func terminalInput(characters: String?, applicationCursorKeys: Bool) -> [UInt8]? {
+    private func terminalInput(characters: String?, applicationCursorKeys: Bool, usesKeyMappings: Bool = true)
+        -> [UInt8]?
+    {
         guard !modifierFlags.contains(.command), let characters, !characters.isEmpty else {
             return nil
         }
         if let key = charactersIgnoringModifiers?.unicodeScalars.first,
             let sequence = NSEvent.SpecialKey(rawValue: Int(key.value))
-                .terminalSequence(applicationCursorKeys: applicationCursorKeys, modifiers: terminalModifiers)
+                .terminalSequence(
+                    applicationCursorKeys: applicationCursorKeys, modifiers: terminalModifiers,
+                    usesKeyMappings: usesKeyMappings)
         {
             return Array(sequence.utf8)
         }
@@ -157,9 +162,9 @@ extension NSEvent.SpecialKey {
         Self(rawValue: 0x1B)
     }
 
-    fileprivate func terminalSequence(applicationCursorKeys: Bool, modifiers: Int, disambiguates: Bool = false)
-        -> String?
-    {
+    fileprivate func terminalSequence(
+        applicationCursorKeys: Bool, modifiers: Int, disambiguates: Bool = false, usesKeyMappings: Bool = true
+    ) -> String? {
         switch self {
         case .carriageReturn, .enter: "\r"
         case .tab: "\t"
@@ -169,7 +174,9 @@ extension NSEvent.SpecialKey {
         case _ where disambiguates && (NSF13FunctionKey ... NSF20FunctionKey).contains(rawValue):
             "\u{1B}[\(57376 + rawValue - NSF13FunctionKey)\(modifiers > 1 ? ";\(modifiers)" : "")u"
         default:
-            if let final = cursorFinal, !disambiguates || self != .f3 {
+            if !disambiguates, usesKeyMappings, let sequence = mappedSequence(modifiers: modifiers) {
+                sequence
+            } else if let final = cursorFinal, !disambiguates || self != .f3 {
                 if modifiers > 1 {
                     "\u{1B}[1;\(modifiers)\(final)"
                 } else {
@@ -181,6 +188,17 @@ extension NSEvent.SpecialKey {
             } else {
                 nil
             }
+        }
+    }
+
+    private func mappedSequence(modifiers: Int) -> String? {
+        switch (modifiers, rawValue) {
+        case (2, NSF5FunctionKey ... NSF12FunctionKey):
+            Self(rawValue: rawValue + 8).tildeNumber.map { "\u{1B}[\($0)~" }
+        case (3, NSF1FunctionKey ... NSF15FunctionKey):
+            Self(rawValue: rawValue + 5).tildeNumber.map { "\u{1B}[\($0)~" }
+        case (7, NSDeleteFunctionKey): "\u{1B}\u{1B}[3;5~"
+        default: nil
         }
     }
 
