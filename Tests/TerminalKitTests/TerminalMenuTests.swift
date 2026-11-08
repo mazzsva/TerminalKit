@@ -96,15 +96,17 @@ struct TerminalMenuTests {
 
     @Test func reportsAForegroundProcess() async throws {
         var configuration = TerminalSession.Configuration(
-            executableURL: URL(filePath: "/bin/zsh"),
-            arguments: ["-f", "-i"],
-            environment: ["HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"]
+            executableURL: URL(filePath: "/usr/bin/login"),
+            arguments: ["-pfql", TerminalSession.Configuration.userName, "/bin/zsh", "-f", "-i"],
+            environment: ["HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"],
+            currentDirectoryURL: FileManager.default.temporaryDirectory
         )
         configuration.isLoginShell = true
         let session = TerminalSession(configuration: configuration)
         #expect(!session.hasForegroundProcess)
         try session.start()
-        session.send("echo ready\r")
+        #expect(!session.hasForegroundProcess)
+        session.send("echo re\"\"ady\r")
         await session.waitForText("ready")
         #expect(!session.hasForegroundProcess)
         session.send("sleep 30\r")
@@ -120,14 +122,16 @@ struct TerminalMenuTests {
         #expect(!session.hasForegroundProcess)
     }
 
-    @Test func reportsTheCommandOfALoginShellAsAForegroundProcess() async throws {
-        var configuration = TerminalSession.Configuration.loginShell(running: [
-            "/bin/sh", "-c", "echo running; exec /bin/sleep 30",
-        ])
-        configuration.executableURL = URL(filePath: "/bin/zsh")
-        configuration.environment = TerminalSession.Configuration.terminalEnvironment(
-            inheriting: ["HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"])
-        let session = TerminalSession(configuration: configuration)
+    @Test func reportsTheCommandOfTheShellAsAForegroundProcess() async throws {
+        let zsh = URL(filePath: "/bin/zsh")
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: zsh,
+                arguments: TerminalSession.Configuration.shellArguments(
+                    running: ["/bin/sh", "-c", "echo running; exec /bin/sleep 30"], shellURL: zsh),
+                environment: TerminalSession.Configuration.terminalEnvironment(
+                    inheriting: ["HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"])
+            ))
         #expect(!session.hasForegroundProcess)
         try session.start()
         await session.waitForText("running")
