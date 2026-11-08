@@ -239,6 +239,6 @@ private func clusters(count: Int) -> String {
     return text
 }
 
-private func text(_ lines: [Terminal.Line], in terminal: Terminal) -> [String] {
+private func text(_ lines: some Sequence<Terminal.Line>, in terminal: Terminal) -> [String] {
     lines.map { $0.map(terminal.character(of:)).joined().trimmingCharacters(in: .whitespaces) }
 }

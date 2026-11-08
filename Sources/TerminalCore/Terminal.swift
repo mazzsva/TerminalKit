@@ -55,7 +55,7 @@ package struct Terminal: Sendable {
     package private(set) var columns: Int
     package private(set) var rows: Int
     package private(set) var screen: [Line]
-    package private(set) var scrollback: [Line] = []
+    package private(set) var scrollback: Scrollback
     package private(set) var removedScrollbackCount = 0
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var usesApplicationCursorKeys = false
@@ -116,10 +116,15 @@ package struct Terminal: Sendable {
         self.columns = columns
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
+        scrollback = Scrollback(columns: columns)
         scrollRegion = 0 ..< rows
     }
 
     package mutating func resize(columns: Int, rows: Int) {
+        resize(columns: columns, rows: rows, restoredRows: rows + 1)
+    }
+
+    mutating func resize(columns: Int, rows: Int, restoredRows: Int) {
         precondition(columns > 0 && rows > 0)
         isTextRunClipped = false
         isLastCharacterDropped = false
@@ -127,7 +132,12 @@ package struct Terminal: Sendable {
         if var normalScreen {
             normalScreen.lines =
                 relaidScreen(
-                    normalScreen.lines, usedRows: normalScreen.lines.count, cursor: nil, columns: columns, rows: rows
+                    normalScreen.lines,
+                    usedRows: normalScreen.lines.count,
+                    cursor: nil,
+                    columns: columns,
+                    rows: rows,
+                    restoredRows: restoredRows
                 )
                 .screen
             normalScreen.savedCursor.position.row += rowChange
@@ -138,7 +148,8 @@ package struct Terminal: Sendable {
             let usedRows =
                 !scrollback.isEmpty || cursor.row == self.rows - 1
                 ? self.rows : (screen.lastIndex { $0.contains(where: \.isWritten) } ?? -1) + 1
-            (screen, cursor) = relaidScreen(screen, usedRows: usedRows, cursor: cursor, columns: columns, rows: rows)
+            (screen, cursor) = relaidScreen(
+                screen, usedRows: usedRows, cursor: cursor, columns: columns, rows: rows, restoredRows: restoredRows)
         }
         if var alternateScreen {
             alternateScreen.lines = Self.resizedAlternateScreen(alternateScreen.lines, columns: columns, rows: rows)
@@ -158,13 +169,15 @@ package struct Terminal: Sendable {
         usedRows: Int,
         cursor: Position?,
         columns: Int,
-        rows: Int
+        rows: Int,
+        restoredRows: Int
     ) -> (screen: [Line], cursor: Position) {
+        let restored = scrollback.removeLast(coveringRows: restoredRows, columns: columns)
+        scrollback.relayOut(columns: columns)
         let storedCursor = cursor.flatMap {
-            $0.row < usedRows ? Position(row: scrollback.count + $0.row, column: $0.column) : nil
+            $0.row < usedRows ? Position(row: restored.count + $0.row, column: $0.column) : nil
         }
-        var (lines, target) = Self.reflow(scrollback + screen.prefix(usedRows), columns: columns, cursor: storedCursor)
-        scrollback = []
+        var (lines, target) = Self.reflow(restored + screen.prefix(usedRows), columns: columns, cursor: storedCursor)
         var column = target?.column ?? 0
         if let cursor, usedRows == self.rows, (lines.last?.textCount ?? 0) >= columns {
             if cursor.row == self.rows - 1 || hasMovedCursorForFullRow {
@@ -528,7 +541,7 @@ package struct Terminal: Sendable {
 
     private mutating func compactGraphemes() {
         var used = Array(repeating: false, count: graphemes.count)
-        Graphemes.markIndices(in: scrollback, into: &used)
+        scrollback.markGraphemes(into: &used)
         Graphemes.markIndices(in: screen, into: &used)
         if let normalScreen {
             Graphemes.markIndices(in: normalScreen.lines, into: &used)
@@ -537,7 +550,7 @@ package struct Terminal: Sendable {
             Graphemes.markIndices(in: alternateScreen.lines, into: &used)
         }
         let newIndices = graphemes.compact(keeping: used)
-        Graphemes.remapIndices(in: &scrollback, with: newIndices)
+        scrollback.remapGraphemes(with: newIndices)
         Graphemes.remapIndices(in: &screen, with: newIndices)
         if var normalScreen {
             Graphemes.remapIndices(in: &normalScreen.lines, with: newIndices)
@@ -626,8 +639,7 @@ package struct Terminal: Sendable {
         var keptLine = Line()
         for line in lines {
             if line != previousLine {
-                let end = line.isWrapped ? line.count : (line.lastIndex { !$0.isBlank } ?? -1) + 1
-                keptLine = end == line.count ? line : Line(line[..<end])
+                keptLine = Self.trimmed(line)
                 previousLine = line
             }
             scrollback.append(keptLine)
@@ -637,9 +649,11 @@ package struct Terminal: Sendable {
 
     private mutating func trimScrollback() {
         if scrollback.count > Self.maximumScrollback + Self.scrollbackTrimCount {
-            removedScrollbackCount += scrollback.count - Self.maximumScrollback
-            scrollback.removeFirst(scrollback.count - Self.maximumScrollback)
-            graphemes.resetCompactionInterval()
+            let removedRows = scrollback.removeFirst(keepingAtMost: Self.maximumScrollback)
+            if removedRows > 0 {
+                removedScrollbackCount += removedRows
+                graphemes.resetCompactionInterval()
+            }
         }
     }
 
@@ -680,8 +694,8 @@ package struct Terminal: Sendable {
     private mutating func unwrapLine(before row: Int) {
         if row > 0 {
             screen[row - 1].isWrapped = false
-        } else if normalScreen == nil, !scrollback.isEmpty {
-            scrollback[scrollback.count - 1].isWrapped = false
+        } else if normalScreen == nil {
+            scrollback.unwrapLastRow()
         }
     }
 
@@ -750,7 +764,7 @@ package struct Terminal: Sendable {
         terminal.windowReport = windowReport
         terminal.graphemes = graphemes
         terminal.scrollback = scrollback
-        scrollback = []
+        scrollback = Scrollback(columns: columns)
         terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount
         terminal.decoder = decoder
@@ -836,7 +850,7 @@ package struct Terminal: Sendable {
             row -= 1
             column += columns
         }
-        if column < 0, row == 0, normalScreen == nil, scrollback.last?.isWrapped == true {
+        if column < 0, row == 0, normalScreen == nil, scrollback.isLastRowWrapped {
             column += columns
         }
         moveCursor(row: row, column: column)

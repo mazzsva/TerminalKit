@@ -1996,6 +1996,158 @@ struct TerminalTests {
         }
     }
 
+    @Test func laysOutTheSavedLinesLikeAFullReflow() {
+        let fragments = [
+            "abc", "\r\n", "\n", "\t", "x\ty", "中", "中文字", "e\u{301}", "\u{1B}[41m", "\u{1B}[m", "\u{1B}[5X",
+            "\u{1B}[K", "\u{1B}[1K", "\u{1B}[2J", "\u{1B}M", "\u{1B}[A", "\u{1B}[3D", "\u{1B}[2P",
+            "KKKKKK", String(repeating: "K", count: 37), String(repeating: "中", count: 23),
+        ]
+        var state: UInt64 = 0x9ABC_DEF0
+        func next(_ limit: Int) -> Int {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int((state >> 33) % UInt64(limit))
+        }
+        var terminal = Terminal(columns: 12, rows: 3)
+        for step in 0 ..< 6_000 {
+            if next(10) == 0 {
+                terminal.resize(columns: [6, 12, 18, 24][next(4)] + next(3) - 1, rows: next(6) + 1)
+            } else {
+                terminal.receive(fragments[next(fragments.count)])
+            }
+            if terminal.scrollback.count > 300 {
+                terminal.receive("\u{1B}[3J")
+            }
+            guard step % 7 == 0 else {
+                continue
+            }
+            let scrollback = terminal.scrollback
+            var paragraphs: [[Terminal.Line]] = []
+            for line in scrollback.lines {
+                if paragraphs.isEmpty || paragraphs[paragraphs.count - 1].last?.isWrapped == false {
+                    paragraphs.append([line])
+                } else {
+                    paragraphs[paragraphs.count - 1].append(line)
+                }
+            }
+            let expected = paragraphs.indices.flatMap { index in
+                index < scrollback.relaidCount
+                    ? Terminal.laidOut(paragraphs[index][...], columns: terminal.columns) : paragraphs[index]
+            }
+            #expect(Array(scrollback) == expected)
+            #expect(scrollback.indices.map { scrollback[$0] } == expected)
+        }
+    }
+
+    @Test func resizesLikeARewrapOfEverySavedLine() {
+        let fragments = [
+            "abc", "\r\n", "\n", "\t", "x\ty", "中文字", "\u{1B}[41m", "\u{1B}[m", "\u{1B}[5X", "\u{1B}[K",
+            "\u{1B}[2J", "\u{1B}M", "\u{1B}[A", "\u{1B}[H", "\u{1B}[2P", "\u{1B}7", "\u{1B}8", "\u{1B}[2;4r",
+            "\u{1B}[r", "\u{1B}[?1049h", "\u{1B}[?1049l", "\u{1B}[?47h", "\u{1B}[?47l", "\u{1B}[?7l", "\u{1B}[?7h",
+            String(repeating: "K", count: 37), String(repeating: "中", count: 23),
+        ]
+        var state: UInt64 = 0x5555_AAAA
+        func next(_ limit: Int) -> Int {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int((state >> 33) % UInt64(limit))
+        }
+        var terminal = Terminal(columns: 12, rows: 4)
+        for _ in 0 ..< 6_000 {
+            guard next(8) == 0 else {
+                terminal.receive(fragments[next(fragments.count)])
+                continue
+            }
+            let columns = [1, 5, 12, 20][next(4)] + next(3)
+            let rows = next(7) + 1
+            var full = terminal
+            terminal.resize(columns: columns, rows: rows)
+            full.resize(columns: columns, rows: rows, restoredRows: .max)
+            #expect(terminal.screen == full.screen)
+            #expect(terminal.cursor == full.cursor)
+            #expect(terminal.normalScreenLines == full.normalScreenLines)
+            #expect(Array(terminal.scrollback) == Array(full.scrollback))
+            if terminal.scrollback.count > 300 {
+                terminal.receive("\u{1B}[3J")
+            }
+        }
+    }
+
+    @Test func laysOutALongSavedLineWithManyWidthRuns() {
+        var terminal = Terminal(columns: 80, rows: 3)
+        terminal.receive(String(repeating: "中\tx", count: 600) + String(repeating: "\r\nx", count: 20))
+        for columns in [97, 31, 64] {
+            terminal.resize(columns: columns, rows: 3)
+            let scrollback = terminal.scrollback
+            let end = scrollback.lines.firstIndex { !$0.isWrapped }.map { $0 + 1 } ?? 0
+            let expected = Terminal.laidOut(scrollback.lines[..<end], columns: columns)
+            #expect(expected.count > 40)
+            #expect(Array(scrollback.prefix(expected.count)) == expected)
+            #expect(expected.indices.reversed().map { scrollback[$0] } == expected.reversed())
+        }
+    }
+
+    @Test func laysOutRandomSavedCellsLikeAFullReflow() {
+        let red = Terminal.Style(background: .indexed(1))
+        var state: UInt64 = 0x0F1E_2D3C
+        func next(_ limit: Int) -> Int {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int((state >> 33) % UInt64(limit))
+        }
+        func cells() -> [Terminal.Cell] {
+            switch next(8) {
+            case 0: [Terminal.Cell(scalar: "中", width: 2), Terminal.Cell(width: 0)]
+            case 5: [Terminal.Cell(width: 0)]
+            case 1: [.tab(style: Terminal.Style())] + Array(repeating: .tabGap(style: Terminal.Style()), count: next(9))
+            case 2: [.tabGap(style: Terminal.Style())]
+            case 3: [.writtenSpace(), Terminal.Cell()]
+            case 4: [Terminal.Cell(style: red)]
+            default: [Terminal.Cell(scalar: "a")]
+            }
+        }
+        for _ in 0 ..< 400 {
+            var scrollback = Terminal.Scrollback(columns: 10)
+            var paragraphs: [[Terminal.Line]] = []
+            for _ in 0 ..< 6 {
+                var rows: [Terminal.Line] = []
+                for _ in 0 ..< next(4) + 1 {
+                    rows.append(Terminal.Line((0 ..< next(8)).flatMap { _ in cells() }, isWrapped: true))
+                }
+                rows[rows.count - 1].isWrapped = false
+                rows = rows.map(Terminal.trimmed)
+                for row in rows {
+                    scrollback.append(row)
+                }
+                paragraphs.append(rows)
+            }
+            for _ in 0 ..< 4 {
+                let columns = [1, 2, 3, 5, 8, 13][next(6)]
+                scrollback.relayOut(columns: columns)
+                let expected = paragraphs.flatMap { Terminal.laidOut($0[...], columns: columns) }
+                #expect(Array(scrollback) == expected)
+                #expect(scrollback.indices.map { scrollback[$0] } == expected)
+            }
+        }
+    }
+
+    @Test func keepsTheEmptyRowOfASavedFullLineAtAnExactWidth() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\r\nabcd")
+        terminal.resize(columns: 4, rows: 2)
+        terminal.receive("\r\n\r\n1\r\n2\r\n3\r\n4\r\n5")
+        terminal.resize(columns: 2, rows: 2)
+        #expect(scrollback(terminal).prefix(4) == ["", "ab", "cd", ""])
+        #expect(terminal.scrollback.map(\.isWrapped).prefix(4) == [false, true, true, false])
+        terminal.resize(columns: 3, rows: 2)
+        #expect(scrollback(terminal).prefix(3) == ["", "abc", "d"])
+    }
+
+    @Test func keepsTheLastSavedLineWholeAtTheLimit() {
+        var terminal = Terminal(columns: 5, rows: 1)
+        terminal.receive("a\r\n" + String(repeating: "b", count: 60_000) + "\r\nc")
+        #expect(terminal.scrollback.count == 12_000)
+        #expect(terminal.removedScrollbackCount == 1)
+        #expect(scrollback(terminal).allSatisfy { $0 == "bbbbb" })
+    }
+
     @Test func limitsTheScrollback() {
         var terminal = Terminal(columns: 5, rows: 1)
         terminal.receive((1 ... 12_000).map { "\($0)\r\n" }.joined())
