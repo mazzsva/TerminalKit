@@ -37,7 +37,7 @@ extension TerminalContentView {
             return
         }
         let location = convert(event.locationInWindow, from: nil)
-        guard event.modifierFlags.contains(.shift), session.terminal.mouseTracking == .off, let selection else {
+        guard event.modifierFlags.contains(.shift), let selection else {
             selectionClickCount = event.clickCount
             selectionOrigin = selectionUnit(at: location)
             selection = selectionOrigin

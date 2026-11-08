@@ -125,9 +125,10 @@ struct TerminalSelectionTests {
         let view = scrollView.terminalView
         let clip = scrollView.contentView
         let row = view.session.terminal.scrollback.count
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row + 3, column: 1, in: view, modifierFlags: .shift))
+        view.mouseDown(
+            with: try mouseEvent(.leftMouseDown, row: row + 3, column: 1, in: view, modifierFlags: .function))
         view.mouseDragged(
-            with: try mouseEvent(.leftMouseDragged, row: row - 3, column: 1, in: view, modifierFlags: .shift))
+            with: try mouseEvent(.leftMouseDragged, row: row - 3, column: 1, in: view, modifierFlags: .function))
         let task = try #require(view.autoscrollTask)
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: row + 3, column: 1, in: view))
         let scroll = clip.bounds.minY
