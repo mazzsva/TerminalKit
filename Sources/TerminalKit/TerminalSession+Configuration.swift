@@ -2,10 +2,26 @@ import Foundation
 
 extension TerminalSession {
     public struct Configuration: Sendable {
-        public var executableURL: URL
-        public var arguments: [String]
+        public var executableURL: URL {
+            didSet {
+                isLoginShell = false
+            }
+        }
+        public var arguments: [String] {
+            didSet {
+                isLoginShell = false
+            }
+        }
         public var environment: [String: String]
-        public var currentDirectoryURL: URL?
+        public var currentDirectoryURL: URL? {
+            didSet {
+                guard isLoginShell else {
+                    return
+                }
+                arguments = Self.loginArguments(in: currentDirectoryURL)
+                isLoginShell = true
+            }
+        }
         var isLoginShell = false
 
         public init(
@@ -35,14 +51,37 @@ extension TerminalSession.Configuration {
     }
 
     static func loginShell(running command: [String], shellURL: URL) -> Self {
-        var configuration = loginShell(inheriting: ProcessInfo.processInfo.environment, shellURL: shellURL)
+        var configuration = loginShell(inheriting: ProcessInfo.processInfo.environment)
+        configuration.arguments =
+            ["-pfql", userName, shellURL.path(percentEncoded: false)]
+            + shellArguments(running: command, shellURL: shellURL)
+        configuration.currentDirectoryURL = .homeDirectory
+        return configuration
+    }
+
+    static func shellArguments(running command: [String], shellURL: URL) -> [String] {
         let fish = shellURL.lastPathComponent == "fish"
         let words = command.map {
-            let word = fish ? $0.replacingOccurrences(of: "\\", with: "\\\\", options: .literal) : $0
-            return "'" + word.replacingOccurrences(of: "'", with: "'\\''", options: .literal) + "'"
+            quoted(fish ? $0.replacingOccurrences(of: "\\", with: "\\\\", options: .literal) : $0)
         }
-        configuration.arguments += ["-i", "-c", "exec -- " + words.joined(separator: " ")]
-        return configuration
+        return ["-l", "-i", "-c", "exec -- " + words.joined(separator: " ")]
+    }
+
+    static func loginArguments(in directory: URL?, shellURL: URL = shellURL) -> [String] {
+        guard directory != nil else {
+            return ["-pf", userName]
+        }
+        let path = shellURL.path(percentEncoded: false)
+        let words = [shellURL.lastPathComponent, path]
+            .map { word in
+                word.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "/._-".contains($0)) }
+                    ? word : quoted(word)
+            }
+        return ["-pfl", userName, "/bin/bash", "-c", "exec -la " + words.joined(separator: " ")]
+    }
+
+    private static func quoted(_ word: String) -> String {
+        "'" + word.replacingOccurrences(of: "'", with: "'\\''", options: .literal) + "'"
     }
 
     @usableFromInline
@@ -75,13 +114,19 @@ extension TerminalSession.Configuration {
         return environment
     }
 
-    static func loginShell(inheriting environment: [String: String], shellURL: URL = shellURL) -> Self {
+    static func loginShell(inheriting environment: [String: String]) -> Self {
         Self(
-            executableURL: shellURL,
-            arguments: ["-l"],
-            environment: terminalEnvironment(inheriting: environment),
-            currentDirectoryURL: .homeDirectory
+            executableURL: URL(filePath: "/usr/bin/login"),
+            arguments: loginArguments(in: nil),
+            environment: terminalEnvironment(inheriting: environment)
         )
+    }
+
+    static var userName: String {
+        guard let name = getpwuid(getuid())?.pointee.pw_name else {
+            return NSUserName()
+        }
+        return String(cString: name)
     }
 
     private static var shellURL: URL {

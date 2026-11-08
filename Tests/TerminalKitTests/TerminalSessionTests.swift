@@ -7,11 +7,65 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct TerminalSessionTests {
-    @Test func startsTheLoginShellInTheHomeDirectory() {
+    @Test func startsTheLoginShellThroughLogin() {
         let configuration = TerminalSession.Configuration.loginShell
-        #expect(configuration.executableURL.path(percentEncoded: false).hasPrefix("/"))
-        #expect(configuration.arguments == ["-l"])
-        #expect(configuration.currentDirectoryURL == .homeDirectory)
+        #expect(configuration.executableURL == URL(filePath: "/usr/bin/login"))
+        #expect(configuration.arguments == ["-pf", TerminalSession.Configuration.userName])
+        #expect(configuration.currentDirectoryURL == nil)
+    }
+
+    @Test func startsTheLoginShellInAFolderThroughLogin() {
+        let user = TerminalSession.Configuration.userName
+        var configuration = TerminalSession.Configuration.loginShell
+        configuration.currentDirectoryURL = URL(filePath: "/tmp")
+        #expect(configuration.arguments == TerminalSession.Configuration.loginArguments(in: URL(filePath: "/tmp")))
+        #expect(configuration.arguments.prefix(4) == ["-pfl", user, "/bin/bash", "-c"])
+        configuration.currentDirectoryURL = nil
+        #expect(configuration.arguments == ["-pf", user])
+        #expect(configuration.isLoginShell)
+        #expect(
+            TerminalSession.Configuration.loginArguments(in: URL(filePath: "/tmp"), shellURL: URL(filePath: "/bin/zsh"))
+                == ["-pfl", user, "/bin/bash", "-c", "exec -la zsh /bin/zsh"])
+        #expect(
+            TerminalSession.Configuration.loginArguments(
+                in: URL(filePath: "/tmp"), shellURL: URL(filePath: "/a b/it's"))
+                == ["-pfl", user, "/bin/bash", "-c", "exec -la 'it'\\''s' '/a b/it'\\''s'"])
+    }
+
+    @Test func keepsTheArgumentsOfTheHostInAFolder() {
+        var configuration = TerminalSession.Configuration.loginShell
+        configuration.arguments = ["-pfq", "user", "/bin/sh"]
+        configuration.currentDirectoryURL = URL(filePath: "/tmp")
+        #expect(configuration.arguments == ["-pfq", "user", "/bin/sh"])
+        #expect(!configuration.isLoginShell)
+        var other = TerminalSession.Configuration.loginShell
+        other.executableURL = URL(filePath: "/bin/zsh")
+        other.currentDirectoryURL = URL(filePath: "/tmp")
+        #expect(other.arguments == ["-pf", TerminalSession.Configuration.userName])
+        #expect(!other.isLoginShell)
+    }
+
+    @Test func runsTheShellInTheFolderThroughLogin() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let shell = folder.appending(path: "shell")
+        try Data("#!/bin/sh\necho \"in ${PWD##*/} as $USER\"\n".utf8).write(to: shell)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: shell.path(percentEncoded: false))
+        let arguments = TerminalSession.Configuration.loginArguments(in: folder, shellURL: shell)
+        try #require(arguments.first == "-pfl")
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/usr/bin/login"),
+                arguments: arguments,
+                environment: ["PATH": "/usr/bin:/bin"],
+                currentDirectoryURL: folder
+            ))
+        try session.start()
+        let lines = await session.linesAfterExit()
+        #expect(lines.contains("in \(folder.lastPathComponent) as \(TerminalSession.Configuration.userName)"))
+        #expect(session.state == .exited(.exit(0)))
     }
 
     @Test func describesTheTerminalToTheLoginShell() {
@@ -109,28 +163,32 @@ struct TerminalSessionTests {
     }
 
     @Test func runsTheCommandInTheInteractiveLoginShell() {
-        let configuration = TerminalSession.Configuration.loginShell(running: ["claude", "--resume", "it's"])
+        let configuration = TerminalSession.Configuration.loginShell(
+            running: ["claude", "--resume", "it's"], shellURL: URL(filePath: "/bin/zsh"))
         let loginShell = TerminalSession.Configuration.loginShell
         #expect(configuration.executableURL == loginShell.executableURL)
-        #expect(configuration.arguments == ["-l", "-i", "-c", "exec -- 'claude' '--resume' 'it'\\''s'"])
+        #expect(
+            configuration.arguments == [
+                "-pfql", TerminalSession.Configuration.userName, "/bin/zsh", "-l", "-i", "-c",
+                "exec -- 'claude' '--resume' 'it'\\''s'",
+            ])
         #expect(configuration.environment == loginShell.environment)
-        #expect(configuration.currentDirectoryURL == loginShell.currentDirectoryURL)
+        #expect(configuration.currentDirectoryURL == .homeDirectory)
         #expect(loginShell.isLoginShell)
         #expect(!configuration.isLoginShell)
     }
 
     @Test func quotesTheBackslashesForFish() {
         let fish = URL(filePath: "/opt/homebrew/bin/fish")
-        let configuration = TerminalSession.Configuration.loginShell(
+        let arguments = TerminalSession.Configuration.shellArguments(
             running: ["printf", "a\\b", "dir\\", "it's"], shellURL: fish)
-        #expect(configuration.executableURL == fish)
-        #expect(configuration.arguments == ["-l", "-i", "-c", "exec -- 'printf' 'a\\\\b' 'dir\\\\' 'it'\\''s'"])
+        #expect(arguments == ["-l", "-i", "-c", "exec -- 'printf' 'a\\\\b' 'dir\\\\' 'it'\\''s'"])
     }
 
     @Test func keepsTheBackslashesForZsh() {
-        let configuration = TerminalSession.Configuration.loginShell(
+        let arguments = TerminalSession.Configuration.shellArguments(
             running: ["printf", "a\\b", "dir\\"], shellURL: URL(filePath: "/bin/zsh"))
-        #expect(configuration.arguments == ["-l", "-i", "-c", "exec -- 'printf' 'a\\b' 'dir\\'"])
+        #expect(arguments == ["-l", "-i", "-c", "exec -- 'printf' 'a\\b' 'dir\\'"])
     }
 
     @Test func startsIdle() {
@@ -341,12 +399,17 @@ private func runInZsh(_ command: [String], startup: String = "") async throws ->
     try Data("#!/bin/sh\necho found\n".utf8).write(to: tool)
     try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tool.path(percentEncoded: false))
     try Data(startup.utf8).write(to: home.appending(path: ".zshrc"))
-    var configuration = TerminalSession.Configuration.loginShell(running: command)
-    configuration.executableURL = URL(filePath: "/bin/zsh")
-    configuration.environment = TerminalSession.Configuration.terminalEnvironment(
-        inheriting: ["HOME": home.path(percentEncoded: false), "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"])
-    configuration.currentDirectoryURL = tool.deletingLastPathComponent()
-    let session = TerminalSession(configuration: configuration)
+    let zsh = URL(filePath: "/bin/zsh")
+    let session = TerminalSession(
+        configuration: .init(
+            executableURL: zsh,
+            arguments: TerminalSession.Configuration.shellArguments(running: command, shellURL: zsh),
+            environment: TerminalSession.Configuration.terminalEnvironment(
+                inheriting: [
+                    "HOME": home.path(percentEncoded: false), "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin",
+                ]),
+            currentDirectoryURL: tool.deletingLastPathComponent()
+        ))
     try session.start()
     await session.waitForExit()
     return session

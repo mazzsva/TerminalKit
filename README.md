@@ -66,4 +66,4 @@ macOS gives microphone access to the host app, not to the program in the termina
 
 **Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts.
 
-**Never touches the shell.** There are no shell integration scripts and no changes to startup files. The host gets the user's own login shell, with the same `PATH` as in Terminal. Programs see `TERM_PROGRAM=Apple_Terminal`, so they act as in Terminal, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file.
+**Never touches the shell.** There are no shell integration scripts and no changes to startup files. As in Terminal, the user's own shell starts through `/usr/bin/login -pf`. Programs see `TERM_PROGRAM=Apple_Terminal`, so they act as in Terminal, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file.
