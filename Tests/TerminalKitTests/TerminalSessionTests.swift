@@ -65,7 +65,16 @@ struct TerminalSessionTests {
         try session.start()
         let lines = await session.linesAfterExit()
         #expect(lines.contains("in \(folder.lastPathComponent) as \(TerminalSession.Configuration.userName)"))
+        #expect(lines.contains("[Process completed]"))
         #expect(session.state == .exited(.exit(0)))
+    }
+
+    @Test func showsTheProcessCompletedTextAfterTheProcessExits() async throws {
+        let session = TerminalSession(running: "printf abc; exit 3")
+        session.showsProcessCompletion = true
+        try session.start()
+        #expect(await session.linesAfterExit().prefix(3) == ["abc", "[Process completed]", ""])
+        #expect(session.state == .exited(.exit(3)))
     }
 
     @Test func describesTheTerminalToTheLoginShell() {

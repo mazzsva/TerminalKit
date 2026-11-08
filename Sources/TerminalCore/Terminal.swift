@@ -307,6 +307,26 @@ package struct Terminal: Sendable {
         eraseInDisplay(3)
     }
 
+    package mutating func completeProcess() {
+        moveToNextScreenRow()
+        let text = "[Process completed]".unicodeScalars
+            .map { $0 == " " ? .writtenSpace() : Cell(scalar: $0) }
+        screen[cursor.row].insert(contentsOf: text, at: 0)
+        moveToNextScreenRow()
+    }
+
+    private mutating func moveToNextScreenRow() {
+        carriageReturn()
+        guard cursor.row == rows - 1 else {
+            cursor.row += 1
+            return
+        }
+        if normalScreen == nil {
+            keepInScrollback(screen.prefix(1))
+        }
+        scrollUp(1, in: 0 ..< rows)
+    }
+
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
         if sequence.privateMarker == nil, sequence.intermediates == " ", sequence.final == "q" {
             setCursorShape(sequence.parameter(at: 0, default: 0))
