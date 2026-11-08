@@ -34,6 +34,7 @@ public final class TerminalSession {
     @ObservationIgnored private var isSized = false
     @ObservationIgnored private var cellSize = CGSize(width: 7, height: 15)
     @ObservationIgnored private var waitingInput: [UInt8]?
+    @ObservationIgnored var showsProcessCompletion = true
 
     @ObservationIgnored private(set) var pseudoTerminal: PseudoTerminal?
 
@@ -164,6 +165,9 @@ public final class TerminalSession {
     private func finish() {
         guard let termination = pseudoTerminal?.termination else {
             return
+        }
+        if showsProcessCompletion {
+            terminal.completeProcess()
         }
         state = .exited(Termination(termination))
         pseudoTerminal = nil
