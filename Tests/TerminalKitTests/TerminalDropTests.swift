@@ -56,6 +56,26 @@ struct TerminalDropTests {
         #expect(await session.linesAfterExit().contains("/   a   \\       b"))
     }
 
+    @Test func asksAfterTheDropBeforeItPastesControlCharacters() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        var alerts = 0
+        view.presentsAlert = { _, _ in
+            alerts += 1
+            return .alertSecondButtonReturn
+        }
+        try session.start()
+        await session.waitForText("ready")
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        pasteboard.setString("a\u{1}bc", forType: .string)
+        #expect(view.performDragOperation(Drag(pasteboard: pasteboard)))
+        #expect(alerts == 0)
+        #expect(await session.linesAfterExit().contains("61  62  63"))
+        #expect(alerts == 1)
+    }
+
     @Test(arguments: [("/bin/zsh", ["-f"]), ("/bin/bash", ["--norc", "--noprofile"])])
     func givesTheShellTheExactPaths(shell: String, arguments: [String]) async throws {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))

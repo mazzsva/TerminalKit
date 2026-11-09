@@ -132,13 +132,22 @@ public final class TerminalSession {
         send(Array(text.utf8))
     }
 
+    static let pasteEnd = "\u{1B}[201~"
+
+    static func containsPasteEnd(_ text: String) -> Bool {
+        text.utf8.firstRange(of: pasteEnd.utf8) != nil
+    }
+
     public func paste(_ text: String) {
         let lines = text.replacing("\r\n", with: "\r").replacing("\n", with: "\r")
         guard terminal.usesBracketedPaste else {
             send(lines)
             return
         }
-        send("\u{1B}[200~\(lines.replacing("\u{1B}", with: ""))\u{1B}[201~")
+        guard !Self.containsPasteEnd(lines) else {
+            return
+        }
+        send("\u{1B}[200~\(lines)\(Self.pasteEnd)")
     }
 
     func clearToStart() {

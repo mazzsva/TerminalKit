@@ -28,8 +28,61 @@ struct TerminalPasteTests {
     }
 
     @Test func bracketsThePasteInBracketedPasteMode() async throws {
-        let bytes = try await pastedBytes("a\u{1B}[201~b", mode: "\\033[?2004h", count: 15)
-        #expect(bytes == "1b  5b  32  30  30  7e  61  5b  32  30  31  7e  62  1b  5b")
+        let bytes = try await pastedBytes("a\u{1B}\u{1}b\u{1B}[200~c", mode: "\\033[?2004h", count: 16)
+        #expect(bytes == "1b  5b  32  30  30  7e  61  1b  01  62  1b  5b  32  30  30  7e")
+    }
+
+    @Test(arguments: ["a\u{1B}[201~b", "a\u{1B}[201~\u{301}b", "a\u{1B}[201~\u{200D}b", "a\u{1B}[201~\u{FE0F}b"])
+    func refusesTheEndMarkerInBracketedPasteMode(text: String) async throws {
+        let (view, session) = try startedView(
+            running: "printf '\\033[?2004h'; stty raw -echo; echo ready; head -c 1 | od -An -tx1")
+        var alerts: [String] = []
+        view.presentsAlert = { alert, _ in
+            alerts.append(alert.messageText)
+            return .alertFirstButtonReturn
+        }
+        await session.waitForText("ready")
+        let pasteboard = pasteboard(containing: text)
+        defer { pasteboard.releaseGlobally() }
+        view.paste(from: pasteboard)
+        session.paste(text)
+        session.send("x")
+        #expect(await session.linesAfterExit().contains("78"))
+        #expect(alerts.count == 1 && alerts[0].hasPrefix("You cannot send the text"))
+    }
+
+    @Test(arguments: [
+        (
+            NSApplication.ModalResponse.alertFirstButtonReturn,
+            "61  01  62  1b  63  7f  64  c2  9b  65  09  0d  0b  0c  c2  85"
+        ),
+        (.alertSecondButtonReturn, "61  62  63  64  65  09  0d  0b  0c  c2  85  78"), (.cancel, "78"),
+    ])
+    func asksBeforeItPastesControlCharacters(response: NSApplication.ModalResponse, bytes: String) async throws {
+        let count = bytes.split(separator: " ").count
+        let (view, session) = try startedView(running: "stty raw -echo; echo ready; head -c \(count) | od -An -tx1")
+        var buttons: [[String]] = []
+        view.presentsAlert = { alert, _ in
+            buttons.append(alert.buttons.map(\.title))
+            return response
+        }
+        await session.waitForText("ready")
+        let pasteboard = pasteboard(containing: "a\u{1}b\u{1B}c\u{7F}d\u{9B}e\t\n\u{B}\u{C}\u{85}")
+        defer { pasteboard.releaseGlobally() }
+        view.paste(from: pasteboard)
+        session.send("x")
+        #expect(await session.linesAfterExit().contains(bytes))
+        #expect(buttons == [["Paste", "Paste without Control Characters", "Cancel"]])
+    }
+
+    @Test func pastesWhitespaceControlsWithoutAsking() async throws {
+        let (view, session) = try startedView(running: "stty raw -echo; echo ready; head -c 7 | od -An -tx1")
+        view.presentsAlert = { _, _ in .cancel }
+        await session.waitForText("ready")
+        let pasteboard = pasteboard(containing: "\t\n\u{B}\u{C}\r\u{85}")
+        defer { pasteboard.releaseGlobally() }
+        view.paste(from: pasteboard)
+        #expect(await session.linesAfterExit().contains("09  0d  0b  0c  0d  c2  85"))
     }
 
     @Test func pastesWithoutBracketsAfterTheModeEnds() async throws {
