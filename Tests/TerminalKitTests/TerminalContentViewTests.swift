@@ -982,11 +982,11 @@ struct TerminalContentViewTests {
     }
 
     @Test(arguments: [
-        (NSEvent.ModifierFlags([.control, .option]), "1b  5b  31  3b  37  44  1b  5b  31  3b  37  43  78"),
-        (NSEvent.ModifierFlags([.shift, .option]), "1b  5b  31  3b  34  44  1b  5b  31  3b  34  43  78"),
+        (NSEvent.ModifierFlags([.control, .option]), "1b  5b  44  1b  5b  43  78"),
+        (NSEvent.ModifierFlags([.shift, .option]), "1b  5b  44  1b  5b  43  78"),
     ])
     func sendsTheOtherModifiersOfTheOptionArrows(modifierFlags: NSEvent.ModifierFlags, bytes: String) async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 13 | od -An -tx1")
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 7 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -996,8 +996,8 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains(bytes))
     }
 
-    @Test func sendsControlKeysThatTheInputSystemDrops() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
+    @Test func sendsNothingForControlKeysWithoutAControlCharacter() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 1 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -1005,7 +1005,7 @@ struct TerminalContentViewTests {
             view.keyDown(with: try keyDown(key, modifierFlags: .control))
         }
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("1f  00  1e  7f  78"))
+        #expect(await session.linesAfterExit().contains("78"))
     }
 
     @Test func leavesControlKeysToTheMarkedText() async throws {
@@ -1138,7 +1138,7 @@ struct TerminalContentViewTests {
     }
 
     @Test func sendsAKeyWithTwoCommandsOnce() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 7 | od -An -tx1")
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 4 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -1159,11 +1159,11 @@ struct TerminalContentViewTests {
         )
         view.keyDown(with: optionUp)
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("1b  5b  31  3b  33  41  78"))
+        #expect(await session.linesAfterExit().contains("1b  5b  41  78"))
     }
 
-    @Test func doesNotSendCommandKeys() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; dd bs=1 count=1 2>/dev/null | od -An -tx1")
+    @Test func sendsOnlyTheReturnOfTheseCommandKeys() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; dd bs=1 count=2 2>/dev/null | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -1174,11 +1174,67 @@ struct TerminalContentViewTests {
         view.keyDown(with: try keyDown("C", modifierFlags: [.command, .shift], keyCode: 8))
         view.keyDown(with: try keyDown("\r", modifierFlags: .command))
         view.keyDown(with: try keyDown("a"))
-        #expect(await session.linesAfterExit().contains("61"))
+        #expect(await session.linesAfterExit().contains("0d  61"))
     }
 
-    @Test func sendsControlUForCommandDelete() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
+    @Test func switchesTheKeypadModeWithTheClearKey() async throws {
+        let session = TerminalSession(running: "printf '\\033='; stty raw -echo; echo ready; head -c 10 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        let clear = String(try #require(UnicodeScalar(NSClearLineFunctionKey)))
+        view.keyDown(with: try keyDown("0", modifierFlags: .numericPad, keyCode: 82))
+        view.keyDown(with: try keyDown(clear, modifierFlags: [.numericPad, .shift], keyCode: 71))
+        view.keyDown(with: try keyDown("0", modifierFlags: .numericPad, keyCode: 82))
+        view.keyDown(with: try keyDown(clear, modifierFlags: .numericPad, keyCode: 71))
+        view.keyDown(with: try keyDown("0", modifierFlags: .numericPad, keyCode: 82))
+        view.keyDown(with: try keyDown(clear, modifierFlags: [.numericPad, .command], keyCode: 71))
+        view.keyDown(with: try keyDown("0", modifierFlags: .numericPad, keyCode: 82))
+        #expect(await session.linesAfterExit().contains("1b  4f  70  1b  4f  70  30  1b  4f  70"))
+    }
+
+    @Test func sendsControlTabAndControlEscapeAsKeyEquivalents() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        let window = NSWindow(contentView: view)
+        window.makeFirstResponder(view)
+        try session.start()
+        await session.waitForText("ready")
+        #expect(view.performKeyEquivalent(with: try keyDown("\t", modifierFlags: .control, keyCode: 48)))
+        #expect(
+            view.performKeyEquivalent(with: try keyDown("\u{1B}", modifierFlags: [.control, .option], keyCode: 53)))
+        #expect(!view.performKeyEquivalent(with: try keyDown("\t", modifierFlags: [.control, .command], keyCode: 48)))
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("09  1b  78"))
+    }
+
+    @Test func leavesControlTabToAMenuItem() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 1 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        let window = NSWindow(contentView: view)
+        window.makeFirstResponder(view)
+        try session.start()
+        await session.waitForText("ready")
+        let recorder = MenuActionRecorder()
+        let menu = NSMenu()
+        let item = menu.addItem(
+            withTitle: "Show Next Tab", action: #selector(MenuActionRecorder.record(_:)), keyEquivalent: "\t")
+        item.keyEquivalentModifierMask = .control
+        item.target = recorder
+        let mainMenu = NSApp.mainMenu
+        let holder = NSMenu()
+        holder.addItem(withTitle: "Window", action: nil, keyEquivalent: "").submenu = menu
+        NSApp.mainMenu = holder
+        let handled = view.performKeyEquivalent(with: try keyDown("\t", modifierFlags: .control, keyCode: 48))
+        NSApp.mainMenu = mainMenu
+        #expect(handled)
+        #expect(recorder.count == 1)
+        view.keyDown(with: try keyDown("x"))
+        #expect(await session.linesAfterExit().contains("78"))
+    }
+
+    @Test func sendsNothingForCommandDelete() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -1193,7 +1249,7 @@ struct TerminalContentViewTests {
         view.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
         view.unmarkText()
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("15  15  c2  b4  78"))
+        #expect(await session.linesAfterExit().contains("c2  b4  78"))
     }
 
     @Test func passesCommandKeysToTheNextResponder() throws {
@@ -1493,5 +1549,13 @@ private final class KeyRecorder: NSResponder {
 
     override func keyDown(with event: NSEvent) {
         keys.append(event.charactersIgnoringModifiers)
+    }
+}
+
+private final class MenuActionRecorder: NSObject {
+    var count = 0
+
+    @objc func record(_ sender: Any?) {
+        count += 1
     }
 }

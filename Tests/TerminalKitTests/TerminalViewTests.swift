@@ -359,8 +359,8 @@ struct TerminalViewTests {
             (NSEndFunctionKey, [.shift, .function], "", "1b  5b  46"),
             (NSPageUpFunctionKey, .function, "\\033[?1049h", "1b  5b  35  7e"),
             (NSPageDownFunctionKey, .function, "\\033[?1049h", "1b  5b  36  7e"),
-            (NSHomeFunctionKey, .function, "\\033[?1049h", "1b  4f  48"),
-            (NSEndFunctionKey, .function, "\\033[?1049h", "1b  4f  46"),
+            (NSHomeFunctionKey, .function, "\\033[?1049h", "1b  5b  48"),
+            (NSEndFunctionKey, .function, "\\033[?1049h", "1b  5b  46"),
             (NSPageUpFunctionKey, .function, "\\033[>1u", "1b  5b  35  7e"),
             (NSPageDownFunctionKey, .function, "\\033[>1u", "1b  5b  36  7e"),
             (NSHomeFunctionKey, .function, "\\033[>1u", "1b  5b  48"),
@@ -394,15 +394,6 @@ struct TerminalViewTests {
         #expect(hides == 0)
         scrollView.terminalView.keyDown(with: try keyDown("\r"))
         #expect(hides == 1)
-        await session.waitForExit()
-    }
-
-    @Test func scrollsToTheBottomForCommandDelete() async throws {
-        let (scrollView, session) = try await scrollView(running: "seq 1 50; read line")
-        scrollView.terminalView.scroll(.zero)
-        scrollView.terminalView.keyDown(with: try keyDown("\u{7F}", modifierFlags: .command))
-        #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
-        scrollView.terminalView.keyDown(with: try keyDown("\r"))
         await session.waitForExit()
     }
 

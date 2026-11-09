@@ -57,6 +57,7 @@ package struct Terminal: Sendable {
     package private(set) var removedScrollbackCount = 0
     package private(set) var cursor = Position(row: 0, column: 0)
     package private(set) var usesApplicationCursorKeys = false
+    package private(set) var usesApplicationKeypad = false
     package private(set) var usesBracketedPaste = false
     package private(set) var isCursorVisible = true
     package private(set) var cursorShape = CursorShape.block
@@ -280,6 +281,10 @@ package struct Terminal: Sendable {
                 characterSets[3] = final
             case .escape(intermediates: "#", final: "8"):
                 fillScreen()
+            case .escape(intermediates: "", final: "="):
+                usesApplicationKeypad = true
+            case .escape(intermediates: "", final: ">"):
+                usesApplicationKeypad = false
             case .escape(intermediates: "", final: "7"):
                 saveCursor()
             case .escape(intermediates: "", final: "8"):
@@ -765,6 +770,7 @@ package struct Terminal: Sendable {
         usesInsertMode = false
         usesNewLineMode = false
         usesApplicationCursorKeys = false
+        usesApplicationKeypad = false
         usesOriginMode = false
         usesReverseVideo = false
         tabStops = TabStops()

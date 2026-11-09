@@ -106,6 +106,7 @@ final class TerminalContentView: NSView {
     private var changedColorsCache: (changes: Terminal.ChangedColors, isReversed: Bool, colors: Colors)?
     private(set) var fonts = Fonts(defaultFont)
     private(set) var keyDownEvent: NSEvent?
+    var isNumLockOn = false
     private var bellTask: Task<Void, Never>?
     private var flagsMonitor: Any?
     private var lastBellDate: Date?
@@ -422,13 +423,25 @@ final class TerminalContentView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
         if markedText.isEmpty, !session.terminal.isAlternateScreenActive, scrollsView(for: event) {
             return
         }
-        let keyInput = markedText.isEmpty ? modifiedInput(event) ?? event.lineDeletionInput : nil
-        guard !event.modifierFlags.contains(.command) || keyInput != nil else {
-            if markedText.isEmpty, !session.terminal.isAlternateScreenActive,
-                event.modifierFlags.intersection([.shift, .control, .option, .command]) == .command,
+        if markedText.isEmpty, event.charactersIgnoringModifiers == "\u{F739}",
+            modifiers.isDisjoint(with: [.shift, .control, .option])
+        {
+            isNumLockOn.toggle()
+            return
+        }
+        let modifiedInput = markedText.isEmpty ? modifiedInput(event) : nil
+        let input = modifiedInput.map(TerminalKeyInput.bytes) ?? (markedText.isEmpty ? keyInput(event) : .text)
+        if case .scroll = input {
+            scrollView(for: event.specialKey)
+            return
+        }
+        let sendsBytes = if case .bytes = input { true } else { false }
+        guard !modifiers.contains(.command) || sendsBytes else {
+            if markedText.isEmpty, !session.terminal.isAlternateScreenActive, modifiers == .command,
                 event.charactersIgnoringModifiers == "k"
             {
                 session.clearToStart()
@@ -439,26 +452,47 @@ final class TerminalContentView: NSView {
         }
         hidePointer()
         scrollToBottom()
-        if markedText.isEmpty, let input = keyInput ?? encodedInput(event) {
+        switch input {
+        case .bytes(let bytes):
             insertedText = ""
-            session.send(input)
-            return
+            session.send(bytes)
+        case .nothing, .scroll:
+            insertedText = ""
+        case .text:
+            keyDownEvent = event
+            interpretKeyEvents([event])
+            keyDownEvent = nil
         }
-        keyDownEvent = event
-        interpretKeyEvents([event])
-        keyDownEvent = nil
     }
 
-    func encodedInput(_ event: NSEvent) -> [UInt8]? {
-        modifiedInput(event) ?? event.controlInput
-            ?? (usesOptionAsMetaKey && event.modifierFlags.contains(.option)
-                ? event.metaInput(applicationCursorKeys: session.terminal.usesApplicationCursorKeys) : nil)
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
+        guard window?.firstResponder === self, modifiers.contains(.control), !modifiers.contains(.command),
+            let key = event.charactersIgnoringModifiers, ["\t", "\u{19}", "\u{1B}"].contains(key)
+        else {
+            return super.performKeyEquivalent(with: event)
+        }
+        if NSApp.mainMenu?.performKeyEquivalent(with: event) == true {
+            return true
+        }
+        keyDown(with: event)
+        return true
     }
 
-    private func modifiedInput(_ event: NSEvent) -> [UInt8]? {
+    func modifiedInput(_ event: NSEvent) -> [UInt8]? {
         session.terminal.usesDisambiguatedKeys
             ? event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey)
             : event.otherKeyInput(level: session.terminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
+    }
+
+    func keyInput(_ event: NSEvent) -> TerminalKeyInput {
+        let terminal = session.terminal
+        return event.terminalKeyInput(
+            TerminalKeyModes(
+                usesOptionAsMetaKey: usesOptionAsMetaKey,
+                usesApplicationCursorKeys: terminal.usesApplicationCursorKeys,
+                usesApplicationKeypad: terminal.usesApplicationKeypad && !isNumLockOn,
+                isAlternateScreenActive: terminal.isAlternateScreenActive))
     }
 
     func scrollToBottom() {
@@ -467,19 +501,23 @@ final class TerminalContentView: NSView {
 
     private func scrollsView(for event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
-        guard
-            modifiers == .command || modifiers == [.command, .option]
-                || modifiers.isEmpty && !session.terminal.usesDisambiguatedKeys,
-            let clipView = superview as? NSClipView
-        else {
+        guard modifiers == .command || modifiers == [.command, .option] else {
+            return false
+        }
+        return scrollView(for: event.specialKey, byLine: modifiers.contains(.option))
+    }
+
+    @discardableResult
+    private func scrollView(for key: NSEvent.SpecialKey?, byLine: Bool = false) -> Bool {
+        guard let clipView = superview as? NSClipView else {
             return false
         }
         let insets = clipView.contentInsets
         let page = clipView.bounds.height - insets.top - insets.bottom - cellSize.height
-        let step = modifiers.contains(.option) ? cellSize.height : page
-        switch event.specialKey {
-        case .home where !modifiers.contains(.option): scroll(CGPoint(x: 0, y: -insets.top))
-        case .end where !modifiers.contains(.option): scrollToBottom()
+        let step = byLine ? cellSize.height : page
+        switch key {
+        case .home where !byLine: scroll(CGPoint(x: 0, y: -insets.top))
+        case .end where !byLine: scrollToBottom()
         case .pageUp: scroll(CGPoint(x: 0, y: clipView.bounds.minY - step))
         case .pageDown: scroll(CGPoint(x: 0, y: clipView.bounds.minY + step))
         default: return false
@@ -488,15 +526,18 @@ final class TerminalContentView: NSView {
     }
 
     override func doCommand(by selector: Selector) {
-        if let event = keyDownEvent,
-            let input = (markedText.isEmpty ? encodedInput(event) : nil) ?? event.wordMovementInput
-                ?? event.shiftedPageKeyInput
-                ?? event.terminalInput(
-                    applicationCursorKeys: session.terminal.usesApplicationCursorKeys,
-                    usesKeyMappings: !session.terminal.usesDisambiguatedKeys)
-        {
+        guard let event = keyDownEvent else {
+            return
+        }
+        let isFunctionKey = event.charactersIgnoringModifiers?.unicodeScalars.first
+            .map {
+                (0xF700 ... 0xF8FF).contains($0.value)
+            }
+        let usesModifiedInput = markedText.isEmpty || session.terminal.usesDisambiguatedKeys && isFunctionKey == true
+        let modifiedInput = usesModifiedInput ? modifiedInput(event) : nil
+        if case .bytes(let bytes) = modifiedInput.map(TerminalKeyInput.bytes) ?? keyInput(event) {
             insertedText = ""
-            session.send(input)
+            session.send(bytes)
             keyDownEvent = nil
         }
     }
