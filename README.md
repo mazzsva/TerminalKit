@@ -14,7 +14,7 @@ Native macOS terminal view for SwiftUI, built on AppKit.
 
 ## Quality gates
 
-- **Tests:** 939 [Swift Testing](https://github.com/swiftlang/swift-testing) tests cover every layer, and many run real programs in pseudo terminals. One test plays byte streams recorded from Terminal.app and compares the screen, the replies, and the title. `Scripts/record-terminal-app.py` records them again in a test window of its own.
+- **Tests:** 942 [Swift Testing](https://github.com/swiftlang/swift-testing) tests cover every layer, and many run real programs in pseudo terminals. One test plays byte streams recorded from Terminal.app and compares the screen, the replies, and the title. `Scripts/record-terminal-app.py` records them again in a test window of its own.
 - **CI:** GitHub Actions lints and runs the full suite on every pull request that is ready for review.
 - **Accessibility:** VoiceOver reads the terminal as a text area and gets a notification when the output changes.
 
@@ -46,6 +46,8 @@ struct ContentView: View {
 
 Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent before `start()` is dropped.
 
+As in Terminal, in bracketed paste mode `paste(_:)` sends nothing when the text contains the end marker `ESC [201~`.
+
 Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
 
 Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the session as Terminal.app, so the command changes the user's Terminal.app profile, not the host. For Option-Return as a new line, turn on `terminalOptionAsMetaKey(_:)`.
@@ -56,7 +58,7 @@ macOS gives microphone access to the host app, not to the program in the termina
 
 ## Engineering decisions
 
-**Terminal.app behavior.** The screen output, the replies, the colors, the font size, resize, and the login shell follow Terminal.app 2.15, as measured in Terminal.app. The modified keys come from its key table. TerminalKit also has two protocols that Terminal.app does not have, because the Claude Code docs use them: the kitty keyboard protocol (flag 1) and xterm's modifyOtherKeys.
+**Terminal.app behavior.** The screen output, the replies, the colors, the font size, resize, and the login shell follow Terminal.app 2.15, as measured in Terminal.app. Keys, the mouse, and paste were compared with the same events posted to Terminal.app. TerminalKit also has two protocols that Terminal.app does not have, because the Claude Code docs use them: the kitty keyboard protocol (flag 1) and xterm's modifyOtherKeys.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 7,000 lines of Swift and C on POSIX and AppKit APIs.
 
@@ -74,5 +76,5 @@ macOS gives microphone access to the host app, not to the program in the termina
 
 - Terminal.app draws with its private SF Mono Terminal font. TerminalKit uses the 12 pt system monospaced font in the same 7 by 15 point cell, so some glyph shapes differ a little.
 - Terminal.app leaves gaps and overlaps in some right-to-left text. TerminalKit does not copy them.
-- Keys follow the Terminal.app key table. Keys, the mouse, and paste are not yet compared with typed input in Terminal.app.
+- In bracketed paste mode, Terminal.app pastes the end marker `ESC [201~` when a combining mark follows it, so the pasted text can end the paste early. TerminalKit refuses this text too.
 - With about 1,000,000 saved lines of wrapped text that mixes wide characters and tabs, one resize step takes about 0.7 s in a release build. Terminal.app takes about 60 ms.
