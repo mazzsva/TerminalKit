@@ -23,14 +23,14 @@ struct TerminalMouseTests {
     }
 
     @Test func reportsAMoveToAnotherCellInsideTheView() async throws {
-        let (view, session) = try await viewReading("head -c 20", modes: "?1003h\\033[?1006h")
+        let (view, session) = try await viewReading("head -c 30", modes: "?1003h\\033[?1006h")
         let window = NSWindow(contentView: view)
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 1, in: view))
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 2, in: view, modifierFlags: .function))
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: -5, in: view))
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 1, column: 3, in: view, modifierFlags: .control))
-        #expect(await session.linesAfterExit().contains("E[<35;2;1ME[<51;4;2M"))
+        #expect(await session.linesAfterExit().contains("E[<35;2;1ME[<35;3;2ME[<51;4;2M"))
         #expect(window.contentView === view)
     }
 
@@ -214,27 +214,103 @@ struct TerminalMouseTests {
     @Test func reportsAShiftClickWhenTheProcessUsesTheMouse() async throws {
         let (view, session) = try await viewReading("head -c 9", modes: "?1000h\\033[?1006h")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .shift))
-        #expect(await session.linesAfterExit().contains { $0.hasPrefix("E[<") && $0.hasSuffix(";2;1M") })
+        #expect(await session.linesAfterExit().contains("E[<4;2;1M"))
         #expect(view.selection == nil)
     }
 
+    @Test func reportsADragWithFnAfterAPressWithoutFn() async throws {
+        let (view, session) = try await viewReading("head -c 37", modes: "?1002h\\033[?1006h")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view))
+        view.mouseDragged(
+            with: try mouseEvent(.leftMouseDragged, row: 0, column: 2, in: view, modifierFlags: .function))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 0, column: 2, in: view, modifierFlags: .function))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 1, in: view, modifierFlags: .function))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 2, in: view))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 2, in: view))
+        view.rightMouseDown(with: try mouseEvent(.rightMouseDown, row: 1, column: 0, in: view))
+        #expect(await session.linesAfterExit().contains("E[<0;2;1ME[<32;3;1ME[<0;3;1mE[<2;1;2M"))
+    }
+
+    @Test func reportsAControlClickTwiceWithoutAMenu() async throws {
+        let (view, session) = try await viewReading("head -c 30", modes: "?1000h\\033[?1006h")
+        let press = try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .control)
+        #expect(view.menu(for: press) == nil)
+        view.mouseDown(with: press)
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 0, column: 1, in: view, modifierFlags: .control))
+        #expect(
+            view.menu(for: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .function)) != nil
+        )
+        #expect(await session.linesAfterExit().contains("E[<16;2;1ME[<16;2;1ME[<16;2;1m"))
+    }
+
+    @Test func keepsThePressOfEachButton() async throws {
+        let (view, session) = try await viewReading("head -c 54", modes: "?1002h\\033[?1006h")
+        let recorder = MouseEventRecorder()
+        view.nextResponder = recorder
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view))
+        view.otherMouseDown(with: try otherMouseEvent(.otherMouseDown, row: 0, column: 1, in: view, buttonNumber: 3))
+        view.rightMouseDown(with: try mouseEvent(.rightMouseDown, row: 0, column: 1, in: view))
+        view.rightMouseUp(with: try mouseEvent(.rightMouseUp, row: 0, column: 1, in: view))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 0, column: 1, in: view))
+        view.rightMouseDown(with: try mouseEvent(.rightMouseDown, row: 0, column: 1, in: view))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .function))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 4, in: view))
+        view.rightMouseUp(with: try mouseEvent(.rightMouseUp, row: 0, column: 1, in: view))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 0, column: 1, in: view))
+        #expect(recorder.types == [.otherMouseDown])
+        let reports = "E[<0;2;1ME[<2;2;1ME[<2;2;1mE[<0;2;1mE[<2;2;1ME[<2;2;1m"
+        #expect(await session.linesAfterExit().joined().contains(reports))
+    }
+
+    @Test func showsTheMenuForAControlClickInAWindowThatIsNotKey() async throws {
+        let (view, session) = try await viewReading("head -c 1", modes: "?1000h\\033[?1006h")
+        let window = NSWindow(contentView: view)
+        let press = try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .control)
+        #expect(!window.isKeyWindow)
+        #expect(view.menu(for: press) != nil)
+        session.send(Array("x".utf8))
+        #expect(await session.linesAfterExit().contains("x"))
+    }
+
+    @Test func scrollsTheViewForTheWheelWithFnWhenTheProcessUsesTheMouse() async throws {
+        let (view, session) = try await viewReading("head -c 10", modes: "?1000h\\033[?1006h")
+        let recorder = MouseEventRecorder()
+        view.nextResponder = recorder
+        view.scrollWheel(with: try scrollWheelEvent(lines: 1, modifierFlags: .function))
+        view.scrollWheel(with: try scrollWheelEvent(lines: -1, modifierFlags: .option))
+        #expect(recorder.types == [.scrollWheel])
+        #expect(await session.linesAfterExit().contains { $0.hasPrefix("E[<73;") })
+    }
+
     @Test func sendsTheCursorKeysForTheWheelOnTheAlternateScreen() async throws {
-        let (view, session) = try await viewReading("head -c 6", modes: "?1049h")
+        let (view, session) = try await viewReading("head -c 12", modes: "?1049h\\033[?1h")
         view.scrollWheel(with: try scrollWheelEvent(lines: 0, columns: 1))
         view.scrollWheel(with: try scrollWheelEvent(lines: 1))
-        view.scrollWheel(with: try scrollWheelEvent(lines: -1))
-        #expect(await session.linesAfterExit().contains("E[AE[B"))
+        view.scrollWheel(with: try scrollWheelEvent(lines: -1, modifierFlags: .control))
+        view.scrollWheel(with: try scrollWheelEvent(x: 0, y: 16))
+        #expect(await session.linesAfterExit().contains("EOAEOBEOAEOA"))
     }
 
     @Test func scrollsTheViewForTheWheelWithFnOrShiftOnTheAlternateScreen() async throws {
-        let (view, session) = try await viewReading("head -c 3", modes: "?1049h")
+        let (view, session) = try await viewReading("head -c 3", modes: "?1049h\\033[?1h")
         let recorder = MouseEventRecorder()
         view.nextResponder = recorder
         view.scrollWheel(with: try scrollWheelEvent(lines: 1, modifierFlags: .function))
         view.scrollWheel(with: try scrollWheelEvent(lines: -1, modifierFlags: .shift))
         view.scrollWheel(with: try scrollWheelEvent(lines: 1))
         #expect(recorder.types == [.scrollWheel, .scrollWheel])
-        #expect(await session.linesAfterExit().contains("E[A"))
+        #expect(await session.linesAfterExit().contains("EOA"))
+    }
+
+    @Test func scrollsTheViewForTheWheelOnTheAlternateScreenWithoutApplicationCursorKeys() async throws {
+        let (view, session) = try await viewReading("head -c 1", modes: "?1049h")
+        let recorder = MouseEventRecorder()
+        view.nextResponder = recorder
+        view.scrollWheel(with: try scrollWheelEvent(lines: 1))
+        view.scrollWheel(with: try scrollWheelEvent(lines: -1, modifierFlags: .option))
+        session.send(Array("x".utf8))
+        #expect(recorder.types == [.scrollWheel, .scrollWheel])
+        #expect(await session.linesAfterExit().contains("x"))
     }
 
     @Test func reportsTheWheel() async throws {
@@ -244,25 +320,27 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains { $0.hasPrefix("E[<65;") && $0.hasSuffix("M") })
     }
 
-    @Test(arguments: [(Int32(1), 66), (-1, 67)])
-    func reportsHorizontalScrolling(columns: Int32, button: Int) async throws {
+    @Test func reportsNoHorizontalScrolling() async throws {
         let (view, session) = try await viewReading(
             "/bin/bash -c 'read -r -d M; printf %sM \"$REPLY\"'", modes: "?1000h\\033[?1006h")
-        view.scrollWheel(with: try scrollWheelEvent(lines: 0, columns: columns))
-        #expect(await session.linesAfterExit().contains { $0.hasPrefix("E[<\(button);") && $0.hasSuffix("M") })
+        view.scrollWheel(with: try scrollWheelEvent(lines: 0, columns: 1))
+        view.scrollWheel(with: try scrollWheelEvent(lines: 0, columns: -1))
+        view.scrollWheel(with: try scrollWheelEvent(lines: -1))
+        #expect(await session.linesAfterExit().contains { $0.hasPrefix("E[<65;") && $0.hasSuffix("M") })
     }
 
-    @Test func reportsWholeColumnsOfHorizontalTrackpadScrolling() async throws {
+    @Test func reportsEachTrackpadEventAsWholeLines() async throws {
         let (view, session) = try await viewReading(
             "/bin/bash -c 'read -r -d x; printf %sx \"$REPLY\"'", modes: "?1000h\\033[?1006h")
-        view.scrollWheel(with: try scrollWheelEvent(x: 20))
-        view.scrollWheel(with: try scrollWheelEvent(x: 5))
+        view.scrollWheel(with: try scrollWheelEvent(x: 0, y: 4))
+        view.scrollWheel(with: try scrollWheelEvent(x: 0, y: -15))
+        view.scrollWheel(with: try scrollWheelEvent(x: 30, y: 0))
         session.send(Array("x".utf8))
-        let lines = await session.linesAfterExit()
-        #expect(lines.contains { $0.hasPrefix("E[<66;") && $0.hasSuffix("Mx") && $0.split(separator: "E").count == 3 })
+        let reports = await session.linesAfterExit().joined().split(separator: "E").dropFirst().map { $0.prefix(4) }
+        #expect(reports == ["[<64", "[<65", "[<65"])
     }
 
-    @Test func reportsBothAxesOfDiagonalTrackpadScrolling() async throws {
+    @Test func reportsOnlyTheVerticalAxisOfDiagonalTrackpadScrolling() async throws {
         let (view, session) = try await viewReading(
             "/bin/bash -c 'read -r -d x; printf %sx \"$REPLY\"'", modes: "?1000h\\033[?1006h")
         for _ in 0 ..< 2 {
@@ -270,7 +348,7 @@ struct TerminalMouseTests {
         }
         session.send(Array("x".utf8))
         let reports = await session.linesAfterExit().joined().split(separator: "E").dropFirst().map { $0.prefix(4) }
-        #expect(reports == ["[<64", "[<67", "[<64", "[<67"])
+        #expect(reports == ["[<64", "[<64", "[<64", "[<64"])
     }
 
     @Test(arguments: [("", "E[D"), ("\\033[?1h", "EOD")])
@@ -311,13 +389,37 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains("$ echo hellodone"))
     }
 
-    @Test(arguments: [("", 0), ("\\033[?1049h", 1)])
-    func movesNoCursorWithOptionOnAnotherLineOrTheAlternateScreen(modes: String, row: Int) async throws {
+    @Test(arguments: [
+        ("", 0, String(repeating: "E[D", count: 10) + "E[A"),
+        ("\\033[?1049h", 1, String(repeating: "E[D", count: 10) + "E[B"),
+        ("", 3, String(repeating: "E[D", count: 10) + "E[BE[B"),
+    ])
+    func movesTheCursorWithOptionToAnotherLineOrOnTheAlternateScreen(modes: String, row: Int, keys: String)
+        async throws
+    {
         let (view, session) = try await viewTyping("printf '\(modes)$ echo hello'")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row, column: 2.5, in: view, modifierFlags: .option))
         view.mouseUp(with: try mouseEvent(.leftMouseUp, row: row, column: 2.5, in: view, modifierFlags: .option))
         session.send(Array("done\n".utf8))
-        #expect(await session.linesAfterExit().contains("$ echo hellodone"))
+        #expect(await session.linesAfterExit().contains("$ echo hello" + keys + "done"))
+    }
+
+    @Test(arguments: [
+        ((6, 1), "E[AE[AE[CE[CE[C"), ((2, 1), "E[DE[AE[A"), ((2, 5), "E[DE[BE[B"),
+        ((10, 3), String(repeating: "E[C", count: 7)),
+    ])
+    func movesTheCursorWithOptionAsTerminal(target: (Int, Int), keys: String) async throws {
+        let count = keys.count
+        let session = TerminalSession(
+            running: "stty raw -echo; printf 'abc\\r\\ndefgh\\r\\nij'; head -c \(count) | tr '\\033' E")
+        let view = TerminalContentView(session: session)
+        view.fit(to: CGSize(width: 400, height: 300))
+        try session.start()
+        await session.waitForText("ij")
+        let (column, row) = (CGFloat(target.0) - 0.5, target.1 - 1)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row, column: column, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: row, column: column, in: view, modifierFlags: .option))
+        #expect(await session.linesAfterExit().contains("ij" + keys))
     }
 }
 

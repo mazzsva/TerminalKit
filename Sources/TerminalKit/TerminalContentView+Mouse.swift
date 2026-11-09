@@ -9,7 +9,7 @@ extension TerminalContentView {
             isOpeningLink = false
             return
         }
-        if reportsMouse(for: event) {
+        if releasesButton(0) {
             reportMouse(event, button: 0, isRelease: true)
         } else if event.modifierFlags.contains(.option), event.clickCount == 1, let clickLocation {
             moveCursor(to: convert(event.locationInWindow, from: nil), from: clickLocation)
@@ -17,7 +17,7 @@ extension TerminalContentView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        if reportsMouse(for: event) {
+        if pressesButton(2, for: event) {
             reportMouse(event, button: 2)
         } else {
             super.rightMouseDown(with: event)
@@ -25,7 +25,7 @@ extension TerminalContentView {
     }
 
     override func rightMouseDragged(with event: NSEvent) {
-        if reportsMouse(for: event) {
+        if reportsPressedButton(2) {
             reportDrag(event, button: 34)
         } else {
             super.rightMouseDragged(with: event)
@@ -33,7 +33,7 @@ extension TerminalContentView {
     }
 
     override func rightMouseUp(with event: NSEvent) {
-        if reportsMouse(for: event) {
+        if releasesButton(2) {
             reportMouse(event, button: 2, isRelease: true)
         } else {
             super.rightMouseUp(with: event)
@@ -41,7 +41,7 @@ extension TerminalContentView {
     }
 
     override func otherMouseDown(with event: NSEvent) {
-        if event.buttonNumber == 2, reportsMouse(for: event) {
+        if event.buttonNumber == 2, pressesButton(1, for: event) {
             reportMouse(event, button: 1)
         } else {
             super.otherMouseDown(with: event)
@@ -49,7 +49,7 @@ extension TerminalContentView {
     }
 
     override func otherMouseDragged(with event: NSEvent) {
-        if event.buttonNumber == 2, reportsMouse(for: event) {
+        if event.buttonNumber == 2, reportsPressedButton(1) {
             reportDrag(event, button: 33)
         } else {
             super.otherMouseDragged(with: event)
@@ -57,7 +57,7 @@ extension TerminalContentView {
     }
 
     override func otherMouseUp(with event: NSEvent) {
-        if event.buttonNumber == 2, reportsMouse(for: event) {
+        if event.buttonNumber == 2, releasesButton(1) {
             reportMouse(event, button: 1, isRelease: true)
         } else {
             super.otherMouseUp(with: event)
@@ -66,35 +66,37 @@ extension TerminalContentView {
 
     override func scrollWheel(with event: NSEvent) {
         let terminal = session.terminal
-        guard
-            terminal.mouseTracking != .off
-                || terminal.isAlternateScreenActive && event.modifierFlags.isDisjoint(with: [.function, .shift])
-        else {
-            super.scrollWheel(with: event)
-            return
-        }
-        scrollWheelLines +=
-            event.hasPreciseScrollingDeltas ? event.scrollingDeltaY / cellSize.height : event.scrollingDeltaY
-        let lines = Int(scrollWheelLines)
-        scrollWheelLines -= CGFloat(lines)
-        for _ in 0 ..< abs(lines) {
-            if terminal.mouseTracking != .off {
-                reportMouse(event, button: lines > 0 ? 64 : 65)
-            } else {
-                let cursorKey = terminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}["
-                session.send(Array((cursorKey + (lines > 0 ? "A" : "B")).utf8))
+        let bypasses = event.modifierFlags.contains(.function)
+        let lines = Int(abs(event.deltaY).rounded(.up))
+        if terminal.mouseTracking != .off, !bypasses {
+            for _ in 0 ..< lines {
+                reportMouse(event, button: event.deltaY > 0 ? 64 : 65)
             }
+        } else if terminal.isAlternateScreenActive, terminal.usesApplicationCursorKeys, !bypasses,
+            !event.modifierFlags.contains(.shift)
+        {
+            let key = event.deltaY > 0 ? "\u{1B}OA" : "\u{1B}OB"
+            session.send(Array(String(repeating: key, count: lines).utf8))
+        } else {
+            super.scrollWheel(with: event)
         }
-        guard terminal.mouseTracking != .off else {
-            return
+    }
+
+    func pressesButton(_ button: Int, for event: NSEvent) -> Bool {
+        guard reportsMouse(for: event) else {
+            reportedButtons.remove(button)
+            return false
         }
-        scrollWheelColumns +=
-            event.hasPreciseScrollingDeltas ? event.scrollingDeltaX / cellSize.width : event.scrollingDeltaX
-        let columns = Int(scrollWheelColumns)
-        scrollWheelColumns -= CGFloat(columns)
-        for _ in 0 ..< abs(columns) {
-            reportMouse(event, button: columns > 0 ? 66 : 67)
-        }
+        reportedButtons.insert(button)
+        return true
+    }
+
+    func reportsPressedButton(_ button: Int) -> Bool {
+        reportedButtons.contains(button) && session.terminal.mouseTracking != .off
+    }
+
+    func releasesButton(_ button: Int) -> Bool {
+        reportedButtons.remove(button) != nil && session.terminal.mouseTracking != .off
     }
 
     func reportsMouse(for event: NSEvent) -> Bool {
@@ -103,7 +105,7 @@ extension TerminalContentView {
 
     func reportMouse(_ event: NSEvent, button: Int, isRelease: Bool = false) {
         let position = mousePosition(of: event)
-        let modifiers = [(NSEvent.ModifierFlags.option, 8), (.control, 16)]
+        let modifiers = [(NSEvent.ModifierFlags.shift, 4), (.option, 8), (.control, 16)]
             .reduce(0) { event.modifierFlags.contains($1.0) ? $0 | $1.1 : $0 }
         lastMousePosition = position
         session.send(
@@ -127,7 +129,9 @@ extension TerminalContentView {
         let location = convert(event.locationInWindow, from: nil)
         let row = Int((location.y - Self.topPadding) / cellSize.height) - terminal.scrollback.count
         let column = Int((location.x - Self.padding) / cellSize.width)
-        let limit = session.terminal.usesSGRMouseEncoding ? Int.max : 222
+        let limit =
+            terminal.usesSGRMouseEncoding || terminal.usesURXVTMouseEncoding || terminal.usesUTF8MouseEncoding
+            ? Int.max : 222
         return Terminal.Position(
             row: min(max(row, 0), terminal.rows - 1, limit), column: min(max(column, 0), terminal.columns - 1, limit))
     }

@@ -72,6 +72,8 @@ package struct Terminal: Sendable {
     package internal(set) var changedColors = ChangedColors()
     package var windowReport = WindowReport()
     package private(set) var usesSGRMouseEncoding = false
+    package private(set) var usesUTF8MouseEncoding = false
+    package private(set) var usesURXVTMouseEncoding = false
     package private(set) var modifyOtherKeys = 0
 
     package var normalScreenLines: [Line] {
@@ -913,8 +915,12 @@ package struct Terminal: Sendable {
             mouseTracking = .off
         case (1004, _):
             usesFocusReporting = isEnabled
+        case (1005, _):
+            usesUTF8MouseEncoding = isEnabled
         case (1006, _):
             usesSGRMouseEncoding = isEnabled
+        case (1015, _):
+            usesURXVTMouseEncoding = isEnabled
         case (2004, _):
             usesBracketedPaste = isEnabled
         case (47, true):

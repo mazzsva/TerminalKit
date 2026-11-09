@@ -125,6 +125,10 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        if event.type == .leftMouseDown, window?.isKeyWindow != false, reportsMouse(for: event) {
+            reportMouse(event, button: 0)
+            return nil
+        }
         let menu = NSMenu()
         menu.items = [#selector(copy(_:)), #selector(paste(_:))]
             .compactMap { action in
