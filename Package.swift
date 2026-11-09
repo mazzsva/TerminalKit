@@ -38,6 +38,7 @@ let package = Package(
         .testTarget(
             name: "TerminalKitTests",
             dependencies: ["TerminalKit"],
+            resources: [.copy("Recordings")],
             swiftSettings: swiftSettings,
         ),
     ]

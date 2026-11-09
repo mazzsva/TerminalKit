@@ -3,7 +3,18 @@ import AppKit
 extension TerminalContentView: NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
         let characters = text(of: string)
-        let input = hasMarkedText() || characters != keyDownEvent?.characters ? nil : keyDownEvent.flatMap(encodedInput)
+        let input: [UInt8]? =
+            if hasMarkedText() || characters != keyDownEvent?.characters {
+                nil
+            } else if let event = keyDownEvent {
+                switch modifiedInput(event).map(TerminalKeyInput.bytes) ?? keyInput(event) {
+                case .bytes(let bytes): bytes
+                case .nothing, .scroll: []
+                case .text: nil
+                }
+            } else {
+                nil
+            }
         let deletions = deletions(replacing: replacementRange)
         insertedText = hasMarkedText() ? "" : characters
         markedString = NSAttributedString()

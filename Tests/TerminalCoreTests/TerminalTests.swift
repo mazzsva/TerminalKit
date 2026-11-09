@@ -1840,6 +1840,21 @@ struct TerminalTests {
         #expect(!terminal.usesApplicationCursorKeys)
     }
 
+    @Test func setsTheApplicationKeypadMode() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(!terminal.usesApplicationKeypad)
+        terminal.receive("\u{1B}=")
+        #expect(terminal.usesApplicationKeypad)
+        terminal.receive("\u{1B}[?1049h\u{1B}[?1049l")
+        #expect(terminal.usesApplicationKeypad)
+        terminal.receive("\u{1B}>")
+        #expect(!terminal.usesApplicationKeypad)
+        terminal.receive("\u{1B}=\u{1B}[!p")
+        #expect(!terminal.usesApplicationKeypad)
+        terminal.receive("\u{1B}=\u{1B}c")
+        #expect(!terminal.usesApplicationKeypad)
+    }
+
     @Test func keepsTheLinesThatScrollOffTheScreen() {
         var terminal = Terminal(columns: 1, rows: 2)
         terminal.receive("a\r\nb\r\nc\r\nd")

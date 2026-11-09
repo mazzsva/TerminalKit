@@ -1,65 +1,163 @@
 import AppKit
 
+enum TerminalKeyInput: Equatable {
+    case bytes([UInt8])
+    case nothing
+    case scroll
+    case text
+}
+
+struct TerminalKeyModes {
+    var usesOptionAsMetaKey = false
+    var usesApplicationCursorKeys = false
+    var usesApplicationKeypad = false
+    var isAlternateScreenActive = false
+}
+
 extension NSEvent {
-    var wordMovementInput: [UInt8]? {
-        guard modifierFlags.intersection([.shift, .control, .option, .command]) == .option,
-            let key = charactersIgnoringModifiers?.unicodeScalars.first
-        else {
-            return nil
+    func terminalKeyInput(_ modes: TerminalKeyModes) -> TerminalKeyInput {
+        let flags = modifierFlags
+        guard let key = charactersIgnoringModifiers?.unicodeScalars.first?.value else {
+            return .text
         }
-        return switch NSEvent.SpecialKey(rawValue: Int(key.value)) {
-        case .leftArrow: [0x1B, 0x62]
-        case .rightArrow: [0x1B, 0x66]
-        default: nil
+        let modifiers = Self.mappingModifiers(flags)
+        if flags.contains(.command) {
+            if let sequence = Self.keyMappings[key]?[modifiers],
+                !(flags.contains(.shift)
+                    && [UInt32(NSLeftArrowFunctionKey), UInt32(NSRightArrowFunctionKey)].contains(key))
+            {
+                return .bytes(Array(sequence.utf8))
+            }
+            return key == 0x0D ? returnInput(modes) : .nothing
         }
+        if let sequence = Self.keyMappings[key]?[modifiers] {
+            return .bytes(Array(sequence.utf8))
+        }
+        let shift = flags.contains(.shift)
+        let control = flags.contains(.control)
+        let meta = flags.contains(.option) && modes.usesOptionAsMetaKey
+        let cursor = modes.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}["
+        switch key {
+        case 0xF700 ... 0xF703:
+            let sequence = cursor + ["A", "B", "D", "C"][Int(key - 0xF700)]
+            return .bytes(Array(((meta ? "\u{1B}" : "") + sequence).utf8))
+        case 0xF729, 0xF72B, 0xF72C, 0xF72D:
+            guard shift != modes.isAlternateScreenActive else {
+                return .scroll
+            }
+            if meta {
+                return metaInput(of: key, shift: shift, control: control)
+            }
+            let sequence =
+                switch key {
+                case 0xF729: cursor + "H"
+                case 0xF72B: cursor + "F"
+                case 0xF72C: "\u{1B}[5~"
+                default: "\u{1B}[6~"
+                }
+            return .bytes(Array(sequence.utf8))
+        case 0xF700 ... 0xF8FF:
+            return meta ? metaInput(of: key, shift: shift, control: control) : .nothing
+        case 0x0D:
+            return returnInput(modes)
+        case 0x03:
+            if meta {
+                return .bytes([0x1B, 0x03])
+            }
+            return .bytes(modes.usesApplicationKeypad ? [0x1B, 0x4F, 0x4D] : [0x0D])
+        case 0x09, 0x19:
+            return .bytes((meta ? [0x1B] : []) + (shift ? [0x1B, 0x5B, 0x5A] : [0x09]))
+        case 0x7F:
+            return .bytes(meta ? [0x1B, shift || control ? 0x08 : 0x7F] : [0x7F])
+        case 0x1B:
+            return .bytes(meta ? [0x1B, 0x1B] : [0x1B])
+        case 0x20:
+            return meta ? .bytes([0x1B, 0x20]) : control ? .bytes([0x00]) : .text
+        default:
+            break
+        }
+        if flags.contains(.numericPad) {
+            if meta {
+                return .bytes([0x1B] + Array(charactersIgnoringModifiers?.utf8 ?? "".utf8))
+            }
+            if modes.usesApplicationKeypad, let final = Self.keypadFinals[key] {
+                return .bytes([0x1B, 0x4F, final])
+            }
+            if modifiers == 0 {
+                return .text
+            }
+            return modifiers == 2 ? .nothing : .bytes(Array((charactersIgnoringModifiers ?? "").utf8))
+        }
+        if meta {
+            let text = control ? characters(byApplyingModifiers: .control) : charactersIgnoringModifiers
+            return .bytes([0x1B] + Array((text ?? "").utf8))
+        }
+        guard control else {
+            return .text
+        }
+        guard !flags.contains(.option) else {
+            return .bytes(Array((characters ?? "").utf8))
+        }
+        let scalars = Array((characters ?? "").unicodeScalars)
+        if shift, Character(UnicodeScalar(key) ?? " ").isLetter {
+            return scalars == ["\r"] ? .bytes([0x1B, 0x0D]) : .nothing
+        }
+        guard scalars.count == 1, scalars[0].value < 0x20 || scalars[0].value == 0x7F else {
+            return .nothing
+        }
+        return .bytes([UInt8(scalars[0].value)])
     }
 
-    var shiftedPageKeyInput: [UInt8]? {
-        guard modifierFlags.intersection([.shift, .control, .option, .command]) == .shift else {
-            return nil
+    private func returnInput(_ modes: TerminalKeyModes) -> TerminalKeyInput {
+        let flags = modifierFlags
+        if flags.contains(.option) && modes.usesOptionAsMetaKey {
+            return .bytes([0x1B, 0x0D])
         }
-        return switch specialKey {
-        case .pageUp: [0x1B, 0x5B, 0x35, 0x7E]
-        case .pageDown: [0x1B, 0x5B, 0x36, 0x7E]
-        case .home: [0x1B, 0x5B, 0x48]
-        case .end: [0x1B, 0x5B, 0x46]
-        default: nil
+        if flags.contains(.control) && !flags.contains(.option) && !flags.contains(.command) {
+            return .text
         }
+        return .bytes(flags.contains(.shift) ? [0x1B, 0x0D] : [0x0D])
     }
 
-    var lineDeletionInput: [UInt8]? {
-        modifierFlags.intersection([.control, .option, .command]) == .command && charactersIgnoringModifiers == "\u{7F}"
-            ? [0x15] : nil
+    private func metaInput(of key: UInt32, shift: Bool, control: Bool) -> TerminalKeyInput {
+        guard shift || control else {
+            return .bytes([0x1B, UInt8(key & 0xFF)])
+        }
+        let text = characters(byApplyingModifiers: modifierFlags.intersection([.shift, .control])) ?? ""
+        return .bytes([0x1B] + Array(text.utf8))
     }
 
-    var controlInput: [UInt8]? {
-        guard modifierFlags.intersection([.control, .option, .command]) == .control,
-            let characters = charactersIgnoringModifiers, characters.unicodeScalars.count == 1,
-            let key = characters.unicodeScalars.first
-        else {
-            return nil
-        }
-        return switch key {
-        case "2", "@", " ": [0x00]
-        case "3": [0x1B]
-        case "4": [0x1C]
-        case "5": [0x1D]
-        case "6", "^": [0x1E]
-        case "7", "/", "-", "_": [0x1F]
-        case "8", "?": [0x7F]
-        case "a" ... "z", "A" ... "Z", "[", "\\", "]": [UInt8(key.value) & 0x1F]
-        default: nil
-        }
+    private static func mappingModifiers(_ flags: ModifierFlags) -> Int {
+        (flags.contains(.shift) ? 1 : 0) | (flags.contains(.control) ? 2 : 0) | (flags.contains(.option) ? 4 : 0)
     }
 
-    func metaInput(applicationCursorKeys: Bool) -> [UInt8]? {
-        guard let key = charactersIgnoringModifiers?.unicodeScalars.first, !(0xF700 ... 0xF8FF).contains(key.value)
-        else {
-            return nil
+    private static let keypadFinals: [UInt32: UInt8] = [
+        0x30: 0x70, 0x31: 0x71, 0x32: 0x72, 0x33: 0x73, 0x34: 0x74, 0x35: 0x75, 0x36: 0x76, 0x37: 0x77, 0x38: 0x78,
+        0x39: 0x79, 0x2E: 0x6E, 0x2B: 0x6C, 0x2D: 0x6D,
+    ]
+
+    private static let keyMappings: [UInt32: [Int: String]] = {
+        var mappings: [UInt32: [Int: String]] = [:]
+        let functionNumbers = [15, 17, 18, 19, 20, 21, 23, 24, 25, 26, 28, 29, 31, 32, 33, 34]
+        for (index, final) in ["P", "Q", "R", "S"].enumerated() {
+            mappings[UInt32(NSF1FunctionKey + index), default: [:]][0] = "\u{1B}O\(final)"
         }
-        let characters = characters(byApplyingModifiers: modifierFlags.subtracting(.option))
-        return terminalInput(characters: characters, applicationCursorKeys: applicationCursorKeys).map { [0x1B] + $0 }
-    }
+        for (index, number) in functionNumbers.enumerated() {
+            mappings[UInt32(NSF5FunctionKey + index), default: [:]][0] = "\u{1B}[\(number)~"
+        }
+        for index in 0 ..< 8 {
+            mappings[UInt32(NSF5FunctionKey + index), default: [:]][1] = "\u{1B}[\(functionNumbers[index + 8])~"
+        }
+        for index in 0 ..< 15 {
+            mappings[UInt32(NSF1FunctionKey + index), default: [:]][4] = "\u{1B}[\(functionNumbers[index + 1])~"
+        }
+        mappings[UInt32(NSLeftArrowFunctionKey)] = [1: "\u{1B}[1;2D", 2: "\u{1B}[1;5D", 4: "\u{1B}b"]
+        mappings[UInt32(NSRightArrowFunctionKey)] = [1: "\u{1B}[1;2C", 2: "\u{1B}[1;5C", 4: "\u{1B}f"]
+        mappings[UInt32(NSDeleteFunctionKey)] = [
+            0: "\u{1B}[3~", 1: "\u{1B}[3;2~", 2: "\u{1B}[3;5~", 6: "\u{1B}\u{1B}[3;5~",
+        ]
+        return mappings
+    }()
 
     func disambiguatedInput(usesOptionAsMetaKey: Bool) -> [UInt8]? {
         guard !modifierFlags.contains(.command),
@@ -75,8 +173,7 @@ extension NSEvent {
         case .delete: number = 127
         case .escape: number = 27
         case let specialKey where (0xF700 ... 0xF8FF).contains(key.value):
-            return specialKey.terminalSequence(applicationCursorKeys: false, modifiers: modifiers, disambiguates: true)
-                .map { Array($0.utf8) }
+            return specialKey.kittySequence(modifiers: modifiers).map { Array($0.utf8) }
         default:
             guard modifierFlags.contains(.control) || usesOptionAsMetaKey && modifierFlags.contains(.option),
                 let key = modifierFlags.contains(.shift)
@@ -126,31 +223,6 @@ extension NSEvent {
         return parameter > 1 ? Array("\u{1B}[27;\(parameter);\(number)~".utf8) : nil
     }
 
-    func terminalInput(applicationCursorKeys: Bool = false, usesKeyMappings: Bool = true) -> [UInt8]? {
-        terminalInput(
-            characters: characters, applicationCursorKeys: applicationCursorKeys, usesKeyMappings: usesKeyMappings)
-    }
-
-    private func terminalInput(characters: String?, applicationCursorKeys: Bool, usesKeyMappings: Bool = true)
-        -> [UInt8]?
-    {
-        guard !modifierFlags.contains(.command), let characters, !characters.isEmpty else {
-            return nil
-        }
-        if let key = charactersIgnoringModifiers?.unicodeScalars.first,
-            let sequence = NSEvent.SpecialKey(rawValue: Int(key.value))
-                .terminalSequence(
-                    applicationCursorKeys: applicationCursorKeys, modifiers: terminalModifiers,
-                    usesKeyMappings: usesKeyMappings)
-        {
-            return Array(sequence.utf8)
-        }
-        guard !characters.unicodeScalars.contains(where: { (0xF700 ... 0xF7FF).contains($0.value) }) else {
-            return nil
-        }
-        return Array(characters.utf8)
-    }
-
     private var terminalModifiers: Int {
         [(NSEvent.ModifierFlags.shift, 1), (.option, 2), (.control, 4)]
             .reduce(1) { modifierFlags.contains($1.0) ? $0 + $1.1 : $0 }
@@ -162,44 +234,15 @@ extension NSEvent.SpecialKey {
         Self(rawValue: 0x1B)
     }
 
-    fileprivate func terminalSequence(
-        applicationCursorKeys: Bool, modifiers: Int, disambiguates: Bool = false, usesKeyMappings: Bool = true
-    ) -> String? {
-        switch self {
-        case .carriageReturn, .enter: "\r"
-        case .tab: "\t"
-        case .delete: "\u{7F}"
-        case .escape: "\u{1B}"
-        case .backTab: "\u{1B}[Z"
-        case _ where disambiguates && (NSF13FunctionKey ... NSF20FunctionKey).contains(rawValue):
-            "\u{1B}[\(57376 + rawValue - NSF13FunctionKey)\(modifiers > 1 ? ";\(modifiers)" : "")u"
-        default:
-            if !disambiguates, usesKeyMappings, let sequence = mappedSequence(modifiers: modifiers) {
-                sequence
-            } else if let final = cursorFinal, !disambiguates || self != .f3 {
-                if modifiers > 1 {
-                    "\u{1B}[1;\(modifiers)\(final)"
-                } else {
-                    (!disambiguates && (applicationCursorKeys || !"ABCD".contains(final)) ? "\u{1B}O" : "\u{1B}[")
-                        + final
-                }
-            } else if let number = tildeNumber {
-                modifiers > 1 ? "\u{1B}[\(number);\(modifiers)~" : "\u{1B}[\(number)~"
-            } else {
-                nil
-            }
+    fileprivate func kittySequence(modifiers: Int) -> String? {
+        let parameter = modifiers > 1 ? ";\(modifiers)" : ""
+        if (NSF13FunctionKey ... NSF20FunctionKey).contains(rawValue) {
+            return "\u{1B}[\(57376 + rawValue - NSF13FunctionKey)\(parameter)u"
         }
-    }
-
-    private func mappedSequence(modifiers: Int) -> String? {
-        switch (modifiers, rawValue) {
-        case (2, NSF5FunctionKey ... NSF12FunctionKey):
-            Self(rawValue: rawValue + 8).tildeNumber.map { "\u{1B}[\($0)~" }
-        case (3, NSF1FunctionKey ... NSF15FunctionKey):
-            Self(rawValue: rawValue + 5).tildeNumber.map { "\u{1B}[\($0)~" }
-        case (7, NSDeleteFunctionKey): "\u{1B}\u{1B}[3;5~"
-        default: nil
+        if let final = cursorFinal, self != .f3 {
+            return modifiers > 1 ? "\u{1B}[1\(parameter)\(final)" : "\u{1B}[\(final)"
         }
+        return tildeNumber.map { "\u{1B}[\($0)\(parameter)~" }
     }
 
     private var cursorFinal: String? {
@@ -233,14 +276,6 @@ extension NSEvent.SpecialKey {
         case .f10: 21
         case .f11: 23
         case .f12: 24
-        case .f13: 25
-        case .f14: 26
-        case .f15: 28
-        case .f16: 29
-        case .f17: 31
-        case .f18: 32
-        case .f19: 33
-        case .f20: 34
         default: nil
         }
     }

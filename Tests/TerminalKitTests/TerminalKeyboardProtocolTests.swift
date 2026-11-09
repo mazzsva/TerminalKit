@@ -240,7 +240,7 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func sendsShiftReturnWithModifyOtherKeys() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>4;2m'; stty raw -echo; echo ready; head -c 34 | od -An -tx1")
+            running: "printf '\\033[>4;2m'; stty raw -echo; echo ready; head -c 35 | od -An -tx1")
         let view = TerminalContentView(session: session)
         view.usesOptionAsMetaKey = true
         try session.start()
@@ -258,8 +258,8 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("x"))
         let lines = await session.linesAfterExit()
         #expect(lines.contains("1b  5b  32  37  3b  32  3b  31  33  7e  1b  5b  32  37  3b  35"))
-        #expect(lines.contains("3b  39  37  7e  1b  5b  32  37  3b  33  3b  31  33  7e  0d  c2"))
-        #expect(lines.contains("b4  78"))
+        #expect(lines.contains("3b  39  37  7e  1b  5b  32  37  3b  33  3b  31  33  7e  1b  0d"))
+        #expect(lines.contains("c2  b4  78"))
     }
 
     @Test func prefersTheKittyProtocolToModifyOtherKeys() async throws {
@@ -295,7 +295,7 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func sendsCommandKeysAsWithoutTheKittyProtocol() async throws {
         let session = TerminalSession(
-            running: "printf 'text\\n\\033[>1u'; stty raw -echo; printf ready; head -c 2 | od -An -tx1")
+            running: "printf 'text\\n\\033[>1u'; stty raw -echo; printf ready; head -c 3 | od -An -tx1")
         let view = TerminalContentView(session: session)
         let item = NSMenuItem(title: "Copy", action: #selector(view.copy(_:)), keyEquivalent: "c")
         let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
@@ -311,7 +311,7 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("k", modifierFlags: .command))
         #expect(session.lines.first == "ready")
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains { $0.hasSuffix(" 15  78") })
+        #expect(await session.linesAfterExit().contains { $0.hasSuffix(" 1b  0d  78") })
     }
 
     @Test func clearsToStartWithCommandK() async throws {
@@ -348,9 +348,9 @@ struct TerminalKeyboardProtocolTests {
         await session.waitForExit()
     }
 
-    @Test func leavesShiftReturnToTheMarkedText() async throws {
+    @Test func sendsShiftReturnAsTerminalDuringMarkedText() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 4 | od -An -tx1")
+            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 5 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -362,7 +362,7 @@ struct TerminalKeyboardProtocolTests {
         view.keyDown(with: try keyDown("\r", modifierFlags: .shift))
         view.unmarkText()
         view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("0d  c2  b4  78"))
+        #expect(await session.linesAfterExit().contains("1b  0d  c2  b4  78"))
     }
 
     @Test(
@@ -399,7 +399,7 @@ struct TerminalKeyboardProtocolTests {
         arguments: [
             ("", "∫", "b", .option, 11, "ed  95  9c  1b  62  78"),
             ("\\033[>1u", "∫", "b", .option, 11, "ed  95  9c  1b  5b  39  38  3b  33  75  78"),
-            ("", "2", "2", .control, 19, "ed  95  9c  00  78"),
+            ("", "2", "2", .control, 19, "ed  95  9c  78"),
             ("\\033[>1u", "\u{1}", "a", .control, 0, "ed  95  9c  1b  5b  39  37  3b  35  75  78"),
             ("", "\r", "\r", .option, 36, "ed  95  9c  1b  0d  78"),
             ("", "a", "a", [], 0, "ed  95  9c  61  78"),
@@ -463,7 +463,7 @@ struct TerminalKeyboardProtocolTests {
         #expect(await session.linesAfterExit().contains("ed  95  9c  78"))
     }
 
-    @Test func sendsReturnForModifiedReturnWithoutTheKittyProtocol() async throws {
+    @Test func sendsTheReturnKeysOfTerminalWithoutTheKittyProtocol() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
@@ -471,7 +471,7 @@ struct TerminalKeyboardProtocolTests {
         for modifierFlags in [NSEvent.ModifierFlags.shift, .control, .option] {
             view.keyDown(with: try keyDown("\r", modifierFlags: modifierFlags))
         }
-        #expect(await session.linesAfterExit().contains("0d  0d  0d"))
+        #expect(await session.linesAfterExit().contains("1b  0d  0d"))
     }
 }
 
