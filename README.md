@@ -58,7 +58,7 @@ macOS gives microphone access to the host app, not to the program in the termina
 
 ## Engineering decisions
 
-**Terminal.app behavior.** The screen output, the replies, the colors, the font size, resize, and the login shell follow Terminal.app 2.15, as measured in Terminal.app. Keys, the mouse, and paste were compared with the same events posted to Terminal.app. TerminalKit also has two protocols that Terminal.app does not have, because the Claude Code docs use them: the kitty keyboard protocol (flag 1) and xterm's modifyOtherKeys.
+**Terminal.app behavior.** The screen output, the replies, the colors, the font size, resize, and the login shell follow Terminal.app 2.15, as measured in Terminal.app. Keys, the mouse, and paste were compared with the same events posted to Terminal.app. TerminalKit also has one protocol that Terminal.app does not have, because the Claude Code docs use it: xterm's modifyOtherKeys.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 7,000 lines of Swift and C on POSIX and AppKit APIs.
 

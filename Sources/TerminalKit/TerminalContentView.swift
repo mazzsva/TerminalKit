@@ -486,9 +486,7 @@ final class TerminalContentView: NSView {
     }
 
     func modifiedInput(_ event: NSEvent) -> [UInt8]? {
-        session.terminal.usesDisambiguatedKeys
-            ? event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey)
-            : event.otherKeyInput(level: session.terminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
+        event.otherKeyInput(level: session.terminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
     }
 
     func keyInput(_ event: NSEvent) -> TerminalKeyInput {
@@ -535,12 +533,7 @@ final class TerminalContentView: NSView {
         guard let event = keyDownEvent else {
             return
         }
-        let isFunctionKey = event.charactersIgnoringModifiers?.unicodeScalars.first
-            .map {
-                (0xF700 ... 0xF8FF).contains($0.value)
-            }
-        let usesModifiedInput = markedText.isEmpty || session.terminal.usesDisambiguatedKeys && isFunctionKey == true
-        let modifiedInput = usesModifiedInput ? modifiedInput(event) : nil
+        let modifiedInput = markedText.isEmpty ? modifiedInput(event) : nil
         if case .bytes(let bytes) = modifiedInput.map(TerminalKeyInput.bytes) ?? keyInput(event) {
             insertedText = ""
             session.send(bytes)

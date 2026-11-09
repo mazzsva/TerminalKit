@@ -6,101 +6,6 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct TerminalKeyboardProtocolTests {
-    @Test func keepsTheFunctionKeysOfTheInputSystemWithTheKittyProtocol() async throws {
-        let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 11 | od -An -tx1")
-        let view = TerminalContentView(session: session)
-        try session.start()
-        await session.waitForText("ready")
-        view.setMarkedText(
-            "か",
-            selectedRange: NSRange(location: 1, length: 0),
-            replacementRange: NSRange(location: NSNotFound, length: 0)
-        )
-        view.keyDown(with: try keyDown(NSF5FunctionKey, modifierFlags: .shift))
-        view.unmarkText()
-        view.keyDown(with: try keyDown("x"))
-        #expect(await session.linesAfterExit().contains("1b  5b  31  35  3b  32  7e  e3  81  8b  78"))
-    }
-
-    @Test func reportsModifiedReturn() throws {
-        #expect(try input(keyDown("\r")) == nil)
-        #expect(try input(keyDown("\r", modifierFlags: .shift)) == "\u{1B}[13;2u")
-        #expect(try input(keyDown("\r", modifierFlags: .option)) == "\u{1B}[13;3u")
-        #expect(try input(keyDown("\r", modifierFlags: .control)) == "\u{1B}[13;5u")
-        #expect(try input(keyDown("\r", modifierFlags: [.control, .shift])) == "\u{1B}[13;6u")
-        #expect(try input(keyDown("\r", modifierFlags: .capsLock)) == nil)
-        #expect(try input(keyDown(NSEnterCharacter)) == nil)
-        #expect(try input(keyDown(NSEnterCharacter, modifierFlags: .shift)) == "\u{1B}[13;2u")
-    }
-
-    @Test func reportsTabBackspaceAndEscape() throws {
-        #expect(try input(keyDown("\t")) == nil)
-        #expect(try input(keyDown(NSBackTabCharacter, modifierFlags: .shift)) == "\u{1B}[9;2u")
-        #expect(try input(keyDown("\t", modifierFlags: .control)) == "\u{1B}[9;5u")
-        #expect(try input(keyDown("\u{7F}")) == nil)
-        #expect(try input(keyDown("\u{7F}", modifierFlags: .option)) == "\u{1B}[127;3u")
-        #expect(try input(keyDown("\u{1B}")) == "\u{1B}[27u")
-        #expect(try input(keyDown("\u{1B}", modifierFlags: .shift)) == "\u{1B}[27;2u")
-    }
-
-    @Test func reportsControlAndMetaKeys() throws {
-        #expect(
-            try input(keyDown("\u{3}", charactersIgnoringModifiers: "c", modifierFlags: .control)) == "\u{1B}[99;5u")
-        for (characters, shiftedKey, keyCode) in [("\u{3}", "C", UInt16(8)), ("\u{1F}", "_", 27)] {
-            let event = try keyDown(
-                characters, charactersIgnoringModifiers: shiftedKey, modifierFlags: [.control, .shift], keyCode: keyCode
-            )
-            let key = try #require(event.characters(byApplyingModifiers: [])?.unicodeScalars.first)
-            #expect(input(event) == "\u{1B}[\(key.value);6u")
-        }
-        #expect(
-            try input(keyDown("\u{3}", charactersIgnoringModifiers: "C", modifierFlags: [.control, .capsLock]))
-                == "\u{1B}[99;5u")
-        #expect(try input(keyDown("\u{3}", charactersIgnoringModifiers: "\u{441}", modifierFlags: .control)) == nil)
-        #expect(try input(keyDown("\u{1}", modifierFlags: .control)) == nil)
-        #expect(
-            try input(keyDown("\u{0}", charactersIgnoringModifiers: " ", modifierFlags: .control)) == "\u{1B}[32;5u")
-        #expect(
-            try input(keyDown("\u{1B}", charactersIgnoringModifiers: "[", modifierFlags: .control)) == "\u{1B}[91;5u")
-        let optionA = try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option)
-        #expect(input(optionA) == nil)
-        #expect(input(optionA, usesOptionAsMetaKey: true) == "\u{1B}[97;3u")
-        #expect(
-            try input(keyDown("ˆ", charactersIgnoringModifiers: "ö", modifierFlags: .option), usesOptionAsMetaKey: true)
-                == "\u{1B}[246;3u")
-        #expect(try input(keyDown("a")) == nil)
-        #expect(try input(keyDown("A", modifierFlags: .shift)) == nil)
-        #expect(try input(keyDown("A", modifierFlags: .shift), usesOptionAsMetaKey: true) == nil)
-    }
-
-    @Test func ignoresCommandKeys() throws {
-        #expect(try input(keyDown("c", modifierFlags: .command)) == nil)
-        #expect(try input(keyDown("C", modifierFlags: [.command, .shift], keyCode: 8)) == nil)
-        #expect(try input(keyDown(NSLeftArrowFunctionKey, modifierFlags: .command)) == nil)
-        #expect(try input(keyDown(NSRightArrowFunctionKey, modifierFlags: .command)) == nil)
-        #expect(try input(keyDown(NSUpArrowFunctionKey, modifierFlags: [.command, .shift])) == nil)
-        #expect(try input(keyDown("\u{7F}", modifierFlags: .command)) == nil)
-        #expect(try input(keyDown("\r", modifierFlags: .command)) == nil)
-        #expect(try input(keyDown("\r", modifierFlags: [.command, .shift])) == nil)
-    }
-
-    @Test func reportsFunctionKeysWithTheControlSequenceIntroducer() throws {
-        #expect(try input(keyDown(NSUpArrowFunctionKey)) == "\u{1B}[A")
-        #expect(try input(keyDown(NSHomeFunctionKey)) == "\u{1B}[H")
-        #expect(try input(keyDown(NSF1FunctionKey)) == "\u{1B}[P")
-        #expect(try input(keyDown(NSF3FunctionKey)) == "\u{1B}[13~")
-        #expect(try input(keyDown(NSF3FunctionKey, modifierFlags: .shift)) == "\u{1B}[13;2~")
-        #expect(try input(keyDown(NSUpArrowFunctionKey, modifierFlags: .control)) == "\u{1B}[1;5A")
-        #expect(try input(keyDown(NSPageUpFunctionKey)) == "\u{1B}[5~")
-        #expect(try input(keyDown(NSF12FunctionKey)) == "\u{1B}[24~")
-        #expect(try input(keyDown(NSF13FunctionKey)) == "\u{1B}[57376u")
-        #expect(try input(keyDown(NSF20FunctionKey)) == "\u{1B}[57383u")
-        #expect(try input(keyDown(NSF16FunctionKey, modifierFlags: .shift)) == "\u{1B}[57379;2u")
-        #expect(try input(keyDown(NSHelpFunctionKey)) == "\u{1B}[2~")
-        #expect(try input(keyDown(NSF21FunctionKey)) == nil)
-    }
-
     @Test func reportsModifiedReturnWithModifyOtherKeys() throws {
         for level in 1 ... 2 {
             #expect(try otherKeyInput(keyDown("\r"), level: level) == nil)
@@ -262,40 +167,9 @@ struct TerminalKeyboardProtocolTests {
         #expect(lines.contains("c2  b4  78"))
     }
 
-    @Test func prefersTheKittyProtocolToModifyOtherKeys() async throws {
+    @Test func sendsCommandKeysAsTerminal() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>4;1m\\033[>1u'; stty raw -echo; echo ready; head -c 7 | od -An -tx1")
-        let view = TerminalContentView(session: session)
-        try session.start()
-        await session.waitForText("ready")
-        view.keyDown(with: try keyDown("\r", modifierFlags: .shift))
-        #expect(await session.linesAfterExit().contains("1b  5b  31  33  3b  32  75"))
-    }
-
-    @Test func sendsShiftReturnWithTheKittyProtocol() async throws {
-        let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 37 | od -An -tx1")
-        let view = TerminalContentView(session: session)
-        try session.start()
-        await session.waitForText("ready")
-        view.keyDown(with: try keyDown("\r", modifierFlags: .shift))
-        view.keyDown(with: try keyDown(NSLeftArrowFunctionKey, modifierFlags: .option))
-        view.keyDown(with: try keyDown(NSRightArrowFunctionKey, modifierFlags: .option))
-        view.keyDown(with: try keyDown("\u{3}", charactersIgnoringModifiers: "c", modifierFlags: .control))
-        view.keyDown(with: try keyDown("\u{3}", charactersIgnoringModifiers: "\u{441}", modifierFlags: .control))
-        view.keyDown(with: try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option))
-        view.usesOptionAsMetaKey = true
-        view.keyDown(with: try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option))
-        view.keyDown(with: try keyDown("\r"))
-        let lines = await session.linesAfterExit()
-        #expect(lines.contains("1b  5b  31  33  3b  32  75  1b  5b  31  3b  33  44  1b  5b  31"))
-        #expect(lines.contains("3b  33  43  1b  5b  39  39  3b  35  75  03  c3  a5  1b  5b  39"))
-        #expect(lines.contains("37  3b  33  75  0d"))
-    }
-
-    @Test func sendsCommandKeysAsWithoutTheKittyProtocol() async throws {
-        let session = TerminalSession(
-            running: "printf 'text\\n\\033[>1u'; stty raw -echo; printf ready; head -c 3 | od -An -tx1")
+            running: "printf 'text\\n'; stty raw -echo; printf ready; head -c 3 | od -An -tx1")
         let view = TerminalContentView(session: session)
         let item = NSMenuItem(title: "Copy", action: #selector(view.copy(_:)), keyEquivalent: "c")
         let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
@@ -350,7 +224,7 @@ struct TerminalKeyboardProtocolTests {
 
     @Test func sendsShiftReturnAsTerminalDuringMarkedText() async throws {
         let session = TerminalSession(
-            running: "printf '\\033[>1u'; stty raw -echo; echo ready; head -c 5 | od -An -tx1")
+            running: "stty raw -echo; echo ready; head -c 5 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
@@ -367,13 +241,13 @@ struct TerminalKeyboardProtocolTests {
 
     @Test(
         arguments: [
-            ("\\033[>1u", NSCarriageReturnCharacter, .shift, "ed  95  9c  1b  5b  31  33  3b  32  75  78"),
+            ("", NSCarriageReturnCharacter, .shift, "ed  95  9c  1b  0d  78"),
             (
                 "\\033[>4;2m", NSCarriageReturnCharacter, .shift,
                 "ed  95  9c  1b  5b  32  37  3b  32  3b  31  33  7e  78"
             ),
-            ("\\033[>1u", NSCarriageReturnCharacter, [], "ed  95  9c  0d  78"),
-            ("\\033[>1u", NSLeftArrowFunctionKey, .option, "ed  95  9c  1b  5b  31  3b  33  44  78"),
+            ("", NSCarriageReturnCharacter, [], "ed  95  9c  0d  78"),
+            ("", NSLeftArrowFunctionKey, .option, "ed  95  9c  1b  62  78"),
         ] as [(String, Int, NSEvent.ModifierFlags, String)])
     func sendsTheKeyThatTheInputMethodCommitsAndPassesOn(
         mode: String, key: Int, modifierFlags: NSEvent.ModifierFlags, bytes: String
@@ -398,9 +272,8 @@ struct TerminalKeyboardProtocolTests {
     @Test(
         arguments: [
             ("", "∫", "b", .option, 11, "ed  95  9c  1b  62  78"),
-            ("\\033[>1u", "∫", "b", .option, 11, "ed  95  9c  1b  5b  39  38  3b  33  75  78"),
             ("", "2", "2", .control, 19, "ed  95  9c  78"),
-            ("\\033[>1u", "\u{1}", "a", .control, 0, "ed  95  9c  1b  5b  39  37  3b  35  75  78"),
+            ("", "\u{1}", "a", .control, 0, "ed  95  9c  01  78"),
             ("", "\r", "\r", .option, 36, "ed  95  9c  1b  0d  78"),
             ("", "a", "a", [], 0, "ed  95  9c  61  78"),
         ] as [(String, String, String, NSEvent.ModifierFlags, UInt16, String)])
@@ -432,8 +305,8 @@ struct TerminalKeyboardProtocolTests {
 
     @Test(
         arguments: [
-            ("\\033[>1u", "\u{1B}", "\u{1B}", [], 53, false),
-            ("\\033[>1u", "\r", "\r", .shift, 36, false),
+            ("", "\u{1B}", "\u{1B}", [], 53, false),
+            ("", "\r", "\r", .shift, 36, false),
             ("", "\r", "m", .control, 46, false),
             ("", "\n", "j", .control, 38, true),
             ("", "∫", "b", .option, 11, true),
@@ -463,7 +336,7 @@ struct TerminalKeyboardProtocolTests {
         #expect(await session.linesAfterExit().contains("ed  95  9c  78"))
     }
 
-    @Test func sendsTheReturnKeysOfTerminalWithoutTheKittyProtocol() async throws {
+    @Test func sendsTheReturnKeysOfTerminal() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
         let view = TerminalContentView(session: session)
         try session.start()
@@ -473,10 +346,6 @@ struct TerminalKeyboardProtocolTests {
         }
         #expect(await session.linesAfterExit().contains("1b  0d  0d"))
     }
-}
-
-private func input(_ event: NSEvent, usesOptionAsMetaKey: Bool = false) -> String? {
-    event.disambiguatedInput(usesOptionAsMetaKey: usesOptionAsMetaKey).map { String(decoding: $0, as: UTF8.self) }
 }
 
 private func otherKeyInput(_ event: NSEvent, level: Int, usesOptionAsMetaKey: Bool = false) -> String? {

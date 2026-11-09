@@ -293,7 +293,7 @@ struct TerminalViewTests {
     func scrollsTheScrollbackWithTheKeyboard(
         key: Int, modifierFlags: NSEvent.ModifierFlags, pages: CGFloat, lines: CGFloat
     ) async throws {
-        let (scrollView, session) = try await scrollView(running: "seq 1 100; printf '\\033[>1u'")
+        let (scrollView, session) = try await scrollView(running: "seq 1 100")
         await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         let view = scrollView.terminalView
@@ -361,11 +361,6 @@ struct TerminalViewTests {
             (NSPageDownFunctionKey, .function, "\\033[?1049h", "1b  5b  36  7e"),
             (NSHomeFunctionKey, .function, "\\033[?1049h", "1b  5b  48"),
             (NSEndFunctionKey, .function, "\\033[?1049h", "1b  5b  46"),
-            (NSPageUpFunctionKey, .function, "\\033[>1u", "1b  5b  35  7e"),
-            (NSPageDownFunctionKey, .function, "\\033[>1u", "1b  5b  36  7e"),
-            (NSHomeFunctionKey, .function, "\\033[>1u", "1b  5b  48"),
-            (NSEndFunctionKey, .function, "\\033[>1u", "1b  5b  46"),
-            (NSPageUpFunctionKey, [.shift, .function], "\\033[>1u", "1b  5b  35  3b  32  7e"),
         ] as [(Int, NSEvent.ModifierFlags, String, String)])
     func sendsThePageKeysToTheProgram(
         key: Int, modifierFlags: NSEvent.ModifierFlags, mode: String, bytes: String

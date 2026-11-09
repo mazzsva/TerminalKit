@@ -251,7 +251,7 @@ struct EscapeSequenceParser: Sendable {
         state = .ground
         return .controlSequence(
             ControlSequence(
-                privateMarker: final == "u" || privateMarker == "?" || privateMarker == ">" ? privateMarker : nil,
+                privateMarker: privateMarker == "?" || privateMarker == ">" ? privateMarker : nil,
                 parameters: hasLargeParameter
                     ? parameters.map { $0 > Self.maximumParameterValue ? 0 : $0 } : parameters,
                 intermediates: intermediates,

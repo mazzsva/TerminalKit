@@ -549,9 +549,8 @@ struct TerminalTests {
         #expect(lines(terminal) == ["b   ", "c   "])
         #expect(scrollback(terminal) == ["a"])
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
-        terminal.receive("\u{1B}[?1049h\u{1B}[>1u\u{1B}[!p")
+        terminal.receive("\u{1B}[?1049h\u{1B}[!p")
         #expect(terminal.isAlternateScreenActive)
-        #expect(terminal.usesDisambiguatedKeys)
     }
 
     @Test func keepsATabInTheText() {

@@ -159,37 +159,6 @@ extension NSEvent {
         return mappings
     }()
 
-    func disambiguatedInput(usesOptionAsMetaKey: Bool) -> [UInt8]? {
-        guard !modifierFlags.contains(.command),
-            let key = charactersIgnoringModifiers?.lowercased().unicodeScalars.first
-        else {
-            return nil
-        }
-        let modifiers = terminalModifiers
-        let number: UInt32
-        switch NSEvent.SpecialKey(rawValue: Int(key.value)) {
-        case .carriageReturn, .enter: number = 13
-        case .tab, .backTab: number = 9
-        case .delete: number = 127
-        case .escape: number = 27
-        case let specialKey where (0xF700 ... 0xF8FF).contains(key.value):
-            return specialKey.kittySequence(modifiers: modifiers).map { Array($0.utf8) }
-        default:
-            guard modifierFlags.contains(.control) || usesOptionAsMetaKey && modifierFlags.contains(.option),
-                let key = modifierFlags.contains(.shift)
-                    ? characters(byApplyingModifiers: [])?.unicodeScalars.first : key,
-                key.value >= 0x20, key.value < 0x7F || !modifierFlags.contains(.control)
-            else {
-                return nil
-            }
-            number = key.value
-        }
-        guard modifiers > 1 || number == 27 else {
-            return nil
-        }
-        return Array("\u{1B}[\(number)\(modifiers > 1 ? ";\(modifiers)" : "")u".utf8)
-    }
-
     func otherKeyInput(level: Int, usesOptionAsMetaKey: Bool) -> [UInt8]? {
         guard level > 0, modifierFlags.isDisjoint(with: [.command, .numericPad]),
             let key = charactersIgnoringModifiers?.unicodeScalars.first
@@ -232,51 +201,5 @@ extension NSEvent {
 extension NSEvent.SpecialKey {
     fileprivate static var escape: Self {
         Self(rawValue: 0x1B)
-    }
-
-    fileprivate func kittySequence(modifiers: Int) -> String? {
-        let parameter = modifiers > 1 ? ";\(modifiers)" : ""
-        if (NSF13FunctionKey ... NSF20FunctionKey).contains(rawValue) {
-            return "\u{1B}[\(57376 + rawValue - NSF13FunctionKey)\(parameter)u"
-        }
-        if let final = cursorFinal, self != .f3 {
-            return modifiers > 1 ? "\u{1B}[1\(parameter)\(final)" : "\u{1B}[\(final)"
-        }
-        return tildeNumber.map { "\u{1B}[\($0)\(parameter)~" }
-    }
-
-    private var cursorFinal: String? {
-        switch self {
-        case .upArrow: "A"
-        case .downArrow: "B"
-        case .rightArrow: "C"
-        case .leftArrow: "D"
-        case .home: "H"
-        case .end: "F"
-        case .f1: "P"
-        case .f2: "Q"
-        case .f3: "R"
-        case .f4: "S"
-        default: nil
-        }
-    }
-
-    private var tildeNumber: Int? {
-        switch self {
-        case .help: 2
-        case .deleteForward: 3
-        case .pageUp: 5
-        case .pageDown: 6
-        case .f3: 13
-        case .f5: 15
-        case .f6: 17
-        case .f7: 18
-        case .f8: 19
-        case .f9: 20
-        case .f10: 21
-        case .f11: 23
-        case .f12: 24
-        default: nil
-        }
     }
 }
