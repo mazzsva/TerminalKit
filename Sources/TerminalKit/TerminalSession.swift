@@ -139,15 +139,20 @@ public final class TerminalSession {
     }
 
     public func paste(_ text: String) {
+        if let bytes = Self.pastedBytes(text, isBracketed: terminal.usesBracketedPaste) {
+            send(bytes)
+        }
+    }
+
+    static func pastedBytes(_ text: String, isBracketed: Bool) -> [UInt8]? {
         let lines = text.replacing("\r\n", with: "\r").replacing("\n", with: "\r")
-        guard terminal.usesBracketedPaste else {
-            send(lines)
-            return
+        guard isBracketed else {
+            return Array(lines.utf8)
         }
-        guard !Self.containsPasteEnd(lines) else {
-            return
+        guard !containsPasteEnd(lines) else {
+            return nil
         }
-        send("\u{1B}[200~\(lines)\(Self.pasteEnd)")
+        return Array("\u{1B}[200~\(lines)\(pasteEnd)".utf8)
     }
 
     func clearToStart() {

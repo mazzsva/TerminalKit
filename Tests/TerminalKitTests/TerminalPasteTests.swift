@@ -51,6 +51,53 @@ struct TerminalPasteTests {
         #expect(alerts.count == 1 && alerts[0].hasPrefix("You cannot send the text"))
     }
 
+    @Test func sendsTheEndMarkerOnlyAtTheEndOfABracketedPaste() {
+        let pieces = ["\u{1B}", "[", "201~", "20", "1~", "\u{301}", "\u{200D}", "\u{FE0F}", "\u{9B}", "\r", "\n", "a"]
+        let start = Array("\u{1B}[200~".utf8)
+        let end = Array("\u{1B}[201~".utf8)
+        var texts = [""]
+        for _ in 1 ... 5 {
+            texts = texts.flatMap { text in pieces.map { text + $0 } }
+            for text in texts {
+                let lines = Array(text.replacing("\r\n", with: "\r").replacing("\n", with: "\r").utf8)
+                guard let bytes = TerminalSession.pastedBytes(text, isBracketed: true) else {
+                    #expect(lines.firstRange(of: end) != nil, "\(Array(text.unicodeScalars))")
+                    continue
+                }
+                #expect(bytes == start + lines + end, "\(Array(text.unicodeScalars))")
+                #expect(bytes.firstRange(of: end)?.lowerBound == bytes.count - end.count)
+            }
+        }
+    }
+
+    @Test func keepsAPastedCommandFromRunningInZsh() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let session = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/bin/zsh"),
+                arguments: ["-f"],
+                environment: [
+                    "HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8",
+                ]
+            )
+        )
+        let view = TerminalContentView(session: session)
+        view.presentsAlert = { _, _ in .alertFirstButtonReturn }
+        view.fit(to: CGSize(width: 800, height: 300))
+        try session.start()
+        for await isBracketed in Observations({ session.terminal.usesBracketedPaste }) where isBracketed {
+            break
+        }
+        let path = folder.path(percentEncoded: false)
+        view.paste(text: "echo a\u{1B}[201~\u{301}\ntouch '\(path)/ended'\n")
+        view.paste(text: "touch '\(path)/pasted'\n")
+        session.send("\u{7}echo do''ne; exit\r")
+        #expect(await session.linesAfterExit().contains { $0.hasPrefix("done") })
+        #expect(try FileManager.default.contentsOfDirectory(atPath: path).isEmpty)
+    }
+
     @Test(arguments: [
         (
             NSApplication.ModalResponse.alertFirstButtonReturn,
