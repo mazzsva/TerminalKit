@@ -72,18 +72,6 @@ struct TerminalInputTests {
             try keyDown("\r", modifierFlags: [.command, .shift]).terminalKeyInput(TerminalKeyModes())
                 == .bytes([0x1B, 0x0D]))
     }
-
-    @Test func keepsTheModifiersOfFunctionKeysWithTheKittyProtocol() throws {
-        #expect(
-            try keyDown(NSF1FunctionKey, modifierFlags: .option).disambiguatedInput(usesOptionAsMetaKey: false)
-                == Array("\u{1B}[1;3P".utf8))
-        #expect(
-            try keyDown(NSF5FunctionKey, modifierFlags: .shift).disambiguatedInput(usesOptionAsMetaKey: false)
-                == Array("\u{1B}[15;2~".utf8))
-        #expect(
-            try keyDown(NSDeleteFunctionKey, modifierFlags: [.option, .control])
-                .disambiguatedInput(usesOptionAsMetaKey: false) == Array("\u{1B}[3;7~".utf8))
-    }
 }
 
 private let keyCodes: [String: UInt16] = [

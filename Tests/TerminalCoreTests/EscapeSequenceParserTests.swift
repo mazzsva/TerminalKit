@@ -112,11 +112,8 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}[1=H") == [controlSequence(parameters: [1], final: "H")])
         #expect(parse("\u{1B}[=?1H") == [controlSequence(privateMarker: "?", parameters: [1], final: "H")])
         #expect(parse("\u{1B}[=>c") == [controlSequence(privateMarker: ">", final: "c")])
-    }
-
-    @Test func keepsTheOtherMarkersForTheKeyboardFlags() {
-        #expect(parse("\u{1B}[=1;1u") == [controlSequence(privateMarker: "=", parameters: [1, 1], final: "u")])
-        #expect(parse("\u{1B}[<u") == [controlSequence(privateMarker: "<", final: "u")])
+        #expect(parse("\u{1B}[=1;1u") == [controlSequence(parameters: [1, 1], final: "u")])
+        #expect(parse("\u{1B}[<u") == [controlSequence(final: "u")])
     }
 
     @Test func dropsTheOtherIntermediates() {

@@ -1109,5 +1109,10 @@
 {"name": "esc n crlf", "input": "\\x1Bn\\x0D\\x0AX", "reply": "\\x1B[2;2R", "screen": ["", "X"]},
 {"name": "esc o crlf", "input": "\\x1Bo\\x0D\\x0AX", "reply": "\\x1B[2;2R", "screen": ["", "X"]},
 {"name": "c1 in title", "input": "\\x1B]2;a\\xC2\\x80b\\x07", "reply": "\\x1B[1;1R", "screen": [], "title": "ab"},
-{"name": "nbsp width", "input": "a\\xC2\\xA0b", "reply": "\\x1B[1;4R", "screen": ["a b"]}
+{"name": "nbsp width", "input": "a\\xC2\\xA0b", "reply": "\\x1B[1;4R", "screen": ["a b"]},
+{"name": "csi ? u", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B[?uX", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
+{"name": "csi = 1 u", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B[=1uX", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
+{"name": "csi = 1 ; 1 u", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B[=1;1uX", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
+{"name": "csi > 1 u then csi ? u", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B[>1u\\x1B[?uX", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
+{"name": "csi s then csi > u", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B[s\\x1B[3;3H\\x1B[>uX", "reply": "\\x1B[3;4R", "screen": ["abc", "def", "ghX"]}
 ]

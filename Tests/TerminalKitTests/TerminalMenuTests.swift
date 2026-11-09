@@ -62,7 +62,7 @@ struct TerminalMenuTests {
 
     @Test func writesTheSelectionForServices() async throws {
         let session = TerminalSession(
-            running: "printf 'text\\033[>1u'; stty raw -echo; echo ready; head -c 1 | od -An -tx1")
+            running: "printf 'text'; stty raw -echo; echo ready; head -c 1 | od -An -tx1")
         let view = TerminalContentView(session: session)
         let window = NSWindow(contentView: view)
         window.makeFirstResponder(view)
