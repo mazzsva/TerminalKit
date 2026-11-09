@@ -76,4 +76,5 @@ macOS gives microphone access to the host app, not to the program in the termina
 
 - Terminal.app draws with its private SF Mono Terminal font. TerminalKit uses the 12 pt system monospaced font in the same 7 by 15 point cell, so some glyph shapes differ a little.
 - Terminal.app leaves gaps and overlaps in some right-to-left text. TerminalKit does not copy them.
+- In bracketed paste mode, Terminal.app pastes the end marker `ESC [201~` when a combining mark follows it, so the pasted text can end the paste early. TerminalKit refuses this text too.
 - With about 1,000,000 saved lines of wrapped text that mixes wide characters and tabs, one resize step takes about 0.7 s in a release build. Terminal.app takes about 60 ms.
