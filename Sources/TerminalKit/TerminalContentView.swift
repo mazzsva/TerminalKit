@@ -106,6 +106,13 @@ final class TerminalContentView: NSView {
     private(set) var keyDownEvent: NSEvent?
     var isNumLockOn = false
     var reportedButtons: Set<Int> = []
+    var presentsAlert: @MainActor (NSAlert, NSWindow?) -> NSApplication.ModalResponse = { alert, window in
+        guard let window else {
+            return alert.runModal()
+        }
+        alert.beginSheetModal(for: window)
+        return .alertFirstButtonReturn
+    }
     private var bellTask: Task<Void, Never>?
     private var flagsMonitor: Any?
     private var lastBellDate: Date?

@@ -107,8 +107,47 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
 
     func paste(text: String) {
         insertedText = ""
+        var text = text
+        if session.terminal.usesBracketedPaste {
+            guard !TerminalSession.containsPasteEnd(text) else {
+                let alert = NSAlert()
+                alert.messageText =
+                    "You cannot send the text to the terminal, because it contains invalid content for Bracketed Paste Mode."
+                alert.informativeText =
+                    "Bracketed Paste Mode is enabled in the terminal and the text to send contains the escape sequence that marks the end of pasted text. This is invalid for Bracketed Paste Mode, and could allow subsequent content in the text to perform arbitrary commands."
+                alert.addButton(withTitle: "OK")
+                _ = presentsAlert(alert, window)
+                return
+            }
+        } else if text.unicodeScalars.contains(where: Self.isPastedControlCharacter) {
+            let alert = NSAlert()
+            alert.messageText = "Paste control characters?"
+            alert.informativeText =
+                "The text contains control characters, which could allow the pasted content to perform arbitrary commands.\n\nTo confirm and Paste, you can use ⇧⌘⏎."
+            let paste = alert.addButton(withTitle: "Paste")
+            paste.keyEquivalent = "\r"
+            paste.keyEquivalentModifierMask = [.shift, .command]
+            alert.addButton(withTitle: "Paste without Control Characters").keyEquivalent = ""
+            alert.addButton(withTitle: "Cancel").keyEquivalent = "\u{1B}"
+            switch presentsAlert(alert, nil) {
+            case .alertFirstButtonReturn:
+                break
+            case .alertSecondButtonReturn:
+                text.unicodeScalars.removeAll(where: Self.isPastedControlCharacter)
+            default:
+                return
+            }
+        }
         scrollToBottom()
         session.paste(text)
+    }
+
+    static func isPastedControlCharacter(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x09 ... 0x0D, 0x85: false
+        case 0x00 ... 0x1F, 0x7F ... 0x9F: true
+        default: false
+        }
     }
 
     @objc override func selectAll(_ sender: Any?) {

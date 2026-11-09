@@ -9,7 +9,9 @@ extension TerminalContentView {
         guard let text = Self.droppedText(from: sender.draggingPasteboard) else {
             return false
         }
-        paste(text: text)
+        DispatchQueue.main.async { [self] in
+            paste(text: text)
+        }
         return true
     }
 
