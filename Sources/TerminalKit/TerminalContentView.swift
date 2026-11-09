@@ -94,8 +94,6 @@ final class TerminalContentView: NSView {
     var isOpeningLink = false
     private var fittedColumns: Int?
     var lastMousePosition: Terminal.Position?
-    var scrollWheelLines: CGFloat = 0
-    var scrollWheelColumns: CGFloat = 0
     var autoscrollTask: Task<Void, Never>?
     var autoscrollClock: any Clock<Duration> = ContinuousClock()
 
@@ -107,6 +105,7 @@ final class TerminalContentView: NSView {
     private(set) var fonts = Fonts(defaultFont)
     private(set) var keyDownEvent: NSEvent?
     var isNumLockOn = false
+    var reportedButtons: Set<Int> = []
     private var bellTask: Task<Void, Never>?
     private var flagsMonitor: Any?
     private var lastBellDate: Date?

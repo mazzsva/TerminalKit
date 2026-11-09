@@ -107,5 +107,6 @@ func scrollWheelEvent(x: Int32, y: Int32 = 0) throws -> NSEvent {
     let event = try #require(
         CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: y, wheel2: x, wheel3: 0)
     )
+    event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
     return try #require(NSEvent(cgEvent: event))
 }

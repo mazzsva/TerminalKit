@@ -32,7 +32,7 @@ extension TerminalContentView {
         guard !isOpeningLink else {
             return
         }
-        if reportsMouse(for: event) {
+        if pressesButton(0, for: event) {
             reportMouse(event, button: 0)
             return
         }
@@ -63,7 +63,7 @@ extension TerminalContentView {
         guard !isOpeningLink else {
             return
         }
-        if reportsMouse(for: event) {
+        if reportsPressedButton(0) {
             reportDrag(event, button: 32)
             return
         }
@@ -83,27 +83,48 @@ extension TerminalContentView {
 
     func moveCursor(to location: CGPoint, from clickLocation: CGPoint) {
         let terminal = session.terminal
-        let cursor = terminal.cursor
-        let row = terminal.scrollback.count + cursor.row
         let cell = { (location: CGPoint) in
             (
-                row: Int((location.y - Self.topPadding) / self.cellSize.height),
+                row: Int((location.y - Self.topPadding) / self.cellSize.height) - terminal.scrollback.count,
                 column: Int(floor((location.x - Self.padding) / self.cellSize.width))
             )
         }
         let target = cell(location)
-        guard session.terminal.mouseTracking == .off, !terminal.isAlternateScreenActive,
-            target == cell(clickLocation),
-            let (cells, index) = cells(atRow: target.row, column: target.column, in: terminal),
-            let cursorIndex = cells.firstIndex(where: {
-                $0.row == row && $0.column <= cursor.column && cursor.column < $0.column + Int($0.cell.width)
-            })
+        guard terminal.mouseTracking == .off, target == cell(clickLocation),
+            terminal.screen.indices.contains(target.row),
+            (0 ..< terminal.columns).contains(target.column)
         else {
             return
         }
-        let key =
-            (session.terminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}[") + (index < cursorIndex ? "D" : "C")
-        session.send(Array(String(repeating: key, count: abs(index - cursorIndex)).utf8))
+        var row = terminal.cursor.row
+        var column = min(terminal.cursor.column, terminal.columns - 1)
+        var keys = ""
+        let cursorKey = terminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}["
+        func press(_ final: String, _ count: Int) {
+            keys += String(repeating: cursorKey + final, count: max(count, 0))
+        }
+        while row != target.row {
+            let isUp = target.row < row
+            let isBoundary = isUp ? row == 0 || !terminal.screen[row - 1].isWrapped : !terminal.screen[row].isWrapped
+            if isBoundary {
+                if target.column < column {
+                    press("D", column - target.column)
+                    column = target.column
+                }
+                press(isUp ? "A" : "B", 1)
+                row += isUp ? -1 : 1
+            } else if isUp {
+                press("D", column + 1)
+                row -= 1
+                column = terminal.columns - 1
+            } else {
+                press("C", terminal.columns - column)
+                row += 1
+                column = 0
+            }
+        }
+        press(target.column < column ? "D" : "C", abs(target.column - column))
+        session.send(Array(keys.utf8))
     }
 
     private func extendSelection(to location: CGPoint) {
