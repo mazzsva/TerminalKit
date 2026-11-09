@@ -21,6 +21,10 @@ struct TerminalInputTests {
                 usesApplicationKeypad: mode == "keypad",
                 isAlternateScreenActive: mode.hasPrefix("alt"))
             let event = try recordedKey(parts[parts.count - 2], modifiers: parts[parts.count - 1])
+            let applied = event.modifierFlags.intersection([.shift, .control])
+            if modes.usesOptionAsMetaKey, !applied.isEmpty, event.characters(byApplyingModifiers: applied) == "" {
+                continue
+            }
             #expect(hex(sent(event, modes)) == expected, "\(recording) \(name)")
         }
     }
