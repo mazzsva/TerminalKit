@@ -10,15 +10,7 @@ extension Terminal {
         if usesSGRMouseEncoding {
             return Array("\u{1B}[<\(button);\(column + 1);\(row + 1)\(isRelease ? "m" : "M")".utf8)
         }
-        let button = isRelease ? button | 3 : button
-        if usesURXVTMouseEncoding {
-            return Array("\u{1B}[\(button + 32);\(column + 1);\(row + 1)M".utf8)
-        }
-        let values = [button, column + 1, row + 1].map { $0 + 32 }
-        guard usesUTF8MouseEncoding else {
-            return Array("\u{1B}[M".utf8) + values.map { UInt8(min($0, 255)) }
-        }
-        return Array("\u{1B}[M".utf8)
-            + values.flatMap { UnicodeScalar(UInt32(min($0, 2047))).map { Array(String($0).utf8) } ?? [] }
+        let values = [isRelease ? button | 3 : button, column + 1, row + 1].map { UInt8(min($0 + 32, 255)) }
+        return Array("\u{1B}[M".utf8) + values
     }
 }

@@ -129,9 +129,7 @@ extension TerminalContentView {
         let location = convert(event.locationInWindow, from: nil)
         let row = Int((location.y - Self.topPadding) / cellSize.height) - terminal.scrollback.count
         let column = Int((location.x - Self.padding) / cellSize.width)
-        let limit =
-            terminal.usesSGRMouseEncoding || terminal.usesURXVTMouseEncoding || terminal.usesUTF8MouseEncoding
-            ? Int.max : 222
+        let limit = terminal.usesSGRMouseEncoding ? Int.max : 222
         return Terminal.Position(
             row: min(max(row, 0), terminal.rows - 1, limit), column: min(max(column, 0), terminal.columns - 1, limit))
     }
