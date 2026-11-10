@@ -8,15 +8,8 @@ import Testing
 struct TerminalJoinedCellTests {
     @Test(
         arguments: [
-            ("\u{1F1FA}\u{1F1F8}", [0]),
-            ("\u{1F1FA}\u{1F1F8}\u{1F1EC}\u{1F1E7}", [0, 2]),
-            ("\u{1F44D}\u{1F3FD}", [0]),
-            ("\u{261D}\u{1F3FD}", [0]),
-            ("1\u{FE0F}\u{20E3}", [0]),
-            ("#\u{FE0F}\u{20E3}", [0]),
-            ("a\u{20E3}", [0]),
-            ("\u{4E2D}\u{20E3}", [0]),
             ("\u{915}\u{93E}", [0]),
+            ("\u{915}\u{93E}\u{915}\u{93F}", [0, 2]),
             ("\u{915}\u{94D}\u{937}", [0]),
             ("\u{E01}\u{E33}", [0]),
         ] as [(String, [Int])])
@@ -29,48 +22,60 @@ struct TerminalJoinedCellTests {
     @Test(
         arguments: [
             "\u{1F468}\u{200D}\u{1F469}", "\u{1F3F4}\u{E0067}", "a\u{1F3FD}", "\u{4E2D}\u{1F3FD}", "\u{1100}\u{1100}",
-            "a\u{903}", "e\u{301}\u{903}", "\u{1F600}\u{1F600}", "ab",
+            "a\u{903}", "e\u{301}\u{903}", "\u{1F600}\u{1F600}", "ab", "a\u{20E3}", "\u{4E2D}\u{20E3}",
         ])
     func keepsTheCellsThatTerminalAppKeepsApart(text: String) {
         let (line, graphemes) = cells(text)
         #expect(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil) == nil)
     }
 
+    @Test(
+        arguments: [
+            "\u{1F1FA}\u{1F1F8}", "\u{1F44D}\u{1F3FD}", "\u{261D}\u{1F3FD}", "1\u{FE0F}\u{20E3}", "#\u{FE0F}\u{20E3}",
+            "\u{1F468}\u{200D}\u{1F469}",
+        ])
+    func leavesAnEmojiSequenceInOneCell(text: String) {
+        let (line, graphemes) = cells(text)
+        #expect(line[0].width == 2)
+        #expect(graphemes.character(of: line[0]) == text)
+        #expect(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil) == nil)
+    }
+
     @Test func keepsCellsWithDifferentBackgroundsApart() {
-        let (line, graphemes) = cells("1\u{FE0F}\u{1B}[41m\u{20E3}")
+        let (line, graphemes) = cells("\u{915}\u{1B}[41m\u{93E}")
         #expect(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil) == nil)
     }
 
     @Test func recordsTheEndAndTheFollowers() throws {
-        let (line, graphemes) = cells("x\u{1F44D}\u{1F3FD}y")
+        let (line, graphemes) = cells("x\u{915}\u{94D}\u{937}y")
         let joined = try #require(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil))
-        #expect(joined.heads[1]?.text == "\u{1F44D}\u{1F3FD}")
-        #expect(joined.heads[1]?.end == 5)
-        #expect(joined.headsOfFollowers == [3: 1])
+        #expect(joined.heads[1]?.text == "\u{915}\u{94D}\u{937}")
+        #expect(joined.heads[1]?.end == 3)
+        #expect(joined.headsOfFollowers == [2: 1])
     }
 
-    @Test func drawsAJoinedFlagAsOneShape() async throws {
-        let flag = try await drawn("\u{1F1FA}\u{1F1F8}")
-        let apart = try await drawn("\u{1F1FA} \u{1F1F8}")
-        let rect = flag.rect(row: 0, columns: 0 ..< 1)
-        #expect(try image(of: flag, in: rect) != image(of: apart, in: rect))
+    @Test func drawsJoinedCellsAsOneShape() async throws {
+        let shape = try await drawn("\u{915}\u{93F}")
+        let apart = try await drawn("\u{915} \u{93F}")
+        let rect = shape.rect(row: 0, columns: 0 ..< 1)
+        #expect(try image(of: shape, in: rect) != image(of: apart, in: rect))
     }
 
     @Test func drawsTheWholeShapeOverACursorOnItsSecondCell() async throws {
-        let flag = try await focused("\u{1F1FA}\u{1F1F8}\\b")
-        let apart = try await focused(" \u{1F1F8}\\b")
+        let shape = try await focused("\u{915}\u{93F}\\b")
+        let apart = try await focused(" \u{93F}\\b")
         let blank = try await focused("  \\b")
-        let rect = flag.view.cursorRect
-        #expect(flag.view.cursorRect == apart.view.cursorRect)
-        #expect(try image(of: flag.view, in: rect) != image(of: apart.view, in: rect))
-        #expect(try image(of: flag.view, in: rect) != image(of: blank.view, in: rect))
+        let rect = shape.view.cursorRect
+        #expect(shape.view.cursorRect == apart.view.cursorRect)
+        #expect(try image(of: shape.view, in: rect) != image(of: apart.view, in: rect))
+        #expect(try image(of: shape.view, in: rect) != image(of: blank.view, in: rect))
     }
 
     @Test func clipsTheShapeToTheCursor() async throws {
-        let flag = try await focused("\u{1F1FA}\u{1F1F8}\\b")
-        let hidden = try await focused("\\033[?25l\u{1F1FA}\u{1F1F8}\\b")
-        let first = flag.view.rect(row: 0, columns: 0 ..< 1)
-        #expect(try image(of: flag.view, in: first) == image(of: hidden.view, in: first))
+        let shape = try await focused("\u{915}\u{93F}\\b")
+        let hidden = try await focused("\\033[?25l\u{915}\u{93F}\\b")
+        let first = shape.view.rect(row: 0, columns: 0 ..< 1)
+        #expect(try image(of: shape.view, in: first) == image(of: hidden.view, in: first))
     }
 
     @Test func keepsTheCursorCellUnderline() async throws {
@@ -90,7 +95,7 @@ struct TerminalJoinedCellTests {
         #expect(TerminalContentView.joinedCells(in: line, graphemes: terminal.graphemes, order: order) == nil)
     }
 
-    @Test(arguments: ["1\u{FE0F}\u{1B}[7m\u{20E3}", "\u{1B}[7;31m\u{915}\u{1B}[32m\u{93E}", "\u{915}\u{1B}[8m\u{93E}"])
+    @Test(arguments: ["\u{1B}[7;31m\u{915}\u{1B}[32m\u{93E}", "\u{915}\u{1B}[8m\u{93E}"])
     func keepsCellsWithDifferentPaintApart(text: String) {
         let (line, graphemes) = cells(text)
         #expect(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil) == nil)
@@ -105,18 +110,18 @@ struct TerminalJoinedCellTests {
     }
 
     @Test func expandsARangeToItsShape() throws {
-        let (line, graphemes) = cells("x\u{1F44D}\u{1F3FD}y")
+        let (line, graphemes) = cells("x\u{915}\u{94D}\u{937}y")
         let joined = try #require(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil))
-        #expect(joined.expanded(3 ..< 5) == 1 ..< 5)
-        #expect(joined.expanded(1 ..< 3) == 1 ..< 5)
+        #expect(joined.expanded(2 ..< 3) == 1 ..< 3)
+        #expect(joined.expanded(1 ..< 2) == 1 ..< 3)
         #expect(joined.expanded(0 ..< 1) == 0 ..< 1)
     }
 
-    @Test func keepsAFlagJoinedInALineWithRightToLeftText() async throws {
-        let flag = try await drawn("\u{1F1FA}\u{1F1F8} \u{5D0}")
-        let apart = try await drawn("\u{1F1FA} \u{1F1F8}\u{5D0}")
-        let rect = flag.rect(row: 0, columns: 0 ..< 1)
-        #expect(try image(of: flag, in: rect) != image(of: apart, in: rect))
+    @Test func keepsCellsJoinedInALineWithRightToLeftText() async throws {
+        let shape = try await drawn("\u{915}\u{93F} \u{5D0}")
+        let apart = try await drawn("\u{915} \u{93F}\u{5D0}")
+        let rect = shape.rect(row: 0, columns: 0 ..< 1)
+        #expect(try image(of: shape, in: rect) != image(of: apart, in: rect))
     }
 
     private func focused(_ text: String) async throws -> (view: TerminalContentView, window: KeyWindow) {

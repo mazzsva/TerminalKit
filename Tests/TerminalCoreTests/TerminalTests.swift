@@ -172,9 +172,9 @@ struct TerminalTests {
     }
 
     @Test func combinesMarksWithAWideCharacter() {
-        var terminal = Terminal(columns: 3, rows: 1)
+        var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("❤\u{FE0F}中\u{FE0F}")
-        #expect(terminal.screen[0].map(terminal.character(of:)) == ["❤\u{FE0F}", "中\u{FE0F}", " "])
+        #expect(terminal.screen[0].map(terminal.character(of:)) == ["❤\u{FE0F}", " ", "中\u{FE0F}", " "])
     }
 
     @Test func combinesMarksWithTheLastCharacterOfALine() {

@@ -70,21 +70,9 @@ extension TerminalContentView {
     }
 
     private static func joins(_ text: String, width: Int, _ next: String, width nextWidth: Int) -> Bool {
-        guard let first = text.unicodeScalars.first, let following = next.unicodeScalars.first else {
+        guard let first = text.unicodeScalars.first else {
             return false
         }
-        let isAllowed =
-            if following == "\u{20E3}" || (isRegionalIndicator(first) && isRegionalIndicator(following)) {
-                true
-            } else if following.properties.isEmojiModifier {
-                first.properties.isEmojiModifierBase
-            } else {
-                !first.isASCII && width == 1 && nextWidth == 1
-            }
-        return isAllowed && (text + next).count == 1
-    }
-
-    private static func isRegionalIndicator(_ scalar: Unicode.Scalar) -> Bool {
-        ("\u{1F1E6}" ... "\u{1F1FF}").contains(scalar)
+        return !first.isASCII && width == 1 && nextWidth == 1 && (text + next).count == 1
     }
 }

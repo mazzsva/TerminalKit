@@ -85,6 +85,14 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityString(for: NSRange(location: 2, length: 3)) == "🙂b")
     }
 
+    @Test func countsAnEmojiSequenceAsOneCharacter() async throws {
+        let view = try await accessibleView(running: "printf 'a\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}b'")
+        #expect(view.accessibilityValue() as? String == "a\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}b\n\n")
+        #expect(view.accessibilitySelectedTextRange() == NSRange(location: 10, length: 0))
+        #expect(view.accessibilityRange(for: 5) == NSRange(location: 1, length: 8))
+        #expect(view.accessibilityRange(for: 9) == NSRange(location: 9, length: 1))
+    }
+
     @Test func givesTheSelectedText() async throws {
         let view = try await accessibleView(running: "printf 'ab\\r\\ncd'")
         #expect(view.accessibilitySelectedText() == "")
