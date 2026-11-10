@@ -421,6 +421,71 @@ struct TerminalMouseTests {
         view.mouseUp(with: try mouseEvent(.leftMouseUp, row: row, column: column, in: view, modifierFlags: .option))
         #expect(await session.linesAfterExit().contains("ij" + keys))
     }
+
+    @Test(arguments: [
+        ("日本語ab", (3, 1), String(repeating: "E[D", count: 6)),
+        ("日本語ab", (4, 1), String(repeating: "E[D", count: 5)),
+        ("日本語ab\\033[1;1H", (5, 1), String(repeating: "E[C", count: 4)),
+        ("日本語ab\\033[1;1H", (6, 1), String(repeating: "E[C", count: 5)),
+        ("日本語ab\\033[1;1H", (8, 1), String(repeating: "E[C", count: 7)),
+        ("日本語ab\\033[1;4H", (8, 1), String(repeating: "E[C", count: 4)),
+        ("日本語ab\\r\\nxyz", (4, 1), "E[A"),
+        ("日本語ab\\r\\nxyz", (8, 1), "E[A" + String(repeating: "E[C", count: 4)),
+        ("xyz\\r\\n日本語ab\\033[1;2H", (6, 2), "E[B" + String(repeating: "E[C", count: 4)),
+        ("ab日本語cd", (2, 1), String(repeating: "E[D", count: 9)),
+    ])
+    func movesTheCursorWithOptionOverWideCharactersAsTerminal(text: String, target: (Int, Int), keys: String)
+        async throws
+    {
+        let (view, session) = try await viewShowing(text)
+        try optionClick(view, column: target.0, row: target.1)
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().joined().contains("<" + keys + "done"))
+    }
+
+    @Test(arguments: [
+        ("abc\\033[999Cz", (3, 1), "E[D", -3, ""),
+        ("abc\\r\\n\\033[999Cz", (3, 1), "E[D", -3, "E[A"),
+        ("abc\\033[999Cz\\r\\n\\r\\nq\\033[1;999Hz", (3, 3), "E[D", -3, "E[BE[B"),
+        ("\\033[999C日\\033[1;1H", (3, 2), "E[C", 2, ""),
+        ("\\033[999C日", (3, 1), "E[D", 0, ""),
+    ])
+    func movesTheCursorWithOptionFromTheLastColumnAsTerminal(
+        text: String, target: (Int, Int), key: String, offset: Int, suffix: String
+    ) async throws {
+        let (view, session) = try await viewShowing(text)
+        try optionClick(view, column: target.0, row: target.1)
+        session.send(Array("done\n".utf8))
+        let keys = String(repeating: key, count: session.terminal.columns + offset) + suffix
+        #expect(await session.linesAfterExit().joined().contains("<" + keys + "done"))
+    }
+
+    @Test func movesNoCursorWithOptionOnAPendingWrap() async throws {
+        let (view, session) = try await viewShowing("abc\\033[999Cz")
+        try optionClick(view, column: session.terminal.columns, row: 1)
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().joined().contains("<done"))
+    }
+
+    private func optionClick(_ view: TerminalContentView, column: Int, row: Int) throws {
+        let (column, row) = (CGFloat(column) - 0.5, row - 1)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row, column: column, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: row, column: column, in: view, modifierFlags: .option))
+    }
+}
+
+@MainActor
+private func viewShowing(_ text: String) async throws -> (TerminalContentView, TerminalSession) {
+    let session = TerminalSession(
+        running: "stty raw -echo; printf '\(text)\\033[c'; head -c 7 >/dev/null; printf '\\033]0;go\\007'; "
+            + "head -n 1 | tr '\\033' E | sed 's/^/</'")
+    let view = TerminalContentView(session: session)
+    view.fit(to: CGSize(width: 400, height: 300))
+    try session.start()
+    for await title in Observations({ session.title }) where title == "go" {
+        break
+    }
+    return (view, session)
 }
 
 @MainActor
