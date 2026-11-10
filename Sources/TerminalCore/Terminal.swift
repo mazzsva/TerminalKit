@@ -31,6 +31,7 @@ package struct Terminal: Sendable {
 
     private static let maximumBytesPerCell = 1_024
     private static let maximumRepeatCount = 1_000_000
+    private static let maximumTitleStackDepth = 10
 
     package private(set) var columns: Int
     package private(set) var rows: Int
@@ -83,6 +84,7 @@ package struct Terminal: Sendable {
     var replies: [UInt8] = []
     private var normalScreen: (lines: [Line], savedCursor: SavedCursor)?
     private var alternateSavedCursor: SavedCursor?
+    private var titleStack: [String] = []
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -325,6 +327,12 @@ package struct Terminal: Sendable {
             modifyOtherKeys = level <= 2 ? level : 0
             return
         }
+        if sequence.privateMarker == "?", sequence.final == "n", sequence.parameters.first == 6 {
+            replies += "\u{1B}[?\(cursor.row + 1);\(cursor.column + 1)R".utf8
+        }
+        if sequence.privateMarker == "?", sequence.final == "m", sequence.parameters.first == 4 {
+            replies += "\u{1B}[>4;\(modifyOtherKeys)m".utf8
+        }
         guard sequence.privateMarker == nil else {
             return
         }
@@ -403,6 +411,13 @@ package struct Terminal: Sendable {
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
             setScrollRegion(top: count - 1, bottom: min(sequence.parameter(at: 1, default: rows), rows))
+        case "t" where count == 22 && sequence.parameter(at: 1, default: 0) <= 2:
+            let saved = sequence.parameter(at: 1, default: 0) == 1 ? titleStack.last ?? title : title
+            titleStack = Array((titleStack + [saved]).suffix(Self.maximumTitleStackDepth))
+        case "t" where count == 23 && sequence.parameter(at: 1, default: 0) <= 2:
+            if let saved = titleStack.popLast(), sequence.parameter(at: 1, default: 0) != 1 {
+                title = saved
+            }
         default:
             break
         }

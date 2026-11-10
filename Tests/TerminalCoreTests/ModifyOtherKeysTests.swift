@@ -25,6 +25,12 @@ struct ModifyOtherKeysTests {
         }
     }
 
+    @Test func reportsTheModifyOtherKeysLevel() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        #expect(terminal.receive("\u{1B}[?4m") == "\u{1B}[>4;0m")
+        #expect(terminal.receive("\u{1B}[>4;2m\u{1B}[?4m") == "\u{1B}[>4;2m")
+    }
+
     @Test func clearsTheModifyOtherKeysLevelOnReset() {
         for reset in ["\u{1B}c", "\u{1B}[!p"] {
             var terminal = Terminal(columns: 4, rows: 2)
