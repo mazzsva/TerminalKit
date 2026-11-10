@@ -31,6 +31,15 @@ struct TerminalFindTests {
         #expect(view.rects(forCharacterRange: emoji)?.map(\.rectValue) == [view.rect(row: 0, columns: 4 ..< 6)])
     }
 
+    @Test func mapsAnEmojiSequence() async throws {
+        let scrollView = try await findView(running: "printf 'a\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}x'")
+        let view = scrollView.terminalView
+        let emoji = (view.string as NSString).range(of: "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}")
+        #expect(view.rects(forCharacterRange: emoji)?.map(\.rectValue) == [view.rect(row: 0, columns: 1 ..< 3)])
+        let range = (view.string as NSString).range(of: "x")
+        #expect(view.rects(forCharacterRange: range)?.map(\.rectValue) == [view.rect(row: 0, columns: 3 ..< 4)])
+    }
+
     @Test func selectsTheFoundText() async throws {
         let scrollView = try await findView(running: "printf 'one two\\r\\nthree'")
         let view = scrollView.terminalView

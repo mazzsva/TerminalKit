@@ -487,6 +487,25 @@ struct TerminalSelectionTests {
         #expect(view.selectedText == "a中b😀")
     }
 
+    @Test func copiesAnEmojiSequenceOnce() async throws {
+        let view = try await view(running: "printf 'a\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}b'")
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 4))
+        #expect(view.selectedText == "a\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}b")
+    }
+
+    @Test(arguments: [
+        (1.4, 3.4, 2, 4, "\u{1F44D}\u{1F3FD}"), (0.6, 2.6, 0, 2, "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"),
+    ])
+    func selectsAnEmojiSequenceAsAWholeWithTheMouse(
+        start: CGFloat, end: CGFloat, anchor: Int, head: Int, text: String
+    ) async throws {
+        let view = try await view(running: "printf '\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F44D}\u{1F3FD}'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: start, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: end, in: view))
+        #expect(view.selection == Selection(anchor: .init(line: 0, column: anchor), head: .init(line: 0, column: head)))
+        #expect(view.selectedText == text)
+    }
+
     @Test func copiesFromTheScrollback() async throws {
         let view = try await view(running: "seq 1 100")
         view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 2, column: 0))
