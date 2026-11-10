@@ -38,6 +38,18 @@ struct TerminalInputTests {
                 .terminalKeyInput(TerminalKeyModes()) == .nothing)
     }
 
+    @Test func sendsNothingForControlReturn() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 2 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown("\r", modifierFlags: .control))
+        view.keyDown(with: try keyDown("\r", modifierFlags: [.control, .shift]))
+        view.keyDown(with: try keyDown("x"))
+        view.keyDown(with: try keyDown("y"))
+        #expect(await session.linesAfterExit().contains("78  79"))
+    }
+
     @Test func sendsNothingForTheHelpKeyAndHigherFunctionKeys() throws {
         for key in [NSHelpFunctionKey, NSF21FunctionKey, NSF35FunctionKey] {
             #expect(try keyDown(key).terminalKeyInput(TerminalKeyModes()) == .nothing)
