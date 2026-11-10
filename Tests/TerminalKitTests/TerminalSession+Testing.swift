@@ -7,7 +7,6 @@ import Testing
 extension TerminalSession {
     convenience init(running script: String) {
         self.init(configuration: .init(executableURL: URL(filePath: "/bin/sh"), arguments: ["-c", script]))
-        showsProcessCompletion = false
     }
 
     var lines: [String] {
