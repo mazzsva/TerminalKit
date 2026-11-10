@@ -58,10 +58,6 @@ struct TerminalAppRecordingTests {
         var reply = terminal.receive(bytes(recording.input))
         for step in steps {
             terminal.resize(columns: step.columns, rows: step.rows)
-            terminal.windowReport = Terminal.WindowReport(
-                width: step.columns * 7 + 20,
-                height: step.rows * 15 + 17
-            )
             reply += terminal.receive(bytes(step.input ?? ""))
         }
         return reply + terminal.receive(Array("\u{1B}[6n".utf8))
@@ -69,21 +65,10 @@ struct TerminalAppRecordingTests {
 
     func terminalLikeTheRecordedWindow() -> Terminal {
         var terminal = Terminal(columns: 40, rows: 12)
-        terminal.windowReport = Terminal.WindowReport(width: 300, height: 197)
         terminal.defaultColors = Terminal.DefaultColors(
             foreground: rgb(0xE6CE, 0xE6CE, 0xE6CE),
             background: rgb(0x213D, 0x2743, 0x33E7),
-            cursor: rgb(0x9D2C, 0x9D2C, 0x9D2C),
-            selection: rgb(0x3370, 0x4E03, 0x5EBA),
-            bold: rgb(0xF165, 0xF165, 0xF165),
-            ansi: [
-                rgb(0x354E, 0x4245, 0x4BCF), rgb(0xB480, 0x55F1, 0x47F9), rgb(0x6C95, 0xAAD2, 0x7107),
-                rgb(0xC4C4, 0xACAC, 0x6262), rgb(0x6D6D, 0x9696, 0xB4B4), rgb(0xBDBD, 0x7B7B, 0xCDCD),
-                rgb(0x7C16, 0xCB85, 0xCE42), rgb(0xDE68, 0xE648, 0xEC13), rgb(0x46BD, 0x5CD3, 0x6D12),
-                rgb(0xE049, 0x6C9A, 0x5A49), rgb(0x7965, 0xBE4A, 0x7E0D), rgb(0xE5E5, 0xC8C8, 0x7272),
-                rgb(0x6767, 0xB5B5, 0xEDED), rgb(0xD3D3, 0x8989, 0xE5E5), rgb(0x848C, 0xDE23, 0xE13A),
-                rgb(0xE64A, 0xEF7A, 0xF63D),
-            ]
+            cursor: rgb(0x9D2C, 0x9D2C, 0x9D2C)
         )
         _ = terminal.receive(
             Array("\u{1B}[3g\u{1B}[9G\u{1B}H\u{1B}[17G\u{1B}H\u{1B}[25G\u{1B}H\u{1B}[33G\u{1B}H\u{1B}[H".utf8))

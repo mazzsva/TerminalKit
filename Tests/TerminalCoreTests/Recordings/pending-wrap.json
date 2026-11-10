@@ -131,7 +131,6 @@
 {"name": "decawm off rep after csi", "input": "\\x1B[?7lAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABC\\x1B[m\\x1B[b\\x1B[6n\\x1B[?7h", "reply": "\\x1B[1;40R\\x1B[1;40R", "screen": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC"]},
 {"name": "decawm off wide then mark", "input": "\\x1B[?7lAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA中\\xCC\\x81\\x1B[6n\\x1B[?7h", "reply": "\\x1B[1;40R\\x1B[1;40R", "screen": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"]},
 {"name": "decawm off text then mark", "input": "\\x1B[?7lAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB\\xCC\\x81\\x1B[6n\\x1B[?7h", "reply": "\\x1B[1;40R\\x1B[1;40R", "screen": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB́"]},
-{"name": "restore origin above region", "input": "\\x1B[?6h\\x1B7\\x1B[3;6r\\x1B8\\x1B[6nX\\x1B[?6l\\x1B[r", "reply": "\\x1B[1;1R\\x1B[1;1R", "screen": ["", "", "X"]},
 {"name": "restore origin below region", "input": "\\x1B[10;1H\\x1B[?6h\\x1B[H\\x1B[12;1H\\x1B[?6l\\x1B[10;1H\\x1B7\\x1B[3;6r\\x1B[?6h\\x1B8\\x1B[6nX\\x1B[?6l\\x1B[r", "reply": "\\x1B[10;1R\\x1B[1;1R", "screen": ["", "", "", "", "", "", "", "", "", "X"]},
 {"name": "origin saved then region moves", "input": "\\x1B[5;8r\\x1B[?6h\\x1B[2;1H\\x1B7\\x1B[?6l\\x1B[r\\x1B[1;3r\\x1B8\\x1B[6nX\\x1B[?6l\\x1B[r", "reply": "\\x1B[2;1R\\x1B[1;1R", "screen": ["", "X"]}
 ]

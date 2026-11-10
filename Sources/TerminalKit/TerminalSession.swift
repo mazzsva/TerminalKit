@@ -191,13 +191,6 @@ public final class TerminalSession {
         if let view = sizingView, view.reportedColors != terminal.defaultColors {
             terminal.defaultColors = view.reportedColors
         }
-        if let report = sizingView?.windowReport {
-            if report != terminal.windowReport {
-                terminal.windowReport = report
-            }
-        } else if terminal.windowReport.isVisible {
-            terminal.windowReport.isVisible = false
-        }
         let replies = terminal.receive(bytes)
         title = terminal.title
         if bellCount != terminal.bellCount {

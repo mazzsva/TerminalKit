@@ -264,13 +264,6 @@ struct TerminalTests {
         #expect(lines(terminal) == ["AZ^q"])
     }
 
-    @Test(arguments: ["A", "1"])
-    func endsTheGraphicsCharactersWithAnyOtherCharacterSet(final: String) {
-        var terminal = Terminal(columns: 2, rows: 1)
-        terminal.receive("\u{1B}(0q\u{1B}(\(final)q")
-        #expect(lines(terminal) == ["─q"])
-    }
-
     @Test func wrapsAtTheEndOfALine() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("abcdef")
@@ -390,6 +383,14 @@ struct TerminalTests {
         #expect(lines(terminal) == ["xyzbc "])
     }
 
+    @Test func ignoresTheOldModes() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        #expect(terminal.receive("\u{1B}[2;3r\u{1B}[?6h\u{1B}#8\u{1B}[?47h\u{1B}[20hA\nB") == "")
+        #expect(lines(terminal) == ["A   ", " B  ", "    "])
+        #expect(!terminal.isAlternateScreenActive)
+        #expect(terminal.receive("\u{1B}[6n") == "\u{1B}[2;3R")
+    }
+
     @Test func keepsReplaceModeForOtherModes() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("abc\r\u{1B}[20hx")
@@ -454,68 +455,22 @@ struct TerminalTests {
         #expect(lines(terminal) == ["ab", "  "])
     }
 
-    @Test(arguments: ["\n", "\u{B}", "\u{C}"])
-    func returnsToTheFirstColumnInNewLineMode(lineFeed: String) {
-        var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("\u{1B}[20hab\(lineFeed)")
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
-        terminal.receive("\u{1B}[20l\u{1B}[Hab\(lineFeed)")
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
-    }
-
-    @Test(arguments: ["\u{1B}[!p", "\u{1B}c"])
-    func resetsNewLineMode(reset: String) {
-        var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("\u{1B}[20h\(reset)ab\n")
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
-    }
-
     @Test func softResetsTheTabStops() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("\u{1B}[3g\u{1B}[!p\t")
         #expect(terminal.cursor.column == 8)
     }
 
-    @Test func shiftsBetweenCharacterSets() {
+    @Test func ignoresTheOldCharacterSets() {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B})0q\u{E}q\u{F}q")
-        #expect(lines(terminal) == ["q─q "])
-    }
-
-    @Test(arguments: [("*", "n"), ("+", "o")])
-    func locksTheOtherCharacterSets(designator: String, shift: String) {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}\(designator)0\u{1B}\(shift)q")
-        #expect(lines(terminal) == ["─   "])
-    }
-
-    @Test(arguments: [
-        ("A", "#", "£"), ("K", "~", "ß"), ("4", "@", "¾"), ("Z", "[", "¡"), ("1", "q", "q"), ("U", "q", "q"),
-    ])
-    func translatesWithEachCharacterSet(final: String, input: String, output: String) {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}(\(final)\(input)")
-        #expect(lines(terminal) == [output + "   "])
-    }
-
-    @Test func savesTheCharacterSetsButNotTheShift() {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B})0\u{E}\u{1B}7\u{F}\u{1B})B\u{1B}8q\u{E}q")
-        #expect(lines(terminal) == ["q─  "])
+        #expect(terminal.receive("\u{1B})0\u{1B}*0\u{1B}+0\u{E}\u{1B}n\u{1B}oq\u{1B}(A#\u{F}\u{1B}(0\u{1B}(Kq") == "")
+        #expect(lines(terminal) == ["q#─ "])
     }
 
     @Test func keepsAnUnderscoreInLineDrawing() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{1B}(0_")
         #expect(lines(terminal) == ["_   "])
-    }
-
-    @Test func fillsTheScreenWithoutMovingTheCursor() {
-        var terminal = Terminal(columns: 2, rows: 2)
-        terminal.receive("\u{1B}[41m\u{1B}[2;2H\u{1B}#8")
-        #expect(lines(terminal) == ["EE", "EE"])
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
-        #expect(terminal.screen[0][0].style == Terminal.Style())
     }
 
     @Test func softResetsTheScrollRegion() {
@@ -689,39 +644,6 @@ struct TerminalTests {
         var terminal = Terminal(columns: 10, rows: 6)
         terminal.receive("\u{1B}[2;5r\u{1B}[\(row + 1);3H\u{1B}[10\(final)")
         #expect(terminal.cursor.row == stop)
-    }
-
-    @Test(arguments: [("A", 1), ("B", 4), ("F", 1), ("E", 4)])
-    func stopsTheCursorAtTheMarginsInOriginMode(final: String, stop: Int) {
-        var terminal = Terminal(columns: 10, rows: 6)
-        terminal.receive("\u{1B}[2;5r\u{1B}[?6h\u{1B}[2;3H\u{1B}[10\(final)")
-        #expect(terminal.cursor.row == stop)
-    }
-
-    @Test func countsRowsFromTheTopMarginInOriginMode() {
-        var terminal = Terminal(columns: 10, rows: 6)
-        #expect(terminal.receive("\u{1B}[2;5r\u{1B}[?6h\u{1B}[2;3H\u{1B}[6n") == "\u{1B}[2;3R")
-        #expect(terminal.cursor == Terminal.Position(row: 2, column: 2))
-        terminal.receive("\u{1B}[99d")
-        #expect(terminal.cursor.row == 4)
-    }
-
-    @Test func keepsTheCursorWhenOriginModeEnds() {
-        var terminal = Terminal(columns: 10, rows: 6)
-        terminal.receive("\u{1B}[2;5r\u{1B}[?6h\u{1B}[2;3H\u{1B}[?6l")
-        #expect(terminal.cursor == Terminal.Position(row: 2, column: 2))
-    }
-
-    @Test func restoresTheRowFromTheNewTopMarginInOriginMode() {
-        var terminal = Terminal(columns: 10, rows: 8)
-        terminal.receive("\u{1B}[5;8r\u{1B}[?6h\u{1B}[2;1H\u{1B}7\u{1B}[?6l\u{1B}[1;3r\u{1B}8")
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
-    }
-
-    @Test func savesOriginModeWithTheCursor() {
-        var terminal = Terminal(columns: 10, rows: 6)
-        terminal.receive("\u{1B}[2;5r\u{1B}[?6h\u{1B}7\u{1B}[?6l\u{1B}8\u{1B}[H")
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
     }
 
     @Test(arguments: ["a", "e"])
@@ -1072,13 +994,6 @@ struct TerminalTests {
         #expect(lines(terminal) == ["        xy"])
     }
 
-    @Test func reportsAnOriginRowAboveTheScrollRegionAsUnsigned() {
-        var terminal = Terminal(columns: 2, rows: 6)
-        terminal.receive("\u{1B}[5;6r\u{1B}[?6h")
-        terminal.resize(columns: 2, rows: 3)
-        #expect(terminal.receive(Array("\u{1B}[6n".utf8)) == Array("\u{1B}[18446744073709551615;2R".utf8))
-    }
-
     @Test func reflowsLinesWhenTheScreenGetsNarrower() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("abcd\r\n")
@@ -1171,7 +1086,7 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 3, column: 2))
     }
 
-    @Test(arguments: [(3, "\u{1B}[?47h")])
+    @Test(arguments: [(3, "\u{1B}[?1049h")])
     func resizesTheAlternateScreenAfterTheRowsChange(rows: Int, sequence: String) {
         var terminal = Terminal(columns: 4, rows: rows)
         terminal.receive("\u{1B}[\(rows)H\u{1B}7\u{1B}[H")
@@ -1183,18 +1098,18 @@ struct TerminalTests {
 
     @Test func reflowsTheNormalScreenAroundItsCursor() {
         var terminal = Terminal(columns: 10, rows: 3)
-        terminal.receive("aaaaaaaa\r\nbbbbbbbb\r\n$ \u{1B}[?47h")
+        terminal.receive("aaaaaaaa\r\nbbbbbbbb\r\n$ \u{1B}[?1049h")
         terminal.resize(columns: 4, rows: 3)
-        terminal.receive("\u{1B}[?47l")
+        terminal.receive("\u{1B}[?1049l")
         #expect(scrollback(terminal) == ["aaaa", "aaaa"])
         #expect(lines(terminal) == ["bbbb", "bbbb", "$   "])
     }
 
     @Test func keepsTheCursorLineOfTheNormalScreenWhenTheRowsChange() {
         var terminal = Terminal(columns: 4, rows: 3)
-        terminal.receive("a\r\nb\r\nc\u{1B}[?47h")
+        terminal.receive("a\r\nb\r\nc\u{1B}[?1049h")
         terminal.resize(columns: 4, rows: 1)
-        terminal.receive("\u{1B}[?47l")
+        terminal.receive("\u{1B}[?1049l")
         #expect(scrollback(terminal) == ["a", "b"])
         #expect(lines(terminal) == ["c   "])
     }
@@ -1291,12 +1206,6 @@ struct TerminalTests {
         #expect(terminal.cursor.row == 1)
     }
 
-    @Test func usesTheDefaultBackgroundOnTheFirstAlternateScreen() {
-        var terminal = Terminal(columns: 2, rows: 1)
-        terminal.receive("\u{1B}[44m\u{1B}[?47h")
-        #expect(terminal.screen[0][0] == Terminal.Cell())
-    }
-
     @Test func usesTheBackgroundWhen1049ClearsTheScreen() {
         var terminal = Terminal(columns: 2, rows: 1)
         terminal.receive("\u{1B}[44m\u{1B}[?1049h")
@@ -1363,18 +1272,6 @@ struct TerminalTests {
         #expect(lines(terminal) == ["abc ", "    "])
     }
 
-    @Test func restoresThePositionWithMode47() {
-        var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("ab\u{1B}[?47hx\u{1B}[?47lc")
-        #expect(lines(terminal) == ["abc ", "    "])
-    }
-
-    @Test func homesTheCursorWithMode47() {
-        var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("ab\u{1B}[?47h")
-        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
-    }
-
     @Test func clearsTheAlternateScreenWithTheBackgroundColor() {
         var terminal = Terminal(columns: 2, rows: 1)
         terminal.receive("\u{1B}[44m\u{1B}[?1049h")
@@ -1387,24 +1284,11 @@ struct TerminalTests {
         #expect(lines(terminal) == ["    "])
     }
 
-    @Test(arguments: [47, 1049])
-    func clearsTheAlternateScreenOnEach1049(mode: Int) {
+    @Test func clearsTheAlternateScreenOnEach1049() {
         var terminal = Terminal(columns: 2, rows: 2)
-        terminal.receive("\u{1B}[?\(mode)hxy\r\nz\u{1B}[A\u{1B}[44m\u{1B}[?1049h")
+        terminal.receive("\u{1B}[?1049hxy\r\nz\u{1B}[A\u{1B}[44m\u{1B}[?1049h")
         #expect(lines(terminal) == ["  ", "  "])
         #expect(terminal.screen.flatMap { $0.map(\.style.background) } == Array(repeating: .indexed(4), count: 4))
-    }
-
-    @Test func keepsTheAlternateScreenOnASecondSwitch() {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}[?1049hxz\u{1B}[?47hy")
-        #expect(lines(terminal) == ["yz  "])
-    }
-
-    @Test func keepsTheAlternateScreenBetweenSwitches() {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}[?47hxz\u{1B}[?47l\u{1B}[?47hy")
-        #expect(lines(terminal) == ["yz  "])
     }
 
     @Test func clearsTheAlternateScreenOnEachSwitchTo1049() {
@@ -1425,10 +1309,9 @@ struct TerminalTests {
         #expect(lines(terminal) == ["x   "])
     }
 
-    @Test(arguments: [47, 1049])
-    func restoresTheNormalCursorAfterASecondSwitch(mode: Int) {
+    @Test func restoresTheNormalCursorAfterASecondSwitch() {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("ab\u{1B}7\u{1B}[?\(mode)hx\u{1B}[?1049h\u{1B}[?1049lc")
+        terminal.receive("ab\u{1B}7\u{1B}[?1049hx\u{1B}[?1049h\u{1B}[?1049lc")
         #expect(lines(terminal) == ["abc "])
     }
 
@@ -2186,18 +2069,10 @@ private func scrollback(_ terminal: Terminal) -> [String] {
 }
 
 struct WindowReportTests {
-    @Test func reportsTheWindowFields() {
-        var terminal = Terminal(columns: 40, rows: 12)
-        terminal.windowReport = Terminal.WindowReport(isVisible: true, x: 12, y: 34, width: 56, height: 78)
-        #expect(terminal.receive("\u{1B}[11t") == "\u{1B}[1t")
-        #expect(terminal.receive("\u{1B}[13t") == "\u{1B}[3;12;34t")
-        #expect(terminal.receive("\u{1B}[14t") == "\u{1B}[4;78;56t")
-        #expect(terminal.receive("\u{1B}[18t") == "\u{1B}[8;12;40t")
-    }
-
-    @Test func keepsTheWindowReportAfterAReset() {
-        var terminal = Terminal(columns: 40, rows: 12)
-        terminal.windowReport = Terminal.WindowReport(isVisible: true, x: 12, y: 34, width: 56, height: 78)
-        #expect(terminal.receive("\u{1B}c\u{1B}[13t") == "\u{1B}[3;12;34t")
+    @Test func ignoresTheWindowReports() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        #expect(terminal.receive("\u{1B}[11t\u{1B}[13t\u{1B}[14t\u{1B}[18t\u{1B}[x\u{1B}[1xA") == "")
+        #expect(lines(terminal) == ["A   ", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
     }
 }

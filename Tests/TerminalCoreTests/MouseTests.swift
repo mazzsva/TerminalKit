@@ -35,35 +35,10 @@ struct MouseTests {
         #expect(terminal.mouseReport(button: 2, column: 250, row: 1, isRelease: true) == Array("\u{1B}[<2;251;2m".utf8))
     }
 
-    @Test func reportsInTheUTF8Encoding() {
-        var terminal = Terminal(columns: 3000, rows: 2)
-        terminal.receive("\u{1B}[?1005h")
+    @Test func ignoresTheOldEncodings() {
+        var terminal = Terminal(columns: 300, rows: 2)
+        #expect(terminal.receive("\u{1B}[?1005h\u{1B}[?1015hA") == "")
         #expect(terminal.mouseReport(button: 0, column: 4, row: 2, isRelease: false) == Array("\u{1B}[M %#".utf8))
-        #expect(
-            terminal.mouseReport(button: 0, column: 229, row: 3, isRelease: true) == Array("\u{1B}[M#\u{106}$".utf8))
-        #expect(
-            terminal.mouseReport(button: 0, column: 2500, row: 0, isRelease: false) == Array("\u{1B}[M \u{7FF}!".utf8))
-    }
-
-    @Test func reportsInTheURXVTEncoding() {
-        var terminal = Terminal(columns: 300, rows: 2)
-        terminal.receive("\u{1B}[?1015h")
-        #expect(
-            terminal.mouseReport(button: 0, column: 229, row: 3, isRelease: false) == Array("\u{1B}[32;230;4M".utf8))
-        #expect(terminal.mouseReport(button: 0, column: 4, row: 2, isRelease: true) == Array("\u{1B}[35;5;3M".utf8))
-        #expect(terminal.mouseReport(button: 64, column: 4, row: 2, isRelease: false) == Array("\u{1B}[96;5;3M".utf8))
-    }
-
-    @Test(arguments: ["\u{1B}[?1015h\u{1B}[?1006h", "\u{1B}[?1005h\u{1B}[?1006h", "\u{1B}[?1006h\u{1B}[?1015h"])
-    func prefersTheSGREncoding(modes: String) {
-        var terminal = Terminal(columns: 300, rows: 2)
-        terminal.receive(modes)
-        #expect(terminal.mouseReport(button: 0, column: 229, row: 3, isRelease: true) == Array("\u{1B}[<0;230;4m".utf8))
-    }
-
-    @Test func turnsTheEncodingsOff() {
-        var terminal = Terminal(columns: 300, rows: 2)
-        terminal.receive("\u{1B}[?1005h\u{1B}[?1015h\u{1B}[?1005l\u{1B}[?1015l")
-        #expect(terminal.mouseReport(button: 0, column: 4, row: 2, isRelease: false) == Array("\u{1B}[M %#".utf8))
+        #expect(terminal.screen[0][0] == Terminal.Cell(scalar: "A"))
     }
 }
