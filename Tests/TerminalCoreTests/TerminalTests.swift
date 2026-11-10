@@ -1806,10 +1806,10 @@ struct TerminalTests {
         }
     }
 
-    @Test func joinsTheDigitsAroundAColonInAControlSequence() {
+    @Test func ignoresAControlSequenceWithAColon() {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("\u{1B}[0:2H")
-        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
+        terminal.receive("\u{1B}[2:2H")
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 0))
     }
 
     @Test func ignoresAColonInACursorShapeSequence() {

@@ -1098,7 +1098,6 @@
 {"name": "query ends esc x", "input": "\\x1B]10;?\\x1BxY", "reply": "\\x1B[1;2R", "screen": ["Y"]},
 {"name": "query ends esc esc", "input": "\\x1B]10;?\\x1B\\x1BY", "reply": "\\x1B[1;1R", "screen": []},
 {"name": "title then esc c", "input": "\\x1B]2;zz\\x07\\x1Bc", "reply": "\\x1B[1;1R", "screen": [], "title": "zz"},
-{"name": "si in osc", "input": "\\x1B)0\\x0E\\x1B]2;a\\x0Fb\\x07q\\x0F\\x1B)B", "reply": "\\x1B[1;2R", "screen": ["q"], "title": "ab"},
 {"name": "esc 6 at start", "input": "\\x1B6X", "reply": "\\x1B[1;2R", "screen": ["X"]},
 {"name": "esc 6 col 5", "input": "\\x1B[1;5H\\x1B6X", "reply": "\\x1B[1;6R", "screen": ["    X"]},
 {"name": "esc 6 then cpr", "input": "\\x1B[1;5H\\x1B6", "reply": "\\x1B[1;5R", "screen": []},

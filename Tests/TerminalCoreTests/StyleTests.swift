@@ -159,10 +159,10 @@ struct StyleTests {
         #expect(style("4;58;5;2;59") == Terminal.Style(isFaint: true, isUnderlined: true, isBlinking: true))
     }
 
-    @Test func joinsTheDigitsAroundAColon() {
-        #expect(style("4:3") == Terminal.Style(background: .indexed(3)))
-        #expect(style("38:2:1:2:3") == Terminal.Style())
-        #expect(style("1;3:1") == Terminal.Style(foreground: .indexed(1), isBold: true))
+    @Test func readsOnlyTheUnderlineSubparameters() {
+        #expect(style("4:3;31") == Terminal.Style(foreground: .indexed(1), isUnderlined: true))
+        #expect(style("4;4:0") == Terminal.Style())
+        #expect(style("38:2::255:0:0;1") == Terminal.Style(isBold: true))
     }
 
     @Test func ignoresTheUnderlineColorWithColons() {
