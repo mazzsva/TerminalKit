@@ -70,7 +70,7 @@ extension TerminalContentView: NSTextFinderClient {
                 if !clipped.isEmpty {
                     drawText(
                         line, columns: clipped, row: row, style: style, foreground: .black, graphemes: graphemes,
-                        order: order, joined: joined, ignoresBlink: true)
+                        order: order, joined: joined)
                 }
             }
         }

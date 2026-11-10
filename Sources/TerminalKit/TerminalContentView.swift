@@ -10,7 +10,6 @@ final class TerminalContentView: NSView {
     static let maximumColumns = 1_000
     static let maximumRows = 1_000
     static let cursorThickness: CGFloat = 2
-    static let blinkInterval = Duration.milliseconds(500)
     static let defaultFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
 
     let session: TerminalSession
@@ -98,9 +97,6 @@ final class TerminalContentView: NSView {
     var autoscrollClock: any Clock<Duration> = ContinuousClock()
 
     private var colors = Colors(.standard)
-    private(set) var isBlinkingTextHidden = false
-    private var drawsBlinkingText = false
-    private var blinkTask: Task<Void, Never>?
     private var changedColorsCache: (changes: Terminal.ChangedColors, isReversed: Bool, colors: Colors)?
     private(set) var fonts = Fonts(defaultFont)
     private(set) var keyDownEvent: NSEvent?
@@ -257,25 +253,6 @@ final class TerminalContentView: NSView {
         super.viewDidChangeEffectiveAppearance()
         changedColorsCache = nil
         updateReportedColors()
-    }
-
-    private func startBlinking() {
-        blinkTask = Task { [weak self] in
-            while true {
-                try? await Task.sleep(for: Self.blinkInterval)
-                guard let self else {
-                    return
-                }
-                guard drawsBlinkingText, window != nil else {
-                    blinkTask = nil
-                    isBlinkingTextHidden = false
-                    return
-                }
-                drawsBlinkingText = false
-                isBlinkingTextHidden.toggle()
-                needsDisplay = true
-            }
-        }
     }
 
     private func currentColors(for terminal: Terminal) -> Colors {
@@ -556,7 +533,6 @@ final class TerminalContentView: NSView {
                     let visual = order?.columns[column] ?? column
                     pixels[visual] = fill
                 }
-                drawsBlinkingText = drawsBlinkingText || style.isBlinking && !style.isHidden && hasInk
                 let drawsText = selected != nil || hasInk
                 if drawsText {
                     runs.append((line, row, columns, style, foreground, order, joined))
@@ -593,9 +569,6 @@ final class TerminalContentView: NSView {
                 order: order, joined: joined)
         }
 
-        if drawsBlinkingText, blinkTask == nil {
-            startBlinking()
-        }
         if hoveredLinkRevision != session.revision {
             updateHoveredLink()
         }
@@ -715,11 +688,9 @@ final class TerminalContentView: NSView {
         foreground: NSColor,
         graphemes: Terminal.Graphemes,
         order: VisualOrder? = nil,
-        joined: JoinedCells? = nil,
-        ignoresBlink: Bool = false
+        joined: JoinedCells? = nil
     ) {
-        guard !style.isHidden, ignoresBlink || !(style.isBlinking && isBlinkingTextHidden),
-            let context = NSGraphicsContext.current?.cgContext
+        guard !style.isHidden, let context = NSGraphicsContext.current?.cgContext
         else {
             return
         }

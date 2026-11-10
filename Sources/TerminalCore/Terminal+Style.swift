@@ -18,8 +18,7 @@ extension Terminal {
             isItalic: Bool = false,
             isUnderlined: Bool = false,
             isInverse: Bool = false,
-            isHidden: Bool = false,
-            isBlinking: Bool = false
+            isHidden: Bool = false
         ) {
             self.foreground = foreground
             self.background = background
@@ -29,7 +28,6 @@ extension Terminal {
             self.isUnderlined = isUnderlined
             self.isInverse = isInverse
             self.isHidden = isHidden
-            self.isBlinking = isBlinking
         }
 
         package var isBold: Bool {
@@ -62,11 +60,6 @@ extension Terminal {
             set { setFlag(5, newValue) }
         }
 
-        package var isBlinking: Bool {
-            get { flag(6) }
-            set { setFlag(6, newValue) }
-        }
-
         private func flag(_ bit: UInt8) -> Bool {
             flags & 1 << bit != 0
         }
@@ -90,8 +83,6 @@ extension Terminal {
                     isItalic = true
                 case 4:
                     isUnderlined = true
-                case 5:
-                    isBlinking = true
                 case 7:
                     isInverse = true
                 case 8:
@@ -103,8 +94,6 @@ extension Terminal {
                     isItalic = false
                 case 24:
                     isUnderlined = false
-                case 25:
-                    isBlinking = false
                 case 27:
                     isInverse = false
                 case 28:
