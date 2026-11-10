@@ -18,7 +18,7 @@ struct ProgramSessionTests {
         "CSI ?1034h",
     ]
 
-    @Test(.enabled(if: isInstalled("/bin/zsh")))
+    @Test(.enabled(if: getpwuid(getuid()).map { String(cString: $0.pointee.pw_shell) } == "/bin/zsh"))
     func loginShell() async throws {
         try await run { session in
             try await session.start()
