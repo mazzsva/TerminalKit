@@ -264,13 +264,6 @@ struct TerminalTests {
         #expect(lines(terminal) == ["AZ^q"])
     }
 
-    @Test(arguments: ["A", "1"])
-    func endsTheGraphicsCharactersWithAnyOtherCharacterSet(final: String) {
-        var terminal = Terminal(columns: 2, rows: 1)
-        terminal.receive("\u{1B}(0q\u{1B}(\(final)q")
-        #expect(lines(terminal) == ["─q"])
-    }
-
     @Test func wrapsAtTheEndOfALine() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("abcdef")
@@ -476,32 +469,10 @@ struct TerminalTests {
         #expect(terminal.cursor.column == 8)
     }
 
-    @Test func shiftsBetweenCharacterSets() {
+    @Test func ignoresTheOldCharacterSets() {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B})0q\u{E}q\u{F}q")
-        #expect(lines(terminal) == ["q─q "])
-    }
-
-    @Test(arguments: [("*", "n"), ("+", "o")])
-    func locksTheOtherCharacterSets(designator: String, shift: String) {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}\(designator)0\u{1B}\(shift)q")
-        #expect(lines(terminal) == ["─   "])
-    }
-
-    @Test(arguments: [
-        ("A", "#", "£"), ("K", "~", "ß"), ("4", "@", "¾"), ("Z", "[", "¡"), ("1", "q", "q"), ("U", "q", "q"),
-    ])
-    func translatesWithEachCharacterSet(final: String, input: String, output: String) {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}(\(final)\(input)")
-        #expect(lines(terminal) == [output + "   "])
-    }
-
-    @Test func savesTheCharacterSetsButNotTheShift() {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B})0\u{E}\u{1B}7\u{F}\u{1B})B\u{1B}8q\u{E}q")
-        #expect(lines(terminal) == ["q─  "])
+        #expect(terminal.receive("\u{1B})0\u{1B}*0\u{1B}+0\u{E}\u{1B}n\u{1B}oq\u{1B}(A#\u{F}\u{1B}(0\u{1B}(Kq") == "")
+        #expect(lines(terminal) == ["q#─ "])
     }
 
     @Test func keepsAnUnderscoreInLineDrawing() {
