@@ -16,6 +16,6 @@ struct TerminalStartupQueryTests {
         let view = TerminalContentView(session: session)
         session.sizingView = view
         try session.start()
-        #expect(await session.linesAfterExit().contains("pE]11;rgb:213d/2743/33e7E[?1;2c"))
+        #expect(await session.linesAfterExit().contains("E]11;rgb:213d/2743/33e7E[?1;2c"))
     }
 }

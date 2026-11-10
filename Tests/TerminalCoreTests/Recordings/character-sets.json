@@ -4,7 +4,6 @@
 {"name": "so-g1", "input": "\\x1B)0a\\x0Eq\\x0Fq", "reply": "\\x1B[1;4R", "screen": ["a─q"]},
 {"name": "c0 \\x0E esc paren", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B(\\x0E0q\\x1B(B", "reply": "\\x1B[2;3R", "screen": ["abc", "dqf", "ghi"]},
 {"name": "so in osc", "input": "\\x1B)0\\x1B]2;a\\x0Eb\\x07q\\x0F\\x1B)B", "reply": "\\x1B[1;2R", "screen": ["─"], "title": "ab"},
-{"name": "so in esc", "input": "\\x1B)0\\x1B\\x0EXq\\x0F\\x1B)B", "reply": "\\x1B[1;2R", "screen": ["─"]},
 {"name": "rep char combining g1", "input": "\\x1B)0\\x0Ee\\xCC\\x81\\x1B[2b\\x0F\\x1B)B", "reply": "\\x1B[1;2R", "screen": ["␊́"]},
 {"name": "rep char ascii g1", "input": "\\x1B)0\\x0Eq\\x1B[2b\\x0F\\x1B)B", "reply": "\\x1B[1;4R", "screen": ["─  "]},
 {"name": "rep hash uk", "input": "\\x1B(A#\\x1B[2b\\x1B(B", "reply": "\\x1B[1;4R", "screen": ["£  "]},

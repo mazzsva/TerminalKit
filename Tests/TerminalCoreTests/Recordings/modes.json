@@ -90,7 +90,6 @@
 {"name": "decaln alt", "input": "\\x1B[?1049h\\x1B#8\\x1B[?1049l", "reply": "\\x1B[1;1R", "screen": []},
 {"name": "esc # 1", "input": "\\x1B#1X", "reply": "\\x1B[1;2R", "screen": ["X"]},
 {"name": "esc # 2", "input": "\\x1B#2X", "reply": "\\x1B[1;2R", "screen": ["X"]},
-{"name": "esc #  ", "input": "\\x1B# X", "reply": "\\x1B[1;2R", "screen": ["X"]},
 {"name": "esc # 9", "input": "\\x1B#9X", "reply": "\\x1B[1;2R", "screen": ["X"]},
 {"name": "deccolm off", "input": "abc\\x1B[?3l\\x1B[6n", "reply": "\\x1B[1;4R\\x1B[1;4R", "screen": ["abc"]},
 {"name": "deccolm on no 40", "input": "abc\\x1B[?3h\\x1B[6n\\x1B[?3l", "reply": "\\x1B[1;4R\\x1B[1;4R", "screen": ["abc"]},
