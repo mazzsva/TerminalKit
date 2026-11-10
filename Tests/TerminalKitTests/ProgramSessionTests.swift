@@ -11,9 +11,9 @@ struct ProgramSessionTests {
         "CSI A", "CSI B", "CSI C", "CSI D", "CSI c", "CSI G", "CSI H", "CSI J", "CSI K", "CSI d", "CSI r", "CSI 4l",
         "CSI 6n", "CSI >c", "CSI >4m", "CSI m", "CSI 0m", "CSI 1m", "CSI 2m", "CSI 4m", "CSI 7m", "CSI 22m",
         "CSI 23m", "CSI 24m", "CSI 27m", "CSI 32m", "CSI 33m", "CSI 36m", "CSI 38m", "CSI 39m", "CSI 48m", "CSI 49m",
-        "CSI 94m", "CSI ?1h", "CSI ?1l", "CSI ?7h", "CSI ?25h",
-        "CSI ?25l", "CSI ?1000l", "CSI ?1002l", "CSI ?1003l", "CSI ?1004h", "CSI ?1004l", "CSI ?1006l", "CSI ?1049h",
-        "CSI ?1049l", "CSI ?2004h", "CSI ?2004l", "OSC 0", "OSC 7", "OSC 10", "OSC 11",
+        "CSI 94m", "CSI ?1h", "CSI ?1l", "CSI ?7h", "CSI ?25h", "CSI ?25l", "CSI ?1000l", "CSI ?1002l", "CSI ?1003l",
+        "CSI ?1004h", "CSI ?1004l", "CSI ?1006l", "CSI ?1049h", "CSI ?1049l", "CSI ?2004h", "CSI ?2004l", "OSC 0",
+        "OSC 7", "OSC 10", "OSC 11",
     ]
 
     static let ignored: Set<String> = [
@@ -196,6 +196,19 @@ struct ProgramSessionTests {
                 $0.isReady && $0.lines.contains("⏺ Bash(echo tk-$((6*7)))")
                     && $0.lines.contains { $0.contains("⎿") && $0.hasSuffix("tk-42") }
             }
+
+            try await session.submit("Create the file note.txt with the content tk-file. Use the Write tool.")
+            try await session.wait(timeout: .seconds(60)) {
+                $0.lines.contains { $0.contains("Do you want to create note.txt?") }
+                    && $0.lines.contains { $0.trimmingCharacters(in: .whitespaces) == "❯ 1. Yes" }
+            }
+            await session.send("\r")
+            try await session.wait(timeout: .seconds(60)) {
+                $0.isReady && $0.lines.contains { $0.hasPrefix("⏺ Write(note.txt)") }
+            }
+            #expect(
+                try String(contentsOf: folder.appending(path: "note.txt"), encoding: .utf8)
+                    .trimmingCharacters(in: .newlines) == "tk-file")
 
             await session.send("/")
             try await session.wait { $0.input == ["❯ /"] && $0.menuRows.count >= 5 }
