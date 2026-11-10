@@ -333,6 +333,12 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
+        guard
+            sequence.subparameters.isEmpty
+                || sequence.privateMarker == nil && sequence.intermediates.isEmpty && sequence.final == "m"
+        else {
+            return
+        }
         if sequence.privateMarker == nil, sequence.intermediates == " ", sequence.final == "q" {
             setCursorShape(sequence.parameter(at: 0, default: 0))
             return
@@ -433,7 +439,15 @@ package struct Terminal: Sendable {
                 }
             }
         case "m":
-            style.apply(sequence.parameters)
+            style.apply(
+                sequence.parameters.indices.map { index in
+                    switch (sequence.parameters[index], sequence.subparameters[index]) {
+                    case (let parameter, nil): parameter
+                    case (4, 0): 24
+                    case (4, _): 4
+                    default: -1
+                    }
+                })
         case "n":
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":

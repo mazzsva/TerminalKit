@@ -12,6 +12,7 @@ struct EscapeSequenceParser: Sendable {
         var parameters: [Int]
         var intermediates: String
         var final: Unicode.Scalar
+        var subparameters: [Int: Int] = [:]
 
         func parameter(at index: Int, default defaultValue: Int) -> Int {
             guard parameters.indices.contains(index), parameters[index] != 0 else {
@@ -45,36 +46,33 @@ struct EscapeSequenceParser: Sendable {
     private var parameters: [Int] = []
     private var isOverflowing = false
     private var hasLargeParameter = false
+    private var subparameters: [Int: Int] = [:]
+    private var colons = 0
     private var string: [Unicode.Scalar] = []
 
     mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
-        if state == .ignoredString {
-            return ignoredString(scalar)
+        if state == .operatingSystemCommandEscape {
+            if scalar == "\\" {
+                return finishString()
+            }
+            enterEscape()
         }
         switch scalar {
-        case "\u{1B}":
-            if isInString {
-                state = .operatingSystemCommandEscape
-            } else {
-                enterEscape()
-            }
-            return nil
-        case "\u{7}" where isInString:
-            return finishString()
-        case "\u{1A}" where isInString:
-            return finishString(requiringSeparator: true)
         case "\u{18}", "\u{1A}":
-            return nil
-        case "\t":
             state = .ground
-            return .execute(scalar)
+            return nil
+        case "\u{1B}" where isInOperatingSystemCommand:
+            state = .operatingSystemCommandEscape
+            return nil
+        case "\u{1B}":
+            enterEscape()
+            return nil
+        case "\u{7}" where isInOperatingSystemCommand:
+            return finishString()
+        case "\u{0}" ... "\u{1F}" where isInOperatingSystemCommand || state == .ignoredString, "\u{7F}":
+            return nil
         case "\u{0}" ... "\u{1F}":
             return .execute(scalar)
-        case "\u{7F}":
-            if !isInString {
-                state = .ground
-            }
-            return nil
         default:
             break
         }
@@ -95,18 +93,14 @@ struct EscapeSequenceParser: Sendable {
         case .operatingSystemCommandNumber:
             return operatingSystemCommandNumber(scalar)
         case .operatingSystemCommand:
-            if string.count <= Self.maximumStringLength {
-                string.append(scalar)
-            }
+            collectString(scalar)
             return nil
-        case .operatingSystemCommandEscape:
-            return operatingSystemCommandEscape(scalar)
-        case .ignoredString:
+        case .operatingSystemCommandEscape, .ignoredString:
             return nil
         }
     }
 
-    private var isInString: Bool {
+    private var isInOperatingSystemCommand: Bool {
         state == .operatingSystemCommandNumber || state == .operatingSystemCommand
     }
 
@@ -145,13 +139,25 @@ struct EscapeSequenceParser: Sendable {
 
     private mutating func controlSequence(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
-        case "0" ... "9":
-            if !isOverflowing {
-                let value = (parameters.popLast() ?? 0) * 10 + Int(scalar.value - 0x30)
+        case "0" ... "9" where !isOverflowing:
+            let digit = Int(scalar.value - 0x30)
+            if colons == 0 {
+                let value = (parameters.popLast() ?? 0) * 10 + digit
                 parameters.append(min(value, Self.maximumParameterValue + 1))
                 hasLargeParameter = hasLargeParameter || value > Self.maximumParameterValue
+            } else if colons == 1, let value = subparameters[parameters.count - 1] {
+                subparameters[parameters.count - 1] = min(value * 10 + digit, Self.maximumParameterValue)
+            }
+        case ":":
+            if parameters.isEmpty {
+                parameters.append(0)
+            }
+            colons += 1
+            if colons == 1 {
+                subparameters[isOverflowing ? parameters.count : parameters.count - 1] = 0
             }
         case ";":
+            colons = 0
             if parameters.count < Self.maximumParameters {
                 if parameters.isEmpty {
                     parameters.append(0)
@@ -204,44 +210,13 @@ struct EscapeSequenceParser: Sendable {
     }
 
     private mutating func operatingSystemCommandNumber(_ scalar: Unicode.Scalar) -> Action? {
-        switch scalar {
-        case "0" ... "9":
-            string.append(scalar)
-        case ";":
-            string.append(scalar)
+        if scalar.value >= 0x80 {
+            return .print(scalar)
+        }
+        if !("0" ... "9").contains(scalar) {
             state = .operatingSystemCommand
-        case ":", "@" ... "~":
-            state = .ground
-        case "\u{80}"...:
-            return .print(scalar)
-        default:
-            break
         }
-        return nil
-    }
-
-    private mutating func operatingSystemCommandEscape(_ scalar: Unicode.Scalar) -> Action? {
-        switch scalar {
-        case "\\":
-            return finishString(requiringSeparator: true)
-        case "\u{80}"...:
-            enterEscape()
-            return .print(scalar)
-        default:
-            state = .ground
-            return nil
-        }
-    }
-
-    private mutating func ignoredString(_ scalar: Unicode.Scalar) -> Action? {
-        switch scalar {
-        case "\u{1B}":
-            enterEscape()
-        case "\u{18}", "\u{1A}":
-            state = .ground
-        default:
-            break
-        }
+        collectString(scalar)
         return nil
     }
 
@@ -252,6 +227,8 @@ struct EscapeSequenceParser: Sendable {
         parameters = []
         isOverflowing = false
         hasLargeParameter = false
+        subparameters = [:]
+        colons = 0
         string = []
     }
 
@@ -263,18 +240,26 @@ struct EscapeSequenceParser: Sendable {
                 parameters: hasLargeParameter
                     ? parameters.map { $0 > Self.maximumParameterValue ? 0 : $0 } : parameters,
                 intermediates: intermediates,
-                final: final
+                final: final,
+                subparameters: subparameters
             )
         )
     }
 
-    private mutating func finishString(requiringSeparator: Bool = false) -> Action? {
+    private mutating func finishString() -> Action? {
         state = .ground
         defer { string = [] }
-        guard string.count <= Self.maximumStringLength, !requiringSeparator || string.contains(";") else {
+        let number = string.prefix { $0 != ";" }
+        guard string.count <= Self.maximumStringLength, !number.isEmpty, number.allSatisfy({ "0" ... "9" ~= $0 }) else {
             return nil
         }
         return .operatingSystemCommand(String(String.UnicodeScalarView(string)))
+    }
+
+    private mutating func collectString(_ scalar: Unicode.Scalar) {
+        if string.count <= Self.maximumStringLength {
+            string.append(scalar)
+        }
     }
 
     private mutating func collect(_ scalar: Unicode.Scalar) {
