@@ -4,8 +4,7 @@ import Testing
 @testable import TerminalCore
 @testable import TerminalKit
 
-@MainActor
-final class ProgramSession {
+actor ProgramSession {
     enum Key: String {
         case up = "A"
         case left = "D"
@@ -14,7 +13,12 @@ final class ProgramSession {
     struct Timeout: Error {}
 
     let folder = URL.temporaryDirectory.appending(path: "ProgramSession-" + UUID().uuidString)
-    private(set) var terminal = Terminal(columns: 80, rows: 24)
+    private(set) var terminal = {
+        var terminal = Terminal(columns: 80, rows: 24)
+        let gray = Terminal.RGB(red: 0x8000, green: 0x8000, blue: 0x8000)
+        terminal.defaultColors = Terminal.DefaultColors(foreground: gray, background: gray, cursor: gray)
+        return terminal
+    }()
     private(set) var output: [UInt8] = []
     private(set) var isFinished = false
     private var pseudoTerminal: PseudoTerminal?
@@ -25,8 +29,6 @@ final class ProgramSession {
         }
         try write("export HOME='\(url("home").path(percentEncoded: false))'\ncd\n", to: "zdot/.zshenv")
         try write("PS1='%# '\n", to: "zdot/.zshrc")
-        let gray = Terminal.RGB(red: 0x8000, green: 0x8000, blue: 0x8000)
-        terminal.defaultColors = Terminal.DefaultColors(foreground: gray, background: gray, cursor: gray)
     }
 
     var lines: [String] {
@@ -66,11 +68,11 @@ final class ProgramSession {
         return names
     }
 
-    func url(_ name: String) -> URL {
+    nonisolated func url(_ name: String) -> URL {
         folder.appending(path: name)
     }
 
-    func write(_ text: String, to name: String) throws {
+    nonisolated func write(_ text: String, to name: String) throws {
         try Data(text.utf8).write(to: url(name))
     }
 
@@ -113,11 +115,14 @@ final class ProgramSession {
         send((terminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}[") + key.rawValue)
     }
 
-    func wait(_ condition: (ProgramSession) -> Bool, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+    func wait(
+        _ condition: @Sendable (isolated ProgramSession) -> Bool, sourceLocation: SourceLocation = #_sourceLocation
+    ) async throws {
         let deadline = ContinuousClock.now + .seconds(10)
         while !condition(self) {
             guard !isFinished, ContinuousClock.now < deadline else {
-                Issue.record("Screen:\n\(lines.joined(separator: "\n"))", sourceLocation: sourceLocation)
+                Issue.record(
+                    "Cursor \(cursor), screen:\n\(lines.joined(separator: "\n"))", sourceLocation: sourceLocation)
                 throw Timeout()
             }
             try await Task.sleep(for: .milliseconds(10))
