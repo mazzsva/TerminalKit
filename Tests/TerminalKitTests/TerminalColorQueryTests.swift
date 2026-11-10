@@ -14,9 +14,6 @@ struct TerminalColorQueryTests {
         #expect(colors.foreground == gray(0xE6CE))
         #expect(colors.background == Terminal.RGB(red: 0x213D, green: 0x2743, blue: 0x33E7))
         #expect(colors.cursor == gray(0x9D2C))
-        #expect(colors.selection == Terminal.RGB(red: 0x3370, green: 0x4E03, blue: 0x5EBA))
-        #expect(colors.bold == gray(0xF165))
-        #expect(colors.ansi[1] == Terminal.RGB(red: 0xB480, green: 0x55F1, blue: 0x47F9))
     }
 
     @Test(arguments: [(NSAppearance.Name.aqua, UInt16(0x0000), UInt16(0xFFFF)), (.darkAqua, 0xFFFF, 0x1E1E)])
@@ -51,16 +48,11 @@ struct TerminalColorQueryTests {
         palette.foreground = Color(.sRGB, red: 1, green: 0, blue: 0)
         palette.background = Color(.sRGB, red: 0, green: 0, blue: 1)
         palette.cursor = Color(.sRGB, red: 0, green: 1, blue: 0)
-        palette.selection = Color(.sRGB, red: 1, green: 1, blue: 0)
-        palette.ansiColors[1] = Color(.sRGB, red: 0, green: 1, blue: 1)
         view.palette = palette
         let colors = try #require(view.reportedColors)
         #expect(colors.foreground == Terminal.RGB(red: 0xFFFF, green: 0, blue: 0))
         #expect(colors.background == Terminal.RGB(red: 0, green: 0, blue: 0xFFFF))
         #expect(colors.cursor == Terminal.RGB(red: 0, green: 0xFFFF, blue: 0))
-        #expect(colors.selection == Terminal.RGB(red: 0xFFFF, green: 0xFFFF, blue: 0))
-        #expect(colors.bold == gray(0xF165))
-        #expect(colors.ansi[1] == Terminal.RGB(red: 0, green: 0xFFFF, blue: 0xFFFF))
         palette.background = Color(nsColor: NSColor(patternImage: NSImage(size: NSSize(width: 1, height: 1))))
         view.palette = palette
         #expect(view.reportedColors == nil)
@@ -255,12 +247,6 @@ struct TerminalChangedColorTests {
         let drawn = try pixel(at: point, of: view)
         let palette = view.palette
         defer { view.palette = palette }
-        let changes = view.session.terminal.changedColors
-        guard changes.background == nil, !view.session.terminal.usesReverseVideo else {
-            return abs(Int((drawn.redComponent * 255).rounded()) - red) <= 1
-                && abs(Int((drawn.greenComponent * 255).rounded()) - green) <= 1
-                && abs(Int((drawn.blueComponent * 255).rounded()) - blue) <= 1
-        }
         view.palette.background = Color(
             .sRGB,
             red: Double(red) / 255,
@@ -271,12 +257,6 @@ struct TerminalChangedColorTests {
         return abs(drawn.redComponent - expected.redComponent) < 0.01
             && abs(drawn.greenComponent - expected.greenComponent) < 0.01
             && abs(drawn.blueComponent - expected.blueComponent) < 0.01
-    }
-
-    @Test func drawsTheChangedBackground() async throws {
-        let view = try await view(after: "\\033]11;#102030\\aX")
-        defer { view.session.terminate() }
-        #expect(try isColor(at: CGPoint(x: 150, y: 80), of: view, red: 0x10, green: 0x20, blue: 0x30))
     }
 
     @Test func drawsTheChangedIndexedBackgrounds() async throws {
@@ -291,15 +271,10 @@ struct TerminalChangedColorTests {
         #expect(try isColor(at: second, of: view, red: 0x40, green: 0x50, blue: 0x60))
     }
 
-    @Test func drawsThePaletteAgainAfterAReset() async throws {
-        let view = try await view(after: "\\033]11;#102030\\a\\033]111\\aX")
-        defer { view.session.terminate() }
-        #expect(!(try isColor(at: CGPoint(x: 150, y: 80), of: view, red: 0x10, green: 0x20, blue: 0x30)))
-    }
-
     @Test func redrawsAfterEachChange() async throws {
         let session = TerminalSession(
-            running: "printf '\\033]11;#102030\\aX'; read a; printf '\\033]11;#405060\\aY'; sleep 30"
+            running:
+                "printf '\\033]4;1;#102030\\a\\033[41m  \\033[mX'; read a; printf '\\033]4;1;#405060\\aY'; sleep 30"
         )
         let view = TerminalContentView(session: session)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
@@ -307,21 +282,14 @@ struct TerminalChangedColorTests {
         defer { session.terminate() }
         try session.start()
         await session.waitForText("X")
-        let point = CGPoint(x: 150, y: 80)
-        #expect(try isColor(at: point, of: view, red: 0x10, green: 0x20, blue: 0x30))
-        session.send("\n")
-        await session.waitForText("Y")
-        #expect(try isColor(at: point, of: view, red: 0x40, green: 0x50, blue: 0x60))
-    }
-
-    @Test func drawsTheChangedForeground() async throws {
-        let view = try await view(after: "\\033]10;#102030\\a\\033[7m  \\033[mX")
-        defer { view.session.terminate() }
         let point = CGPoint(
             x: TerminalContentView.padding + view.cellSize.width,
             y: TerminalContentView.topPadding + view.cellSize.height / 2
         )
         #expect(try isColor(at: point, of: view, red: 0x10, green: 0x20, blue: 0x30))
+        session.send("\n")
+        await session.waitForText("Y")
+        #expect(try isColor(at: point, of: view, red: 0x40, green: 0x50, blue: 0x60))
     }
 
     private func boldView(after output: String) async throws -> TerminalContentView {
@@ -351,20 +319,6 @@ struct TerminalChangedColorTests {
 
     @Test func drawsBoldTextWithTheDefaultForegroundInTheBoldColor() async throws {
         let view = try await boldView(after: "")
-        defer { view.session.terminate() }
-        let color = try pixel(at: firstCell(of: view), of: view)
-        #expect(abs(color.redComponent - 0.8) < 0.01)
-    }
-
-    @Test func drawsTheChangedBoldColor() async throws {
-        let view = try await boldView(after: "\\033]5;0;#ff0000\\a")
-        defer { view.session.terminate() }
-        let color = try pixel(at: firstCell(of: view), of: view)
-        #expect(color.redComponent > 0.9 && color.greenComponent < 0.2 && color.blueComponent < 0.05)
-    }
-
-    @Test func keepsTheBoldColorWhenTheForegroundChanges() async throws {
-        let view = try await boldView(after: "\\033]10;#ff0000\\a")
         defer { view.session.terminate() }
         let color = try pixel(at: firstCell(of: view), of: view)
         #expect(abs(color.redComponent - 0.8) < 0.01)
@@ -415,28 +369,6 @@ struct TerminalChangedColorTests {
         await session.waitForText("X")
         let color = try pixel(at: firstCell(of: view), of: view)
         #expect(color.redComponent > 0.5 && color.greenComponent < 0.45)
-    }
-
-    @Test func swapsTheChangedColorsInReverseVideo() async throws {
-        let view = try await view(after: "\\033]10;#102030\\a\\033]11;#405060\\a\\033[?5hX")
-        defer { view.session.terminate() }
-        #expect(try isColor(at: CGPoint(x: 150, y: 80), of: view, red: 0x10, green: 0x20, blue: 0x30))
-    }
-
-    @Test func drawsTheChangedSelection() async throws {
-        let session = TerminalSession(running: "printf '\\033]17;#102030\\aX'")
-        let view = TerminalContentView(session: session)
-        let window = KeyWindow(contentView: view)
-        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-        try session.start()
-        await session.waitForExit()
-        view.selection = TerminalContentView.Selection(
-            anchor: .init(line: 0, column: 2),
-            head: .init(line: 0, column: 8)
-        )
-        #expect(window.firstResponder === view)
-        let point = CGPoint(x: 10 + view.cellSize.width * 5.5, y: 7 + view.cellSize.height / 2)
-        #expect(try isColor(at: point, of: view, red: 0x10, green: 0x20, blue: 0x30))
     }
 
     @Test func drawsTheChangedCursor() async throws {

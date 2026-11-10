@@ -5,26 +5,16 @@ extension Terminal {
         package var foreground: RGB
         package var background: RGB
         package var cursor: RGB
-        package var selection: RGB
-        package var bold: RGB
-        package var ansi: [RGB]
 
-        package init(foreground: RGB, background: RGB, cursor: RGB, selection: RGB, bold: RGB, ansi: [RGB]) {
+        package init(foreground: RGB, background: RGB, cursor: RGB) {
             self.foreground = foreground
             self.background = background
             self.cursor = cursor
-            self.selection = selection
-            self.bold = bold
-            self.ansi = ansi
         }
     }
 
     package struct ChangedColors: Equatable, Sendable {
-        package var foreground: RGB?
-        package var background: RGB?
         package var cursor: RGB?
-        package var selection: RGB?
-        package var bold: RGB?
         package var indexed: [UInt8: RGB] = [:]
 
         package init() {}
@@ -33,20 +23,6 @@ extension Terminal {
             self == ChangedColors()
         }
     }
-
-    private enum ColorSlot {
-        case indexed(UInt8)
-        case foreground
-        case background
-        case cursor
-        case selection
-        case bold
-        case trackingForeground
-        case fixed(RGB)
-    }
-
-    private static let black = RGB(red: 0, green: 0, blue: 0)
-    private static let white = RGB(red: 0xFFFF, green: 0xFFFF, blue: 0xFFFF)
 
     package static func standardColor(_ index: UInt8) -> (red: UInt8, green: UInt8, blue: UInt8) {
         guard index < 232 else {
@@ -61,176 +37,44 @@ extension Terminal {
     mutating func changeIndexedColors(_ text: Substring) {
         var fields = Self.fields(of: text)[...]
         while fields.count >= 2 {
-            let index = Self.integer(fields[fields.startIndex])
-            let item = fields[fields.startIndex + 1]
+            let index = NSString(string: String(fields[fields.startIndex])).integerValue
+            let color = Self.color(specification: fields[fields.startIndex + 1])
             fields = fields.dropFirst(2)
-            guard (0 ... 260).contains(index),
-                apply(item, to: Self.indexedSlot(index), command: "4;\(index)")
-            else {
+            guard (0 ... 255).contains(index), let color else {
                 return
             }
-        }
-    }
-
-    mutating func changeSpecialColors(_ text: Substring) {
-        var fields = Self.fields(of: text)[...]
-        while fields.count >= 2 {
-            let index = Self.integer(fields[fields.startIndex])
-            let item = fields[fields.startIndex + 1]
-            fields = fields.dropFirst(2)
-            guard (0 ... 4).contains(index),
-                apply(item, to: index == 0 ? .bold : .fixed(Self.black), command: "5;\(index)")
-            else {
-                return
-            }
+            changedColors.indexed[UInt8(index)] = color
         }
     }
 
     mutating func changeDynamicColors(_ text: Substring, from first: Int) {
-        for (number, item) in zip(first ... 19, Self.fields(of: text)) {
-            guard apply(item, to: Self.dynamicSlot(number), command: "\(number)") else {
+        for (number, item) in zip(first ... 12, Self.fields(of: text)) {
+            if item == "?" {
+                if let color = dynamicColor(number) {
+                    let rgb = String(format: "rgb:%04x/%04x/%04x", color.red, color.green, color.blue)
+                    replies += "\u{1B}]\(number);\(rgb)\u{7}".utf8
+                }
+            } else if number == 12, let color = Self.color(specification: item) {
+                changedColors.cursor = color
+            } else {
                 return
             }
         }
     }
 
-    mutating func resetIndexedColors(_ text: Substring?) {
-        guard let text, !text.isEmpty else {
-            changedColors.indexed = [:]
-            return
-        }
-        for field in Self.fields(of: text) {
-            let index = Self.integer(field)
-            guard (0 ... 260).contains(index) else {
-                return
-            }
-            if index < 256 {
-                changedColors.indexed[UInt8(index)] = nil
-            }
-        }
-    }
-
-    mutating func resetSpecialColors(_ text: Substring) {
-        for field in Self.fields(of: text) {
-            let index = Self.integer(field)
-            guard (0 ... 4).contains(index) else {
-                return
-            }
-            if index == 0 {
-                changedColors.bold = nil
-            }
-        }
-    }
-
-    mutating func resetDynamicColor(_ number: Int) {
+    private func dynamicColor(_ number: Int) -> RGB? {
         switch number {
         case 10:
-            changedColors.foreground = nil
+            defaultColors?.foreground
         case 11:
-            changedColors.background = nil
-        case 12:
-            changedColors.cursor = nil
+            defaultColors?.background
         default:
-            changedColors.selection = nil
+            changedColors.cursor ?? defaultColors?.cursor
         }
     }
 
     private static func fields(of text: Substring) -> [Substring] {
         text.unicodeScalars.split(separator: ";", omittingEmptySubsequences: false).map(Substring.init)
-    }
-
-    private static func integer(_ field: Substring) -> Int {
-        NSString(string: String(field)).integerValue
-    }
-
-    private static func indexedSlot(_ index: Int) -> ColorSlot {
-        switch index {
-        case ..<256:
-            .indexed(UInt8(index))
-        case 256:
-            .bold
-        default:
-            .trackingForeground
-        }
-    }
-
-    private static func dynamicSlot(_ number: Int) -> ColorSlot {
-        switch number {
-        case 10:
-            .foreground
-        case 11:
-            .background
-        case 12:
-            .cursor
-        case 14, 16:
-            .fixed(white)
-        case 17:
-            .selection
-        case 19:
-            .trackingForeground
-        default:
-            .fixed(black)
-        }
-    }
-
-    private mutating func apply(_ item: Substring, to slot: ColorSlot, command: String) -> Bool {
-        if item == "?" {
-            if let color = color(in: slot) {
-                let rgb = String(format: "rgb:%04x/%04x/%04x", color.red, color.green, color.blue)
-                replies += "\u{1B}]\(command);\(rgb)\u{7}".utf8
-            }
-            return true
-        }
-        guard let color = Self.color(specification: item) else {
-            return false
-        }
-        switch slot {
-        case .indexed(let index):
-            changedColors.indexed[index] = color
-        case .foreground:
-            changedColors.foreground = color
-        case .background:
-            changedColors.background = color
-        case .cursor:
-            changedColors.cursor = color
-        case .selection:
-            changedColors.selection = color
-        case .bold:
-            changedColors.bold = color
-        case .trackingForeground, .fixed:
-            break
-        }
-        return true
-    }
-
-    private func color(in slot: ColorSlot) -> RGB? {
-        switch slot {
-        case .indexed(let index):
-            if let color = changedColors.indexed[index] {
-                return color
-            }
-            guard index >= 16 else {
-                return defaultColors?.ansi[Int(index)]
-            }
-            let color = Self.standardColor(index)
-            return RGB(
-                red: UInt16(color.red) * 257,
-                green: UInt16(color.green) * 257,
-                blue: UInt16(color.blue) * 257
-            )
-        case .foreground, .trackingForeground:
-            return changedColors.foreground ?? defaultColors?.foreground
-        case .background:
-            return changedColors.background ?? defaultColors?.background
-        case .cursor:
-            return changedColors.cursor ?? defaultColors?.cursor
-        case .selection:
-            return changedColors.selection ?? defaultColors?.selection
-        case .bold:
-            return changedColors.bold ?? defaultColors?.bold
-        case .fixed(let color):
-            return color
-        }
     }
 
     private static func color(specification: Substring) -> RGB? {

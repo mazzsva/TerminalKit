@@ -170,15 +170,12 @@ final class TerminalContentView: NSView {
             let paletteForeground = NSColor(palette.foreground)
             let paletteBackground = NSColor(palette.background)
             let paletteCursor = NSColor(palette.cursor)
-            let currentForeground = changes.foreground.map { NSColor($0) } ?? paletteForeground
-            let currentBackground =
-                changes.background.map { NSColor($0, alpha: paletteBackground.alphaComponent) } ?? paletteBackground
-            foreground = isReversed ? currentBackground.withAlphaComponent(1) : currentForeground
-            background = isReversed ? currentForeground : currentBackground
+            foreground = isReversed ? paletteBackground.withAlphaComponent(1) : paletteForeground
+            background = isReversed ? paletteForeground : paletteBackground
             backgroundAlpha = paletteBackground.alphaComponent
-            bold = isReversed ? foreground : changes.bold.map { NSColor($0) } ?? NSColor(palette.bold)
+            bold = isReversed ? foreground : NSColor(palette.bold)
             cursor = changes.cursor.map { NSColor($0, alpha: paletteCursor.alphaComponent) } ?? paletteCursor
-            selection = changes.selection.map { NSColor($0) } ?? NSColor(palette.selection)
+            selection = NSColor(palette.selection)
             var ansiColors =
                 (palette.ansiColors.prefix(16) + TerminalPalette.standard.ansiColors.dropFirst(palette.ansiColors.count))
                 .map(NSColor.init)
@@ -297,25 +294,14 @@ final class TerminalContentView: NSView {
 
     private func updateReportedColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            let ansi = colors.ansiColors.compactMap(\.terminalRGB)
             guard let foreground = colors.foreground.terminalRGB,
                 let background = colors.background.terminalRGB,
-                let cursor = colors.cursor.terminalRGB,
-                let selection = colors.selection.terminalRGB,
-                let bold = colors.bold.terminalRGB,
-                ansi.count == colors.ansiColors.count
+                let cursor = colors.cursor.terminalRGB
             else {
                 reportedColors = nil
                 return
             }
-            reportedColors = Terminal.DefaultColors(
-                foreground: foreground,
-                background: background,
-                cursor: cursor,
-                selection: selection,
-                bold: bold,
-                ansi: ansi
-            )
+            reportedColors = Terminal.DefaultColors(foreground: foreground, background: background, cursor: cursor)
         }
     }
 

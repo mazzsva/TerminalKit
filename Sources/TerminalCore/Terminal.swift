@@ -812,17 +812,11 @@ package struct Terminal: Sendable {
             setCurrentDirectory(text)
         case (4, let text?):
             changeIndexedColors(text)
-        case (5, let text?):
-            changeSpecialColors(text)
-        case (10 ... 19, let text?):
+        case (10 ... 12, let text?):
             changeDynamicColors(text, from: number)
-        case (104, _):
-            resetIndexedColors(text)
-        case (105, let text?):
-            resetSpecialColors(text)
-        case (110, _), (111, _), (112, _), (117, _):
+        case (112, _):
             if text?.isEmpty != false {
-                resetDynamicColor(number - 100)
+                changedColors.cursor = nil
             }
         default:
             break
