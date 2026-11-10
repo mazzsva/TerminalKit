@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 
 @testable import TerminalCore
@@ -7,6 +7,7 @@ import Testing
 actor ProgramSession {
     enum Key: String {
         case up = "A"
+        case down = "B"
         case left = "D"
     }
 
@@ -32,10 +33,11 @@ actor ProgramSession {
     }
 
     var lines: [String] {
-        terminal.screen.map { line in
-            let text = line.filter { $0.width != 0 }.map { $0.isTab || $0.isTabGap ? " " : terminal.character(of: $0) }
-            return String(text.joined().reversed().drop { $0 == " " }.reversed())
-        }
+        terminal.screen.map(text(of:))
+    }
+
+    var scrollbackLines: [String] {
+        terminal.scrollback.map(text(of:))
     }
 
     var cursor: Terminal.Position {
@@ -86,6 +88,10 @@ actor ProgramSession {
             configuration.arguments = Array(command.dropFirst())
             configuration.currentDirectoryURL = url("work")
         }
+        try start(configuration)
+    }
+
+    func start(_ configuration: TerminalSession.Configuration) throws {
         let pseudoTerminal = try PseudoTerminal(
             executableURL: configuration.executableURL,
             arguments: configuration.arguments,
@@ -111,14 +117,36 @@ actor ProgramSession {
         pseudoTerminal?.write(Array(text.utf8))
     }
 
+    func pressShiftReturn() throws {
+        let event = try keyDown("\r", modifierFlags: .shift)
+        let input =
+            event.otherKeyInput(level: terminal.modifyOtherKeys, usesOptionAsMetaKey: false).map(TerminalKeyInput.bytes)
+            ?? event.terminalKeyInput(TerminalKeyModes())
+        if case .bytes(let bytes) = input {
+            pseudoTerminal?.write(bytes)
+        }
+    }
+
+    func paste(_ text: String) async {
+        let bytes = await TerminalSession.pastedBytes(text, isBracketed: terminal.usesBracketedPaste)
+        pseudoTerminal?.write(bytes ?? [])
+    }
+
+    func resize(columns: Int, rows: Int) {
+        terminal.resize(columns: columns, rows: rows)
+        pseudoTerminal?.resize(columns: columns, rows: rows)
+    }
+
     func press(_ key: Key) {
         send((terminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}[") + key.rawValue)
     }
 
     func wait(
-        _ condition: @Sendable (isolated ProgramSession) -> Bool, sourceLocation: SourceLocation = #_sourceLocation
+        timeout: Duration = .seconds(10),
+        _ condition: @Sendable (isolated ProgramSession) -> Bool,
+        sourceLocation: SourceLocation = #_sourceLocation
     ) async throws {
-        let deadline = ContinuousClock.now + .seconds(10)
+        let deadline = ContinuousClock.now + timeout
         while !condition(self) {
             guard !isFinished, ContinuousClock.now < deadline else {
                 Issue.record(
@@ -132,6 +160,11 @@ actor ProgramSession {
     func exit(sourceLocation: SourceLocation = #_sourceLocation) async throws -> PseudoTerminal.Termination? {
         try await wait({ $0.isFinished }, sourceLocation: sourceLocation)
         return pseudoTerminal?.termination
+    }
+
+    private func text(of line: Terminal.Line) -> String {
+        let text = line.filter { $0.width != 0 }.map { $0.isTab || $0.isTabGap ? " " : terminal.character(of: $0) }
+        return String(text.joined().reversed().drop { $0 == " " }.reversed())
     }
 
     func close() {
