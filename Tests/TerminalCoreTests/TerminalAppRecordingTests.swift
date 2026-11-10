@@ -58,10 +58,6 @@ struct TerminalAppRecordingTests {
         var reply = terminal.receive(bytes(recording.input))
         for step in steps {
             terminal.resize(columns: step.columns, rows: step.rows)
-            terminal.windowReport = Terminal.WindowReport(
-                width: step.columns * 7 + 20,
-                height: step.rows * 15 + 17
-            )
             reply += terminal.receive(bytes(step.input ?? ""))
         }
         return reply + terminal.receive(Array("\u{1B}[6n".utf8))
@@ -69,7 +65,6 @@ struct TerminalAppRecordingTests {
 
     func terminalLikeTheRecordedWindow() -> Terminal {
         var terminal = Terminal(columns: 40, rows: 12)
-        terminal.windowReport = Terminal.WindowReport(width: 300, height: 197)
         terminal.defaultColors = Terminal.DefaultColors(
             foreground: rgb(0xE6CE, 0xE6CE, 0xE6CE),
             background: rgb(0x213D, 0x2743, 0x33E7),

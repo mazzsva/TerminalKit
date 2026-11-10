@@ -305,17 +305,6 @@ final class TerminalContentView: NSView {
         }
     }
 
-    var windowReport: Terminal.WindowReport {
-        let size = enclosingScrollView?.frame.size ?? bounds.size
-        var report = Terminal.WindowReport(width: Int(size.width), height: Int(size.height))
-        if let window {
-            report.isVisible = window.isVisible && !window.isMiniaturized
-            report.x = Int(window.frame.minX)
-            report.y = Int((window.screen?.visibleFrame.maxY ?? window.frame.maxY) - window.frame.maxY)
-        }
-        return report
-    }
-
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
         if newWindow == nil, let window, window.firstResponder === self, let contentView = window.contentView {
