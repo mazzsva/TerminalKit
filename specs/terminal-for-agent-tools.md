@@ -3,7 +3,7 @@
 Status: accepted
 
 ## Goal
-TerminalKit aimed at an exact replica of Terminal.app. That aim has no end, and it removed features that agent tools use. The new aim is a native terminal view for Mac apps in which a login shell and agent tools such as Claude Code work as well as in the best Mac terminals. The change affects each host app that shows `TerminalView`, and the README, which states the old aim.
+TerminalKit aimed at an exact replica of Terminal.app. That aim has no end, and it copied rules of Terminal.app that differ from the standard that programs expect. The new aim is a native terminal view for Mac apps in which a login shell and agent tools such as Claude Code work as well as in the best Mac terminals. The change affects each host app that shows `TerminalView`, and the README, which states the old aim.
 
 ## Decisions
 - The measure of done is a fixed list of programs that run correctly, not parity with Terminal.app. It is the choice most likely to change first.
