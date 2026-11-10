@@ -27,7 +27,6 @@ package struct Terminal: Sendable {
         var position = Position(row: 0, column: 0)
         var style = Style()
         var usesLineDrawing = false
-        var usesOriginMode = false
     }
 
     private static let maximumBytesPerCell = 1_024
@@ -65,9 +64,7 @@ package struct Terminal: Sendable {
     }
 
     private var usesAutowrap = true
-    private var usesOriginMode = false
     private var usesInsertMode = false
-    private var usesNewLineMode = false
 
     private var decoder = UTF8Decoder()
     private var parser = EscapeSequenceParser()
@@ -84,8 +81,8 @@ package struct Terminal: Sendable {
     private var hasMovedCursorForFullRow = false
     private var tabStops = TabStops()
     var replies: [UInt8] = []
-    private var normalScreen: (lines: [Line], cursor: Position, savedCursor: SavedCursor)?
-    private var alternateScreen: (lines: [Line], savedCursor: SavedCursor)?
+    private var normalScreen: (lines: [Line], savedCursor: SavedCursor)?
+    private var alternateSavedCursor: SavedCursor?
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -128,11 +125,7 @@ package struct Terminal: Sendable {
             (screen, cursor) = relaidScreen(
                 screen, usedRows: usedRows, cursor: cursor, columns: columns, rows: rows, restoredRows: restoredRows)
         }
-        if var alternateScreen {
-            alternateScreen.lines = Self.resizedAlternateScreen(alternateScreen.lines, columns: columns, rows: rows)
-            alternateScreen.savedCursor.position.row += rowChange
-            self.alternateScreen = alternateScreen
-        }
+        alternateSavedCursor?.position.row += rowChange
         savedCursor.position.row += rowChange
         self.columns = columns
         self.rows = rows
@@ -219,9 +212,6 @@ package struct Terminal: Sendable {
                 print(printed)
             case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
                 lineFeed()
-                if usesNewLineMode {
-                    carriageReturn()
-                }
             case .execute("\r"):
                 carriageReturn()
             case .execute("\u{7}"):
@@ -245,8 +235,6 @@ package struct Terminal: Sendable {
                 usesLineDrawing = true
             case .escape(intermediates: "(", final: "B"):
                 usesLineDrawing = false
-            case .escape(intermediates: "#", final: "8"):
-                fillScreen()
             case .escape(intermediates: "", final: "="):
                 usesApplicationKeypad = true
             case .escape(intermediates: "", final: ">"):
@@ -343,9 +331,9 @@ package struct Terminal: Sendable {
         let count = sequence.parameter(at: 0, default: 1)
         switch sequence.final {
         case "A":
-            moveCursor(row: max(cursor.row - count, topLimit), column: cursor.column)
+            moveCursor(row: cursor.row - count, column: cursor.column)
         case "B":
-            moveCursor(row: min(cursor.row + count, bottomLimit), column: cursor.column)
+            moveCursor(row: cursor.row + count, column: cursor.column)
         case "C":
             moveCursor(row: cursor.row, column: cursor.column + count)
         case "D":
@@ -355,9 +343,9 @@ package struct Terminal: Sendable {
                 moveBackward(count)
             }
         case "E":
-            moveCursor(row: min(cursor.row + count, bottomLimit), column: 0)
+            moveCursor(row: cursor.row + count, column: 0)
         case "F":
-            moveCursor(row: max(cursor.row - count, topLimit), column: 0)
+            moveCursor(row: cursor.row - count, column: 0)
         case "G", "`":
             moveCursor(row: cursor.row, column: count - 1)
         case "I":
@@ -367,9 +355,9 @@ package struct Terminal: Sendable {
         case "g":
             clearTabStops(sequence.parameter(at: 0, default: 0))
         case "H", "f":
-            moveCursor(row: min(topLimit + count - 1, bottomLimit), column: sequence.parameter(at: 1, default: 1) - 1)
+            moveCursor(row: count - 1, column: sequence.parameter(at: 1, default: 1) - 1)
         case "d":
-            cursor.row = min(topLimit + count - 1, bottomLimit, rows - 1)
+            cursor.row = min(count - 1, rows - 1)
         case "J":
             eraseInDisplay(sequence.parameter(at: 0, default: 0))
         case "K":
@@ -398,12 +386,8 @@ package struct Terminal: Sendable {
         case "c" where sequence.parameters.count <= 1 && sequence.parameter(at: 0, default: 0) == 0:
             replies += "\u{1B}[?1;2c".utf8
         case "h", "l":
-            for mode in sequence.parameters {
-                if mode == 4 {
-                    usesInsertMode = sequence.final == "h"
-                } else if mode == 20 {
-                    usesNewLineMode = sequence.final == "h"
-                }
+            for mode in sequence.parameters where mode == 4 {
+                usesInsertMode = sequence.final == "h"
             }
         case "m":
             style.apply(
@@ -680,7 +664,7 @@ package struct Terminal: Sendable {
         }
         scrollRegion = top ..< bottom
         hasScrollRegion = top > 0 || bottom < rows
-        moveCursor(row: topLimit, column: 0)
+        moveCursor(row: 0, column: 0)
     }
 
     private mutating func keepInScrollback(_ lines: ArraySlice<Line>) {
@@ -746,14 +730,6 @@ package struct Terminal: Sendable {
         }
     }
 
-    private var topLimit: Int {
-        usesOriginMode ? scrollRegion.lowerBound : 0
-    }
-
-    private var bottomLimit: Int {
-        usesOriginMode ? min(scrollRegion.upperBound, rows) - 1 : rows - 1
-    }
-
     private mutating func carriageReturn() {
         isWrapPending = false
         cursor.column = 0
@@ -805,21 +781,11 @@ package struct Terminal: Sendable {
         self = terminal
     }
 
-    private mutating func fillScreen() {
-        for row in screen.indices {
-            screen[row].replaceSubrange(0 ..< columns, with: repeatElement(Cell(scalar: "E"), count: columns))
-            blankBrokenWideCharacter(at: columns, row: row)
-        }
-        unwrapLine(before: 0)
-    }
-
     private mutating func softReset() {
         changedColors.indexed = [:]
         usesInsertMode = false
-        usesNewLineMode = false
         usesApplicationCursorKeys = false
         usesApplicationKeypad = false
-        usesOriginMode = false
         usesReverseVideo = false
         tabStops = TabStops()
         isCursorVisible = true
@@ -941,11 +907,6 @@ package struct Terminal: Sendable {
             usesApplicationCursorKeys = isEnabled
         case (5, _):
             usesReverseVideo = isEnabled
-        case (6, _):
-            usesOriginMode = isEnabled
-            if isEnabled {
-                moveCursor(row: topLimit, column: 0)
-            }
         case (7, _):
             usesAutowrap = isEnabled
         case (25, _):
@@ -964,19 +925,11 @@ package struct Terminal: Sendable {
             usesSGRMouseEncoding = isEnabled
         case (2004, _):
             usesBracketedPaste = isEnabled
-        case (47, true):
-            enterAlternateScreen()
-            homeCursor()
-        case (47, false):
-            if let position = normalScreen?.cursor {
-                exitAlternateScreen()
-                moveCursor(row: position.row, column: position.column)
-            }
         case (1049, true):
             saveCursor()
             enterAlternateScreen()
             screen = blankLines(rows)
-            homeCursor()
+            cursor = Position(row: 0, column: 0)
         case (1049, false):
             exitAlternateScreen()
             restoreCursor()
@@ -985,27 +938,19 @@ package struct Terminal: Sendable {
         }
     }
 
-    private mutating func homeCursor() {
-        cursor = Position(row: min(topLimit, rows - 1), column: 0)
-    }
-
     private mutating func enterAlternateScreen() {
         guard normalScreen == nil else {
             return
         }
-        normalScreen = (screen, cursor, savedCursor)
-        screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
-        if let alternateScreen {
-            screen = alternateScreen.lines
-        }
-        savedCursor = alternateScreen?.savedCursor ?? SavedCursor()
+        normalScreen = (screen, savedCursor)
+        savedCursor = alternateSavedCursor ?? SavedCursor()
     }
 
     private mutating func exitAlternateScreen() {
         guard let normalScreen else {
             return
         }
-        alternateScreen = (screen, savedCursor)
+        alternateSavedCursor = savedCursor
         screen =
             normalScreen.lines
             + Array(repeating: Self.blankLine(columns: columns), count: rows - normalScreen.lines.count)
@@ -1018,7 +963,7 @@ package struct Terminal: Sendable {
         case 5:
             replies += "\u{1B}[0n".utf8
         case 6:
-            replies += "\u{1B}[\(UInt(bitPattern: cursor.row - topLimit + 1));\(cursor.column + 1)R".utf8
+            replies += "\u{1B}[\(cursor.row + 1);\(cursor.column + 1)R".utf8
         default:
             break
         }
@@ -1026,16 +971,14 @@ package struct Terminal: Sendable {
 
     private mutating func saveCursor() {
         savedCursor = SavedCursor(
-            position: Position(row: cursor.row - topLimit, column: cursor.column),
+            position: cursor,
             style: style,
-            usesLineDrawing: usesLineDrawing,
-            usesOriginMode: usesOriginMode
+            usesLineDrawing: usesLineDrawing
         )
     }
 
     private mutating func restoreCursor() {
-        usesOriginMode = savedCursor.usesOriginMode
-        moveCursor(row: min(topLimit + savedCursor.position.row, bottomLimit), column: savedCursor.position.column)
+        moveCursor(row: savedCursor.position.row, column: savedCursor.position.column)
         style = savedCursor.style
         usesLineDrawing = savedCursor.usesLineDrawing
     }
