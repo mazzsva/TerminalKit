@@ -1671,10 +1671,10 @@ struct TerminalTests {
     }
 
     @Test(arguments: ["\u{1B}P1;2\u{7}x\u{1B}\\", "\u{1B}_\u{7}\u{1B}\\"])
-    func ringsTheBellInAStringOfOtherControls(string: String) {
+    func ignoresABellInAString(string: String) {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive(string)
-        #expect(terminal.bellCount == 1)
+        #expect(terminal.bellCount == 0)
     }
 
     @Test func keepsTheBellCountAfterAReset() {
@@ -1711,7 +1711,7 @@ struct TerminalTests {
         #expect(terminal.cursorShape == shape)
     }
 
-    @Test(arguments: ["\u{1B}[7 q", "\u{1B}[2q", "\u{1B}[2!q", "\u{1B}[2 p"])
+    @Test(arguments: ["\u{1B}[7 q", "\u{1B}[?2 q", "\u{1B}[2q", "\u{1B}[2!q", "\u{1B}[2 p"])
     func ignoresOtherCursorShapeSequences(sequence: String) {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{1B}[5 q" + sequence + "x")
@@ -1719,11 +1719,24 @@ struct TerminalTests {
         #expect(terminal.character(of: terminal.screen[0][0]) == "x")
     }
 
-    @Test func printsTheFinalOfAMarkedCursorShapeSequence() {
+    @Test func ignoresAStringBeforeACursorReport() {
+        var terminal = Terminal(columns: 10, rows: 4)
+        terminal.receive("\u{1B}[2;3H")
+        #expect(terminal.receive("\u{1B}Pzz\u{1B}\\\u{1B}[6n") == "\u{1B}[2;3R")
+        #expect(lines(terminal) == ["          ", "          ", "          ", "          "])
+    }
+
+    @Test func ignoresAnSGRWithAnIntermediate() {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}[5 q\u{1B}[?2 qx")
-        #expect(terminal.cursorShape == .bar)
-        #expect(terminal.screen[0].map(terminal.character(of:)) == ["q", "x", " ", " "])
+        var style = Terminal.Style()
+        style.apply([1, 31])
+        terminal.receive("\u{1B}[1;31m\u{1B}[0%mx")
+        #expect(terminal.screen[0][0].style == style)
+    }
+
+    @Test func ignoresDeviceAttributesWithAnEqualsMarker() {
+        var terminal = Terminal(columns: 1, rows: 1)
+        #expect(terminal.receive("\u{1B}[=c") == "")
     }
 
     @Test(arguments: ["\u{1B}[m", "\r", "\n", "\u{8}", "\t", "\u{1B}[3;3H", "\u{1B}]2;t\u{7}"])

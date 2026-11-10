@@ -31,6 +31,7 @@ struct EscapeSequenceParser: Sendable {
         case operatingSystemCommandNumber
         case operatingSystemCommand
         case operatingSystemCommandEscape
+        case ignoredString
     }
 
     private static let maximumIntermediates = 2
@@ -47,6 +48,9 @@ struct EscapeSequenceParser: Sendable {
     private var string: [Unicode.Scalar] = []
 
     mutating func advance(_ scalar: Unicode.Scalar) -> Action? {
+        if state == .ignoredString {
+            return ignoredString(scalar)
+        }
         switch scalar {
         case "\u{1B}":
             if isInString {
@@ -97,6 +101,8 @@ struct EscapeSequenceParser: Sendable {
             return nil
         case .operatingSystemCommandEscape:
             return operatingSystemCommandEscape(scalar)
+        case .ignoredString:
+            return nil
         }
     }
 
@@ -106,15 +112,15 @@ struct EscapeSequenceParser: Sendable {
 
     private mutating func escape(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
-        case "#", "(", ")", "*", "+", "-", ".", "/":
+        case " " ... "/":
             collect(scalar)
             state = .escapeIntermediate
         case "[":
             state = .controlSequence
         case "]":
             state = .operatingSystemCommandNumber
-        case " " ... "/", "P", "X", "^", "_":
-            state = .ground
+        case "P", "X", "^", "_":
+            state = .ignoredString
         case "0" ... "~":
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)
@@ -127,7 +133,7 @@ struct EscapeSequenceParser: Sendable {
     private mutating func escapeIntermediate(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
         case " " ... "/":
-            state = .ground
+            collect(scalar)
         case "0" ... "~":
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)
@@ -154,17 +160,11 @@ struct EscapeSequenceParser: Sendable {
             } else {
                 isOverflowing = true
             }
-        case "<" ... "?" where privateMarker == "?" || privateMarker == ">":
-            state = .ground
-        case "?" where parameters.isEmpty, ">" where parameters.isEmpty:
+        case "<" ... "?" where parameters.isEmpty && privateMarker == nil:
             privateMarker = scalar
-        case "?", ">":
+        case "<" ... "?":
             state = .ignoredControlSequence
-        case "<" where parameters.isEmpty && privateMarker == nil, "=" where parameters.isEmpty && privateMarker == nil:
-            privateMarker = scalar
-        case " " ... "/" where privateMarker == "?" || privateMarker == ">":
-            state = .ground
-        case " ", "!":
+        case " " ... "/":
             collect(scalar)
             state = .controlSequenceIntermediate
         case "@" ... "~":
@@ -180,13 +180,9 @@ struct EscapeSequenceParser: Sendable {
     private mutating func controlSequenceIntermediate(_ scalar: Unicode.Scalar) -> Action? {
         switch scalar {
         case " " ... "/":
-            guard intermediates.unicodeScalars.count < Self.maximumIntermediates else {
-                state = .ground
-                return .print(scalar)
-            }
             collect(scalar)
         case "0" ... "?":
-            state = .ground
+            state = .ignoredControlSequence
         case "@" ... "~":
             return finishControlSequence(scalar)
         default:
@@ -237,6 +233,18 @@ struct EscapeSequenceParser: Sendable {
         }
     }
 
+    private mutating func ignoredString(_ scalar: Unicode.Scalar) -> Action? {
+        switch scalar {
+        case "\u{1B}":
+            enterEscape()
+        case "\u{18}", "\u{1A}":
+            state = .ground
+        default:
+            break
+        }
+        return nil
+    }
+
     private mutating func enterEscape() {
         state = .escape
         intermediates = ""
@@ -251,7 +259,7 @@ struct EscapeSequenceParser: Sendable {
         state = .ground
         return .controlSequence(
             ControlSequence(
-                privateMarker: privateMarker == "?" || privateMarker == ">" ? privateMarker : nil,
+                privateMarker: privateMarker,
                 parameters: hasLargeParameter
                     ? parameters.map { $0 > Self.maximumParameterValue ? 0 : $0 } : parameters,
                 intermediates: intermediates,
@@ -270,6 +278,8 @@ struct EscapeSequenceParser: Sendable {
     }
 
     private mutating func collect(_ scalar: Unicode.Scalar) {
-        intermediates.unicodeScalars.append(scalar)
+        if intermediates.unicodeScalars.count < Self.maximumIntermediates {
+            intermediates.unicodeScalars.append(scalar)
+        }
     }
 }
