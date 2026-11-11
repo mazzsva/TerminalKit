@@ -25,7 +25,7 @@ struct SpeedTests {
             let terminal = session.terminal
             let rows = widths.reduce(1) { $0 + max(1, ($1 + terminal.columns - 1) / terminal.columns) }
             #expect(session.state == .exited(.exit(0)))
-            #expect(terminal.scrollback.count + terminal.rows == rows)
+            #expect(terminal.removedScrollbackCount + terminal.scrollback.count + terminal.rows == rows)
             #expect(session.lines.suffix(2) == ["end of the text", ""])
             if viewTimes.count == 1 {
                 var usage = rusage()
@@ -58,7 +58,7 @@ struct SpeedTests {
         let (scrollView, window) = shownView(session)
         let view = scrollView.terminalView
         var index = 0
-        while session.liveTerminal.scrollback.count < 100_000 {
+        while session.liveTerminal.removedScrollbackCount == 0 {
             var text = ""
             for _ in 0 ..< 1000 {
                 text += line(index) + "\r\n"
@@ -81,7 +81,7 @@ struct SpeedTests {
             view.cacheDisplay(in: visible, to: try #require(view.bitmapImageRepForCachingDisplay(in: visible)))
             times.append(clock.now - start)
             #expect(session.terminal.columns == (step.isMultiple(of: 2) ? columns : columns - 1))
-            #expect(session.terminal.scrollback.count >= 100_000)
+            #expect(session.terminal.scrollback.count > 99_000)
             #expect(visible.height > 20 * view.cellSize.height && visible.maxY == view.bounds.maxY)
         }
         print(
