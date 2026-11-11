@@ -75,10 +75,6 @@ extension Terminal {
         private var characters: [String] = []
         private var indices: [[UInt8]: UInt32] = [:]
 
-        var count: Int {
-            characters.count
-        }
-
         package func character(of cell: Cell) -> String {
             guard let index = cell.graphemeIndex else {
                 if cell.isTab {
