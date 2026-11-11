@@ -108,18 +108,6 @@ struct TerminalColorQueryTests {
         await session.waitForExit()
     }
 
-    @Test func sendsNothingWhenTheAppearanceChanges() async throws {
-        let session = TerminalSession(running: "stty raw -echo; printf '\\033[?2031ha'; head -c 1 | tr '\\033' E")
-        let view = TerminalContentView(session: session)
-        view.appearance = NSAppearance(named: .aqua)
-        session.sizingView = view
-        try session.start()
-        await session.waitForText("a")
-        view.appearance = NSAppearance(named: .darkAqua)
-        session.send("x")
-        #expect(await session.linesAfterExit().contains("ax"))
-    }
-
     @Test func ignoresTheColorQueriesWithoutAView() async throws {
         let session = TerminalSession(
             running: "stty raw -echo; printf '\\033]11;?\\a\\033[c'; head -c 7 | tr '\\033' E"

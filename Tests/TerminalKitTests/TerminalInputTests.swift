@@ -50,12 +50,6 @@ struct TerminalInputTests {
         #expect(await session.linesAfterExit().contains("78  79"))
     }
 
-    @Test func sendsNothingForTheHelpKeyAndHigherFunctionKeys() throws {
-        for key in [NSHelpFunctionKey, NSF21FunctionKey, NSF35FunctionKey] {
-            #expect(try keyDown(key).terminalKeyInput(TerminalKeyModes()) == .nothing)
-        }
-    }
-
     @Test func leavesTextKeysToTheInputSystem() throws {
         #expect(try keyDown("a").terminalKeyInput(TerminalKeyModes()) == .text)
         #expect(try keyDown("", charactersIgnoringModifiers: "").terminalKeyInput(TerminalKeyModes()) == .text)

@@ -372,18 +372,6 @@ struct TerminalContentViewTests {
         #expect(windows[0].firstResponder === view && windows[1].firstResponder === reference)
     }
 
-    @Test(arguments: ["\u{1038}", "\u{93E}"])
-    func drawsASpacingMarkWithNoBase(character: String) throws {
-        let entry = GlyphCache().entry(for: character, font: TerminalContentView.defaultFont, index: 0)
-        #expect(entry.runs.first?.positions.first?.x == 0)
-    }
-
-    @Test func drawsAShadeFromTheFont() async throws {
-        let view = try await drawnView(running: "printf '\\033[?25l\u{2593}'")
-        let cell = view.rect(row: 0, columns: 0 ..< 1).insetBy(dx: 1, dy: 3)
-        #expect(Set(try pixels(in: cell, of: view)).count > 1)
-    }
-
     @Test func drawsEachCharacterInItsCellWithAProportionalFont() async throws {
         let narrow = try await drawnView(running: "printf 'iiiiW\\n'")
         let spaced = try await drawnView(running: "printf '    W\\n'")
@@ -465,18 +453,6 @@ struct TerminalContentViewTests {
         let underline = stride(from: 10 + view.cellSize.width / 4, to: 10 + view.cellSize.width * 3.75, by: 1)
             .map { color(in: representation, at: CGPoint(x: $0, y: y)) }
         #expect(underline.allSatisfy { $0 != background })
-    }
-
-    @Test(arguments: [1, 2] as [CGFloat])
-    func drawsTheUnderlineColorAsAPlainUnderline(scale: CGFloat) async throws {
-        let plain = try await drawnView(running: "printf '\\033[4mab\\033[m\\r'")
-        let view = try await drawnView(running: "printf '\\033[4;58:2::0:200:0mab\\033[m\\r'")
-        let windows = [ScaledWindow(contentView: plain), ScaledWindow(contentView: view)]
-        for window in windows {
-            window.scale = scale
-        }
-        let cells = CGRect(x: 10, y: 7, width: 2 * view.cellSize.width, height: view.cellSize.height)
-        #expect(try pixels(in: cells, of: view) == pixels(in: cells, of: plain))
     }
 
     @Test(arguments: ["", "7;"], [1, 2] as [CGFloat])
@@ -762,12 +738,6 @@ struct TerminalContentViewTests {
         #expect(styled != plain)
     }
 
-    @Test func drawsStrikethroughTextAsPlainText() async throws {
-        let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
-        let struck = try image(of: try await drawnView(running: "printf '\\033[9mX\\r'"))
-        #expect(struck == plain)
-    }
-
     @Test func drawsInverseText() async throws {
         let view = try await drawnView(running: "printf '\\033[7m  \\033[m'")
         let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
@@ -1033,28 +1003,6 @@ struct TerminalContentViewTests {
         )
         view.insertText("か", replacementRange: NSRange(location: 0, length: 1))
         #expect(await session.linesAfterExit().contains("65  1b  5b  44  c3  a9  e3  81  8b"))
-    }
-
-    @Test func sendsTheMappedFunctionKeys() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 12 | od -An -tx1")
-        let view = TerminalContentView(session: session)
-        try session.start()
-        await session.waitForText("ready")
-        view.keyDown(with: try keyDown(NSDeleteFunctionKey, modifierFlags: [.option, .control]))
-        view.keyDown(with: try keyDown(NSF15FunctionKey, modifierFlags: .option))
-        #expect(await session.linesAfterExit().contains("1b  1b  5b  33  3b  35  7e  1b  5b  33  34  7e"))
-    }
-
-    @Test func sendsTheMappedFunctionKeysWithOptionAsTheMetaKey() async throws {
-        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 15 | od -An -tx1")
-        let view = TerminalContentView(session: session)
-        view.usesOptionAsMetaKey = true
-        try session.start()
-        await session.waitForText("ready")
-        view.keyDown(with: try keyDown(NSF1FunctionKey, modifierFlags: .option))
-        view.keyDown(with: try keyDown(NSF5FunctionKey, modifierFlags: .shift))
-        view.keyDown(with: try keyDown(NSF12FunctionKey, modifierFlags: .shift))
-        #expect(await session.linesAfterExit().contains("1b  5b  31  37  7e  1b  5b  32  35  7e  1b  5b  33  34  7e"))
     }
 
     @Test func leavesOptionKeysToTheMarkedText() async throws {

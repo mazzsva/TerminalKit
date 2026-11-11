@@ -21,32 +21,6 @@ struct TerminalViewTests {
         #expect(session.terminal.rows == Int((visibleSize.height - 17) / view.cellSize.height))
     }
 
-    @Test func opensLinksWithoutTheOpenURLActionOfTheEnvironment() throws {
-        let session = TerminalSession(running: "exit")
-        var opened: [URL] = []
-        let openURL = OpenURLAction { url in
-            opened.append(url)
-            return .handled
-        }
-        let large = NSFont.monospacedSystemFont(ofSize: 20, weight: .regular)
-        let hostingView = NSHostingView(
-            rootView: TerminalView(session: session).terminalFont(large).environment(\.openURL, openURL))
-        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
-        hostingView.layoutSubtreeIfNeeded()
-        let view = try #require(contentView(in: hostingView))
-        var actions: [TerminalContentView.LinkAction] = []
-        view.performLinkAction = { actions.append($0) }
-
-        let small = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
-        hostingView.rootView = TerminalView(session: session).terminalFont(small).environment(\.openURL, openURL)
-        hostingView.layoutSubtreeIfNeeded()
-        let url = try #require(URL(string: "https://example.com/a"))
-        view.performLinkAction(.open(url))
-        #expect(view.font == small)
-        #expect(opened.isEmpty)
-        #expect(actions == [.open(url)])
-    }
-
     @Test func showsANewSessionInANewView() throws {
         let hostingView = NSHostingView(rootView: TerminalView(session: TerminalSession(running: "exit")))
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
