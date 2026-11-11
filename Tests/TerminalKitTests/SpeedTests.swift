@@ -6,13 +6,24 @@ import Testing
 @MainActor
 @Suite(.enabled(if: isReleaseBuild && ProcessInfo.processInfo.environment["TERMINALKIT_SPEED"] != nil), .serialized)
 struct SpeedTests {
-    @Test(.timeLimit(.minutes(5)))
-    func outputsAHundredMegabytes() async throws {
-        let file = URL.temporaryDirectory.appending(path: "SpeedTests-" + UUID().uuidString + ".txt")
+    @Test(.timeLimit(.minutes(10)))
+    func outputsAHundredMegabytesNoSlowerThanTerminal() async throws {
+        let folder = URL.temporaryDirectory.appending(path: "SpeedTests-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appending(path: "text.txt")
         let widths = try writeText(to: file, byteCount: 100_000_000)
-        defer { try? FileManager.default.removeItem(at: file) }
+        let terminalApp: TerminalApp?
+        do {
+            terminalApp = try TerminalApp(folder: folder)
+        } catch {
+            terminalApp = nil
+            Issue.record("Terminal.app cannot run, so the test has no comparison: \(error)")
+        }
+        defer { terminalApp?.close() }
 
         var viewTimes: [Duration] = []
+        var terminalAppTimes: [Duration] = []
         var drawCounts: [Int] = []
         var sessionTimes: [Duration] = []
         var bytesPerLine = 0
@@ -41,6 +52,10 @@ struct SpeedTests {
             }
             #expect(window.contentView === scrollView)
             #expect(window.isVisible && !window.isKeyWindow)
+            if let terminalApp {
+                terminalAppTimes.append(
+                    try await terminalApp.time(file, columns: terminal.columns, rows: terminal.rows))
+            }
         }
         for _ in 0 ..< 5 {
             let session = catSession(file)
@@ -52,12 +67,22 @@ struct SpeedTests {
         print(
             """
             Output of 100 MB with a view: \(viewTimes), median \(viewTime), \(Int(100 / (viewTime / .seconds(1)))) MB/s
+            Output of 100 MB in Terminal.app: \(terminalAppTimes)
             Draws during the output with a view: \(drawCounts)
             Output of 100 MB with no view: \(sessionTimes), median \(median(sessionTimes))
             Peak memory after the first output: \(peakMemory / 1_000_000) MB, bytes for each saved line: \(bytesPerLine)
             """
         )
-        #expect(viewTime <= .milliseconds(5_000))
+        if !terminalAppTimes.isEmpty {
+            let terminalAppTime = median(terminalAppTimes)
+            print(
+                """
+                Median in Terminal.app \(terminalAppTime), in TerminalKit \(viewTime), \
+                ratio \(viewTime / terminalAppTime)
+                """
+            )
+            #expect(viewTime <= terminalAppTime * 1.1)
+        }
     }
 
     @Test(.timeLimit(.minutes(2)))
@@ -190,6 +215,113 @@ struct SpeedTests {
             }
         }
         return Int(information.phys_footprint)
+    }
+}
+
+@MainActor
+private struct TerminalApp {
+    struct ScriptError: Error, CustomStringConvertible {
+        let description: String
+    }
+
+    let folder: URL
+    let windowID: Int
+
+    init(folder: URL) throws {
+        self.folder = folder
+        let script = folder.appending(path: "cat.zsh")
+        try """
+        zmodload zsh/datetime
+        printf '\\033[3J\\033[H\\033[2J'
+        start=$EPOCHREALTIME
+        cat "$1"
+        end=$EPOCHREALTIME
+        print -r -- $(( end - start )) >> "$2"
+        """
+        .write(to: script, atomically: true, encoding: .utf8)
+        let output = try Self.run(
+            """
+            tell application "Terminal"
+                set newTab to do script "exec /bin/zsh -f"
+                repeat 40 times
+                    delay 0.25
+                    set newTTY to tty of newTab
+                    if newTTY is not "" then
+                        repeat with candidate in windows
+                            if tty of tab 1 of candidate is newTTY then return id of candidate
+                        end repeat
+                    end if
+                end repeat
+                close (first window whose tty of tab 1 is tty of newTab)
+            end tell
+            """
+        )
+        guard let windowID = Int(output) else {
+            throw ScriptError(description: "no window of its own: \(output)")
+        }
+        self.windowID = windowID
+    }
+
+    func time(_ file: URL, columns: Int, rows: Int) async throws -> Duration {
+        let script = folder.appending(path: "cat.zsh").path(percentEncoded: false)
+        let times = folder.appending(path: "times.txt")
+        let count = Self.times(in: times).count
+        _ = try Self.run(
+            """
+            tell application "Terminal"
+                tell tab 1 of window id \(windowID)
+                    set number of columns to \(columns)
+                    set number of rows to \(rows)
+                end tell
+            end tell
+            """
+        )
+        try await Task.sleep(for: .seconds(1))
+        let size = try Self.run(
+            """
+            tell application "Terminal" to tell tab 1 of window id \(windowID) to \
+            return (number of columns as text) & "x" & (number of rows as text)
+            """
+        )
+        #expect(size == "\(columns)x\(rows)")
+        let command =
+            "/bin/zsh -f '\(script)' '\(file.path(percentEncoded: false))' '\(times.path(percentEncoded: false))'"
+        _ = try Self.run(
+            """
+            tell application "Terminal" to do script "\(command)" in tab 1 of window id \(windowID)
+            """
+        )
+        while Self.times(in: times).count == count {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let seconds = try #require(Self.times(in: times).last)
+        return .seconds(seconds)
+    }
+
+    func close() {
+        _ = try? Self.run("tell application \"Terminal\" to close window id \(windowID)")
+    }
+
+    private static func times(in file: URL) -> [Double] {
+        ((try? String(contentsOf: file, encoding: .utf8)) ?? "").split(separator: "\n").compactMap { Double($0) }
+    }
+
+    private static func run(_ source: String) throws -> String {
+        let process = Process()
+        process.executableURL = URL(filePath: "/usr/bin/osascript")
+        process.arguments = ["-e", source]
+        let output = Pipe()
+        let error = Pipe()
+        process.standardOutput = output
+        process.standardError = error
+        try process.run()
+        process.waitUntilExit()
+        let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        guard process.terminationStatus == 0 else {
+            let message = String(decoding: error.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            throw ScriptError(description: message.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
