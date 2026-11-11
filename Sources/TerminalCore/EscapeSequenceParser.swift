@@ -12,7 +12,7 @@ struct EscapeSequenceParser: Sendable {
         var parameters: [Int]
         var intermediates: String
         var final: Unicode.Scalar
-        var subparameters: [Int: Int] = [:]
+        var subparameters: [Int: Int]
 
         func parameter(at index: Int, default defaultValue: Int) -> Int {
             guard parameters.indices.contains(index), parameters[index] != 0 else {
