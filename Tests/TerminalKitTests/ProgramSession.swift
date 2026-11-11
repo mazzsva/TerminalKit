@@ -56,18 +56,60 @@ actor ProgramSession {
             case .controlSequence(let sequence):
                 let prefix = "CSI \(sequence.privateMarker.map(String.init) ?? "")"
                 let suffix = "\(sequence.intermediates)\(sequence.final)"
-                let parameters =
-                    "hl".unicodeScalars.contains(sequence.final)
-                    ? sequence.parameters
-                    : "mnt".unicodeScalars.contains(sequence.final) ? Array(sequence.parameters.prefix(1)) : []
-                names.formUnion(parameters.isEmpty ? [prefix + suffix] : parameters.map { prefix + "\($0)" + suffix })
+                let units = Self.units(of: sequence)
+                names.formUnion(units.isEmpty ? [prefix + suffix] : units.map { prefix + $0 + suffix })
             case .operatingSystemCommand(let command):
-                names.insert("OSC " + command.prefix { $0 != ";" })
+                let number = command.prefix { $0 != ";" }
+                let isQuery = ["4", "10", "11", "12"].contains(number) && command.split(separator: ";").contains("?")
+                names.insert("OSC " + number + (isQuery ? ";?" : ""))
             default:
                 break
             }
         }
         return names
+    }
+
+    private static func units(of sequence: EscapeSequenceParser.ControlSequence) -> [String] {
+        let parameters = sequence.parameters.indices.map { index in
+            "\(sequence.parameters[index])" + (sequence.subparameters[index].map { ":\($0)" } ?? "")
+        }
+        let isPlain = sequence.privateMarker == nil && sequence.intermediates.isEmpty
+        switch sequence.final {
+        case "m" where isPlain:
+            return graphicRenditionUnits(of: sequence, names: parameters)
+        case "h", "l":
+            return parameters
+        case "m" where sequence.privateMarker == ">", "t" where ["22", "23"].contains(parameters.first):
+            return [parameters.prefix(2).joined(separator: ";")]
+        case "c", "J", "K", "m", "n", "t":
+            return Array(parameters.prefix(1))
+        default:
+            return []
+        }
+    }
+
+    private static func graphicRenditionUnits(
+        of sequence: EscapeSequenceParser.ControlSequence,
+        names: [String]
+    ) -> [String] {
+        let values = sequence.parameters.indices.map {
+            sequence.subparameters[$0] == nil ? sequence.parameters[$0] : -1
+        }
+        var units: [String] = []
+        var index = 0
+        while index < values.count {
+            guard [38, 48, 58].contains(values[index]), index + 1 < values.count else {
+                units.append(names[index])
+                index += 1
+                continue
+            }
+            let length = [5: 1, 2: 3][values[index + 1]] ?? 0
+            let colors = values.dropFirst(index + 2).prefix(length)
+            let isComplete = length > 0 && colors.count == length && colors.allSatisfy { (0 ... 255).contains($0) }
+            units.append(isComplete ? "\(values[index]);\(values[index + 1])" : "\(values[index])")
+            index += 2 + length
+        }
+        return units
     }
 
     nonisolated func url(_ name: String) -> URL {
