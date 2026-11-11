@@ -218,17 +218,16 @@ package struct Terminal: Sendable {
             guard let action = parser.advance(scalar) else {
                 continue
             }
-            if case .print = action {
-            } else {
-                isTextRunClipped = false
-                isLastCharacterDropped = false
-                isAfterPrint = false
-            }
-            switch action {
-            case .print(let scalar):
+            if case .print(let scalar) = action {
                 let printed = usesLineDrawing ? Self.lineDrawingCharacter(for: scalar) : scalar
                 lastCharacter = scalar.isASCII ? (printed == scalar ? scalar : " ") : nil
                 print(printed)
+                continue
+            }
+            isTextRunClipped = false
+            isLastCharacterDropped = false
+            isAfterPrint = false
+            switch action {
             case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
                 lineFeed()
             case .execute("\r"):
@@ -269,12 +268,9 @@ package struct Terminal: Sendable {
             default:
                 break
             }
-            if case .print = action {
-            } else {
-                isTextRunClipped = false
-                isLastCharacterDropped = false
-                isAfterPrint = false
-            }
+            isTextRunClipped = false
+            isLastCharacterDropped = false
+            isAfterPrint = false
         }
         return replies
     }
