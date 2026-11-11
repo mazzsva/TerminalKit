@@ -54,14 +54,25 @@ extension Terminal {
             }
         }
 
-        private(set) var lines: [Line] = []
+        static let maximumCount = 100_000
+
+        private var storedLines: [Line] = []
         private var paragraphs: [Paragraph] = []
         private var rowEnds: [Int] = []
-        private(set) var relaidCount = 0
+        private var storedRelaidCount = 0
+        private var firstParagraph = 0
         private var columns: Int
 
         init(columns: Int) {
             self.columns = columns
+        }
+
+        var lines: ArraySlice<Line> {
+            storedLines[firstLine...]
+        }
+
+        var relaidCount: Int {
+            Swift.max(storedRelaidCount - firstParagraph, 0)
         }
 
         package var startIndex: Int {
@@ -69,16 +80,25 @@ extension Terminal {
         }
 
         package var endIndex: Int {
-            rowEnds.last ?? 0
+            (rowEnds.last ?? 0) - removedRowCount
+        }
+
+        private var firstLine: Int {
+            firstParagraph < paragraphs.count ? paragraphs[firstParagraph].start : storedLines.count
+        }
+
+        private var removedRowCount: Int {
+            rowStart(of: firstParagraph)
         }
 
         var isLastRowWrapped: Bool {
-            lines.last?.isWrapped ?? false
+            storedLines.last?.isWrapped ?? false
         }
 
         package subscript(row: Int) -> Line {
             precondition(indices.contains(row))
-            var lower = 0
+            let row = removedRowCount + row
+            var lower = firstParagraph
             var upper = rowEnds.count
             while lower < upper {
                 let middle = (lower + upper) / 2
@@ -104,17 +124,20 @@ extension Terminal {
             return result
         }
 
-        mutating func append(_ line: Line) {
+        @discardableResult
+        mutating func append(_ line: Line) -> Int {
             let textCount = line.textCount
             let isSimple = line[..<textCount].allSatisfy { $0.width == 1 && !$0.isTab && !$0.isTabGap }
-            guard isLastRowWrapped, let last = paragraphs.indices.last else {
-                paragraphs.append(Paragraph(start: lines.count, textCount: textCount, isSimple: isSimple))
-                lines.append(line)
-                rowEnds.append(endIndex + 1)
-                return
+            guard isLastRowWrapped, let last = paragraphs.indices.last,
+                storedLines.count - paragraphs[last].start < Self.maximumCount
+            else {
+                paragraphs.append(Paragraph(start: storedLines.count, textCount: textCount, isSimple: isSimple))
+                storedLines.append(line)
+                rowEnds.append((rowEnds.last ?? 0) + 1)
+                return removeOldest()
             }
             let start = paragraphs[last].start
-            if lines.count - start == 1 {
+            if storedLines.count - start == 1 {
                 paragraphs[last].rowTextCount = paragraphs[last].lastRowTextCount
             } else if paragraphs[last].rowTextCount != paragraphs[last].lastRowTextCount {
                 paragraphs[last].rowTextCount = -1
@@ -126,29 +149,32 @@ extension Terminal {
             }
             paragraphs[last].isSimple = paragraphs[last].isSimple && isSimple
             if !paragraphs[last].isSimple {
-                paragraphs[last].updateWidths(of: lines[start...]) { $0.append(line[..<textCount]) }
+                paragraphs[last].updateWidths(of: storedLines[start...]) { $0.append(line[..<textCount]) }
             }
-            lines.append(line)
-            rowEnds[last] = rowStart(of: last) + rowCount(of: last, columns: columns, isRelaid: last < relaidCount)
+            storedLines.append(line)
+            rowEnds[last] =
+                rowStart(of: last) + rowCount(of: last, columns: columns, isRelaid: last < storedRelaidCount)
+            return removeOldest()
         }
 
         mutating func unwrapLastRow() {
-            if !lines.isEmpty {
-                lines[lines.count - 1].isWrapped = false
+            if !storedLines.isEmpty {
+                storedLines[storedLines.count - 1].isWrapped = false
             }
         }
 
         mutating func removeAll() {
-            lines.removeAll()
+            storedLines.removeAll()
             paragraphs.removeAll()
             rowEnds.removeAll()
-            relaidCount = 0
+            storedRelaidCount = 0
+            firstParagraph = 0
         }
 
         mutating func removeLast(coveringRows rows: Int, columns: Int) -> [Line] {
             var first = paragraphs.count
             var coveredRows = 0
-            while first > 0, coveredRows < rows {
+            while first > firstParagraph, coveredRows < rows {
                 first -= 1
                 coveredRows += rowCount(of: first, columns: columns, isRelaid: true)
             }
@@ -156,29 +182,35 @@ extension Terminal {
                 return []
             }
             let start = paragraphs[first].start
-            let removed = Array(lines[start...])
-            lines.removeSubrange(start...)
+            let removed = Array(storedLines[start...])
+            storedLines.removeSubrange(start...)
             paragraphs.removeSubrange(first...)
             rowEnds.removeSubrange(first...)
-            relaidCount = Swift.min(relaidCount, first)
+            storedRelaidCount = Swift.min(storedRelaidCount, first)
+            if first == firstParagraph {
+                removeAll()
+            }
             return removed
         }
 
-        mutating func relayOut(columns: Int) {
+        @discardableResult
+        mutating func relayOut(columns: Int) -> Int {
+            removeRemovedParagraphs()
             self.columns = columns
-            relaidCount = paragraphs.count
+            storedRelaidCount = paragraphs.count
             var end = 0
             for index in paragraphs.indices {
                 if !paragraphs[index].isSimple, paragraphs[index].textCount > columns,
                     paragraphs[index].needsMarks
                 {
-                    paragraphs[index].updateWidths(of: lines[storedRange(of: index)]) { $0.markRows(columns: columns) }
+                    paragraphs[index]
+                        .updateWidths(of: storedLines[storedRange(of: index)]) { $0.markRows(columns: columns) }
                 }
                 if paragraphs[index].rowTextCount < 0, paragraphs[index].rowOffsets == nil {
                     var offset = 0
                     paragraphs[index]
                         .setRowOffsets(
-                            lines[storedRange(of: index)]
+                            storedLines[storedRange(of: index)]
                                 .map { line in
                                     defer { offset += line.textCount }
                                     return offset
@@ -187,6 +219,45 @@ extension Terminal {
                 end += rowCount(of: index, columns: columns, isRelaid: true)
                 rowEnds[index] = end
             }
+            return removeOldest()
+        }
+
+        private mutating func removeOldest() -> Int {
+            let count = self.count
+            guard count > Self.maximumCount else {
+                return 0
+            }
+            while firstParagraph < paragraphs.count, self.count > Self.maximumCount {
+                for index in storedRange(of: firstParagraph) {
+                    storedLines[index] = Line()
+                }
+                paragraphs[firstParagraph] = Paragraph(
+                    start: paragraphs[firstParagraph].start, textCount: 0, isSimple: true)
+                firstParagraph += 1
+            }
+            if firstParagraph == paragraphs.count {
+                removeAll()
+            } else if firstParagraph >= paragraphs.count - firstParagraph {
+                removeRemovedParagraphs()
+            }
+            return count - self.count
+        }
+
+        private mutating func removeRemovedParagraphs() {
+            guard firstParagraph > 0 else {
+                return
+            }
+            let lineCount = firstLine
+            let rowCount = removedRowCount
+            storedLines.removeSubrange(..<lineCount)
+            paragraphs.removeSubrange(..<firstParagraph)
+            rowEnds.removeSubrange(..<firstParagraph)
+            for index in paragraphs.indices {
+                paragraphs[index].start -= lineCount
+                rowEnds[index] -= rowCount
+            }
+            storedRelaidCount = Swift.max(storedRelaidCount - firstParagraph, 0)
+            firstParagraph = 0
         }
 
         private func rowStart(of paragraph: Int) -> Int {
@@ -195,7 +266,7 @@ extension Terminal {
 
         private func storedRange(of paragraph: Int) -> Range<Int> {
             paragraphs[paragraph].start
-                ..< (paragraph + 1 < paragraphs.count ? paragraphs[paragraph + 1].start : lines.count)
+                ..< (paragraph + 1 < paragraphs.count ? paragraphs[paragraph + 1].start : storedLines.count)
         }
 
         private func rowCount(of index: Int, columns: Int, isRelaid: Bool) -> Int {
@@ -209,12 +280,12 @@ extension Terminal {
             }
             let isSimple = paragraphs[index].isSimple
             if !isSimple, columns == 1 {
-                return Terminal.laidOut(lines[range], columns: columns).count
+                return Terminal.laidOut(storedLines[range], columns: columns).count
             }
             let (rows, used) =
                 isSimple
                 ? Widths.simpleRowCount(textCount: textCount, columns: columns)
-                : paragraphs[index].rowCount(of: lines[range], columns: columns)
+                : paragraphs[index].rowCount(of: storedLines[range], columns: columns)
             return rows + (keepsEmptyRow(index, storedRows: range.count, used: used, columns: columns) ? 1 : 0)
         }
 
@@ -223,24 +294,24 @@ extension Terminal {
         }
 
         fileprivate func isCheap(_ index: Int) -> Bool {
-            index >= relaidCount || columns > 1 || paragraphs[index].isSimple
+            index >= storedRelaidCount || columns > 1 || paragraphs[index].isSimple
                 || (storedRange(of: index).count == 1 && paragraphs[index].textCount <= columns)
         }
 
         fileprivate func row(_ row: Int, of index: Int) -> Line {
             let range = storedRange(of: index)
-            guard index < relaidCount else {
-                return lines[range.lowerBound + row]
+            guard index < storedRelaidCount else {
+                return storedLines[range.lowerBound + row]
             }
             let paragraph = paragraphs[index]
             if range.count == 1, paragraph.textCount <= columns {
-                return Terminal.relaidRow(lines[range.lowerBound], columns: columns)
+                return Terminal.relaidRow(storedLines[range.lowerBound], columns: columns)
             }
             guard paragraph.isSimple || columns > 1 else {
-                return Terminal.laidOut(lines[range], columns: columns)[row]
+                return Terminal.laidOut(storedLines[range], columns: columns)[row]
             }
-            let widths = paragraph.isSimple ? nil : paragraph.widths ?? Widths(lines[range])
-            let last = lines[range.upperBound - 1]
+            let widths = paragraph.isSimple ? nil : paragraph.widths ?? Widths(storedLines[range])
+            let last = storedLines[range.upperBound - 1]
             var rows = rowCount(of: index)
             var keepsEmptyRow = false
             if row == rows - 1 {
@@ -293,10 +364,10 @@ extension Terminal {
             }
             var offset = offsets.lowerBound
             while offset < offsets.upperBound {
-                let textCount = lines[storedRow].textCount
+                let textCount = storedLines[storedRow].textCount
                 if offset < rowStart + textCount {
                     let upper = Swift.min(offsets.upperBound, rowStart + textCount)
-                    line.append(contentsOf: lines[storedRow][(offset - rowStart) ..< (upper - rowStart)])
+                    line.append(contentsOf: storedLines[storedRow][(offset - rowStart) ..< (upper - rowStart)])
                     offset = upper
                 }
                 rowStart += textCount
@@ -306,7 +377,7 @@ extension Terminal {
         }
 
         fileprivate func rows(of index: Int) -> [Line] {
-            Terminal.laidOut(lines[storedRange(of: index)], columns: columns)
+            Terminal.laidOut(storedLines[storedRange(of: index)], columns: columns)
         }
 
         fileprivate func rowCount(of index: Int) -> Int {
@@ -503,12 +574,13 @@ extension Terminal {
 
         package struct Iterator: IteratorProtocol {
             private let scrollback: Scrollback
-            private var paragraph = 0
+            private var paragraph: Int
             private var row = 0
             private var rows: [Line]?
 
             fileprivate init(scrollback: Scrollback) {
                 self.scrollback = scrollback
+                paragraph = scrollback.firstParagraph
             }
 
             package mutating func next() -> Line? {
