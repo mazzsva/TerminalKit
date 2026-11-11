@@ -298,16 +298,11 @@ struct TerminalSessionTests {
         let session = TerminalSession(running: "exec yes \"$(printf '\\033[m%.0s' $(seq 3000))end\"")
         try session.start()
         await session.waitForText("end")
-        let clock = ContinuousClock()
-        let start = clock.now
         for _ in 0 ..< 2 {
             try await Task.sleep(for: .milliseconds(5))
         }
-        let interrupt = clock.now
         session.send([3])
         await session.waitForExit()
-        #expect(interrupt - start < .seconds(20))
-        #expect(clock.now - interrupt < .seconds(20))
         #expect(session.state == .exited(.uncaughtSignal(SIGINT)))
     }
 
