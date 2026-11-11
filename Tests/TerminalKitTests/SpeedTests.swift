@@ -19,17 +19,7 @@ struct SpeedTests {
         let footprint = memoryFootprint()
         for _ in 0 ..< 5 {
             let session = catSession(file)
-            let scrollView = TerminalScrollView(session: session)
-            let view = scrollView.terminalView
-            let window = NSWindow(contentView: scrollView)
-            window.setContentSize(
-                CGSize(
-                    width: 80 * view.cellSize.width + 2 * TerminalContentView.padding + 20,
-                    height: 24 * view.cellSize.height + TerminalContentView.topPadding
-                        + TerminalContentView.bottomPadding
-                )
-            )
-            scrollView.layoutSubtreeIfNeeded()
+            let (scrollView, window) = shownView(session)
             viewTimes.append(try await time(session))
             scrollView.layoutSubtreeIfNeeded()
             let terminal = session.terminal
@@ -65,6 +55,8 @@ struct SpeedTests {
     @Test(.timeLimit(.minutes(2)))
     func resizesAHundredThousandSavedLines() async throws {
         let session = TerminalSession(running: "true")
+        let (scrollView, window) = shownView(session)
+        let view = scrollView.terminalView
         var index = 0
         while session.liveTerminal.scrollback.count < 100_000 {
             var text = ""
@@ -74,23 +66,45 @@ struct SpeedTests {
             }
             _ = session.liveTerminal.receive(Array(text.utf8))
         }
+        scrollView.layoutSubtreeIfNeeded()
+        view.scrollToBottom()
 
+        let columns = session.terminal.columns
         var times: [Duration] = []
-        for columns in [79, 80, 79, 80, 79, 80] {
+        for step in 1 ... 8 {
             let clock = ContinuousClock()
             let start = clock.now
-            session.resize(columns: columns, rows: 24)
-            _ = session.terminal.scrollback.last
+            let width = window.contentLayoutRect.width + (step.isMultiple(of: 2) ? 1 : -1) * view.cellSize.width
+            window.setContentSize(CGSize(width: width, height: window.contentLayoutRect.height))
+            scrollView.layoutSubtreeIfNeeded()
+            let visible = view.visibleRect
+            view.cacheDisplay(in: visible, to: try #require(view.bitmapImageRepForCachingDisplay(in: visible)))
             times.append(clock.now - start)
-            #expect(session.terminal.columns == columns)
+            #expect(session.terminal.columns == (step.isMultiple(of: 2) ? columns : columns - 1))
+            #expect(session.terminal.scrollback.count >= 100_000)
+            #expect(visible.height > 20 * view.cellSize.height && visible.maxY == view.bounds.maxY)
         }
         print(
             """
-            Resize with \(session.terminal.scrollback.count) saved lines: \(times), \
+            Resize of the view with \(session.terminal.scrollback.count) saved lines: \(times), \
             median \(median(times)), slowest \(times.max() ?? .zero)
             """
         )
         #expect(try #require(times.max()) < .milliseconds(100))
+    }
+
+    private func shownView(_ session: TerminalSession) -> (TerminalScrollView, NSWindow) {
+        let scrollView = TerminalScrollView(session: session)
+        let view = scrollView.terminalView
+        let window = NSWindow(contentView: scrollView)
+        window.setContentSize(
+            CGSize(
+                width: 80.5 * view.cellSize.width + 2 * TerminalContentView.padding + 20,
+                height: 24 * view.cellSize.height + TerminalContentView.topPadding + TerminalContentView.bottomPadding
+            )
+        )
+        scrollView.layoutSubtreeIfNeeded()
+        return (scrollView, window)
     }
 
     private func catSession(_ file: URL) -> TerminalSession {
@@ -149,7 +163,7 @@ struct SpeedTests {
         case 1:
             String(repeating: "wrapped line \(index) ", count: 12)
         case 2:
-            "\(index) 日本語のテキスト 漢字"
+            String(repeating: "mixed \(index)\t日本語のテキスト\tabc 漢字 ", count: 10)
         default:
             "\(index)\ttab\tseparated\tcolumns"
         }
