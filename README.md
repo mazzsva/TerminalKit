@@ -21,7 +21,7 @@ TerminalKit is a terminal view for Mac apps in which a login shell and agent too
 - **Claude Code:** The real session runs only on request, with Claude Code installed and signed in. Without `TERMINALKIT_CLAUDE_SESSION` or without Claude Code, the test reports that it did not run:
   `TEST_RUNNER_TERMINALKIT_CLAUDE_SESSION=1 xcodebuild test -scheme TerminalKit -destination 'platform=macOS' -only-testing:'TerminalKitTests/ProgramSessionTests/claudeCode()'`
 - **Speed:** `TERMINALKIT_SPEED=1 swift test -c release -Xswiftc -enable-testing --filter SpeedTests` outputs 100 MB of text and resizes the view with 100,000 saved lines. It opens a Terminal.app window to compare the output time live.
-- **Coverage:** `TERMINALKIT_CLAUDE_SESSION=1 Scripts/unused-functions.sh` reports each function in `Sources` that no test uses. `Scripts/unused-functions.txt` lists the expected ones, with a reason for each.
+- **Coverage:** `TERMINALKIT_CLAUDE_SESSION=1 Scripts/unused-functions.sh` reports each function in `Sources` that the program sessions, the view tests, and the bad input run do not use. `Scripts/unused-functions.txt` lists the expected ones, with a reason for each.
 - **CI:** GitHub Actions lints, builds the example app, and runs the full suite on every pull request that is ready for review.
 - **Accessibility:** VoiceOver reads the terminal as a text area and gets a notification when the output changes.
 
@@ -103,6 +103,7 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 - TerminalKit also ignores these, which no listed program sends:
   - SGR 5 (blink), and colors with colon parameters, such as `CSI 38:2::255:0:0m`.
   - OSC 8 marked links. A Command-click opens printed links only.
+  - OSC 9 and OSC 777, the notification requests of programs. A host gets no notification event from a program. The bell is the only signal, through `bellCount`.
   - OSC 4 queries, OSC 5, OSC 10 and 11 that set a color, OSC 13 to 19, and OSC 104, 105, 110, 111, and 117.
   - The window reports `CSI 11t`, `CSI 13t`, `CSI 14t`, and `CSI 18t`, and DECREQTPARM.
   - SO, LS2, LS3, the G1 to G3 character sets, and the national character sets.
