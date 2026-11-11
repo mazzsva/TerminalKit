@@ -62,7 +62,7 @@ Each one needs a test.
 - `xcodebuild test -scheme TerminalKit -destination 'platform=macOS'`: `** TEST SUCCEEDED **`
 - `xcodebuild build` for the scheme of the example app: `** BUILD SUCCEEDED **` and no warning
 - The real session test on this Mac: Claude Code passes, and does not report that it did not run
-- The coverage report: no function is unused, apart from the functions on the list
+- `TERMINALKIT_CLAUDE_SESSION=1 Scripts/unused-functions.sh`: exit status 0, the line `The real Claude Code session ran`, and a last line that ends with `unused ones is on the list`
 - In the example app, type `claude` and press Return: the start screen of Claude Code shows
 
 ## Deviations
