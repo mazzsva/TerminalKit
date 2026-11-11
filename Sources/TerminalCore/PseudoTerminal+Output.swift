@@ -10,10 +10,6 @@ extension PseudoTerminal {
             AsyncIterator(wakeUps: wakeUps.makeAsyncIterator(), buffer: buffer)
         }
 
-        package func takeAvailable() -> [UInt8] {
-            buffer.take()
-        }
-
         package struct AsyncIterator: AsyncIteratorProtocol {
             var wakeUps: AsyncStream<Void>.Iterator
             let buffer: OutputBuffer

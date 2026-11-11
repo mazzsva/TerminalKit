@@ -249,10 +249,6 @@ final class TerminalContentView: NSView {
         true
     }
 
-    var isOnScreen: Bool {
-        window?.isVisible == true
-    }
-
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         changedColorsCache = nil
