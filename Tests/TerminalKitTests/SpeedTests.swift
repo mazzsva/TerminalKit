@@ -20,6 +20,8 @@ struct SpeedTests {
         for _ in 0 ..< 5 {
             let session = catSession(file)
             let (scrollView, window) = shownView(session)
+            window.orderFrontRegardless()
+            defer { window.orderOut(nil) }
             viewTimes.append(try await time(session))
             scrollView.layoutSubtreeIfNeeded()
             let terminal = session.terminal
@@ -34,6 +36,7 @@ struct SpeedTests {
                 bytesPerLine = (memoryFootprint() - footprint) / terminal.scrollback.count
             }
             #expect(window.contentView === scrollView)
+            #expect(window.isVisible && !window.isKeyWindow)
         }
         for _ in 0 ..< 5 {
             let session = catSession(file)
@@ -49,7 +52,7 @@ struct SpeedTests {
             Peak memory after the first output: \(peakMemory / 1_000_000) MB, bytes for each saved line: \(bytesPerLine)
             """
         )
-        #expect(viewTime <= .seconds(4))
+        #expect(viewTime <= .milliseconds(3_600))
     }
 
     @Test(.timeLimit(.minutes(2)))
