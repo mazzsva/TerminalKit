@@ -162,7 +162,7 @@ package struct Terminal: Sendable {
         restoredRows: Int
     ) -> (screen: [Line], cursor: Position) {
         let restored = scrollback.removeLast(coveringRows: restoredRows, columns: columns)
-        scrollback.relayOut(columns: columns)
+        removedScrollbackCount += scrollback.relayOut(columns: columns)
         let storedCursor = cursor.flatMap {
             $0.row < usedRows ? Position(row: restored.count + $0.row, column: $0.column) : nil
         }
@@ -687,7 +687,7 @@ package struct Terminal: Sendable {
                 keptLine = Self.trimmed(line)
                 previousLine = line
             }
-            scrollback.append(keptLine)
+            removedScrollbackCount += scrollback.append(keptLine)
         }
     }
 
