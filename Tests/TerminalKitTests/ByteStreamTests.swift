@@ -10,13 +10,18 @@ struct ByteStreamTests {
     static let streamCount = 1_000_000
     static let chunkSize = 10_000
     static let drawInterval = 500
+    static let yieldInterval = 10
     static let maximumReplyBytesPerByte = 72
 
     @MainActor private static let view = TerminalContentView(session: TerminalSession())
 
     @Test(arguments: 0 ..< streamCount / chunkSize)
     func receivesTheStreamsWithNoCrash(chunk: Int) async throws {
-        var streams = ByteStreams(seed: Self.seed, chunk: chunk)
+        try await Task(priority: .background) { try await Self.receiveTheStreams(chunk: chunk) }.value
+    }
+
+    private static func receiveTheStreams(chunk: Int) async throws {
+        var streams = ByteStreams(seed: seed, chunk: chunk)
         var size = streams.size()
         var terminal = Terminal(columns: size.columns, rows: size.rows)
         terminal.defaultColors = Terminal.DefaultColors(
@@ -24,22 +29,24 @@ struct ByteStreamTests {
             background: Terminal.RGB(red: 4, green: 5, blue: 6),
             cursor: Terminal.RGB(red: 7, green: 8, blue: 9)
         )
-        for index in chunk * Self.chunkSize ..< (chunk + 1) * Self.chunkSize {
+        for index in chunk * chunkSize ..< (chunk + 1) * chunkSize {
             let (resize, bytes) = streams.next()
             if let resize {
                 size = resize
                 terminal.resize(columns: size.columns, rows: size.rows)
             }
             let replies = terminal.receive(bytes)
-            let problem =
-                replies.count > Self.maximumReplyBytesPerByte * bytes.count
-                ? "\(replies.count) reply bytes" : Self.problem(in: terminal, size: size)
-            if let problem {
-                Issue.record("Seed \(Self.seed), stream \(index): \(problem)")
+            let failure =
+                replies.count > maximumReplyBytesPerByte * bytes.count
+                ? "\(replies.count) reply bytes" : problem(in: terminal, size: size)
+            if let failure {
+                Issue.record("Seed \(seed), stream \(index): \(failure)")
                 return
             }
-            if index % Self.drawInterval == 0 {
-                try await Self.draw(terminal)
+            if index % drawInterval == chunk * drawInterval * chunkSize / streamCount {
+                try await draw(terminal)
+            } else if index % yieldInterval == 0 {
+                await Task.yield()
             }
         }
     }
