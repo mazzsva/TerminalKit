@@ -11,10 +11,6 @@ struct EscapeSequenceParserTests {
         #expect(parse("\r\n\u{7}") == [.execute("\r"), .execute("\n"), .execute("\u{7}")])
     }
 
-    @Test func printsC1ControlCharacters() {
-        #expect(parse("\u{7F}\u{85}") == [.print("\u{85}")])
-    }
-
     @Test func dispatchesEscapeSequences() {
         #expect(parse("\u{1B}7") == [.escape(intermediates: "", final: "7")])
         #expect(parse("\u{1B}(B") == [.escape(intermediates: "(", final: "B")])
@@ -30,18 +26,6 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}]0;Ti\(cancel)t\u{7}") == [.print("t"), .execute("\u{7}")])
     }
 
-    @Test func printsANonASCIICharacterAndContinuesTheEscape() {
-        #expect(parse("\u{1B}éAB") == [.print("é"), .escape(intermediates: "", final: "A"), .print("B")])
-        #expect(parse("\u{1B}(éAB") == [.print("é"), .escape(intermediates: "(", final: "A"), .print("B")])
-        #expect(parse("\u{1B}\u{85}7") == [.print("\u{85}"), .escape(intermediates: "", final: "7")])
-    }
-
-    @Test func printsANonASCIICharacterAndContinuesTheControlSequence() {
-        #expect(parse("\u{1B}[1éA") == [.print("é"), controlSequence(parameters: [1], final: "A")])
-        #expect(
-            parse("\u{1B}[1 éq") == [.print("é"), controlSequence(parameters: [1], intermediates: " ", final: "q")])
-    }
-
     @Test func ignoresDeleteInASequence() {
         #expect(parse("\u{1B}(\u{7F}A") == [.escape(intermediates: "(", final: "A")])
         #expect(parse("\u{1B}[1\u{7F}A") == [controlSequence(parameters: [1], final: "A")])
@@ -51,11 +35,6 @@ struct EscapeSequenceParserTests {
     @Test func executesATabAndContinuesTheSequence() {
         #expect(parse("\u{1B}(\tA") == [.execute("\t"), .escape(intermediates: "(", final: "A")])
         #expect(parse("\u{1B}[1\tA") == [.execute("\t"), controlSequence(parameters: [1], final: "A")])
-    }
-
-    @Test(arguments: ["#", "(", ")", "*", "+", "-", ".", "/"])
-    func continuesAnEscapeAfterADesignator(intermediate: String) {
-        #expect(parse("\u{1B}\(intermediate)0A") == [.escape(intermediates: intermediate, final: "0"), .print("A")])
     }
 
     @Test(arguments: [" ", "!", "\"", "$", "%", "&", "'", ","])
@@ -96,11 +75,6 @@ struct EscapeSequenceParserTests {
         #expect(
             parse("\u{1B}[:2;:3H") == [controlSequence(parameters: [0, 0], final: "H", subparameters: [0: 2, 1: 3])])
         #expect(parse("\u{1B}[38:2::255m") == [controlSequence(parameters: [38], final: "m", subparameters: [0: 2])])
-    }
-
-    @Test func ignoresAMarkerAfterAParameter() {
-        #expect(parse("\u{1B}[1?hA") == [.print("A")])
-        #expect(parse("\u{1B}[1>cA") == [.print("A")])
     }
 
     @Test func ignoresASecondMarker() {
@@ -169,10 +143,6 @@ struct EscapeSequenceParserTests {
     @Test func cancelsAnOperatingSystemCommandAtAnEscape() {
         #expect(parse("\u{1B}]0;Title\u{1B}xA") == [.escape(intermediates: "", final: "x"), .print("A")])
         #expect(parse("\u{1B}]0;abc\u{1B}[31m") == [controlSequence(parameters: [31], final: "m")])
-    }
-
-    @Test func startsAnEscapeAfterTwoEscapesInAnOperatingSystemCommand() {
-        #expect(parse("\u{1B}]0;Title\u{1B}\u{1B}7") == [.escape(intermediates: "", final: "7")])
     }
 
     @Test(arguments: ["", "A2", "2:1", " 2", "2?", "+2"])

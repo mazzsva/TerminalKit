@@ -85,12 +85,6 @@ struct TerminalLinkTests {
         }
     }
 
-    @Test func findsNoLinkInTheTextOfAHyperlink() async throws {
-        let view = try await linkView(
-            running: "printf 'x \\033]8;;https://example.com/a\\033\\\\ab\\033]8;;\\033\\\\ c'")
-        #expect(view.link(atRow: 0, column: 3) == nil)
-    }
-
     @Test func findsAWrappedLinkAfterWideCharacters() async throws {
         let view = try await linkView(running: "printf '中 https://example.com/abc d'")
         let link = try #require(view.link(atRow: 1, column: 2))

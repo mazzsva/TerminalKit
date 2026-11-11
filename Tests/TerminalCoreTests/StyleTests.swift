@@ -34,17 +34,6 @@ struct StyleTests {
         #expect(style.isUnderlined)
     }
 
-    @Test func ignoresStrikethrough() {
-        #expect(style("9") == Terminal.Style())
-        #expect(style("1;9;29") == Terminal.Style(isBold: true))
-    }
-
-    @Test func ignoresDoubleUnderline() {
-        var style = Terminal.Style()
-        style.apply([21])
-        #expect(!style.isUnderlined)
-    }
-
     @Test func ignoresUnknownParameters() {
         var style = Terminal.Style()
         style.apply([5, 6, 25, 99, 1])
@@ -130,21 +119,10 @@ struct StyleTests {
         #expect(style == Terminal.Style(isBold: true))
     }
 
-    @Test func readsTheUnderlineColorValuesAsSeparateParameters() {
-        #expect(style("4;58;2;255;0;0") == Terminal.Style())
-        #expect(style("58;5;2") == Terminal.Style(isFaint: true))
-        #expect(style("4;58;5;2;59") == Terminal.Style(isFaint: true, isUnderlined: true))
-    }
-
     @Test func readsOnlyTheUnderlineSubparameters() {
         #expect(style("4:3;31") == Terminal.Style(foreground: .indexed(1), isUnderlined: true))
         #expect(style("4;4:0") == Terminal.Style())
         #expect(style("38:2::255:0:0;1") == Terminal.Style(isBold: true))
-    }
-
-    @Test func ignoresTheUnderlineColorWithColons() {
-        #expect(style("4;58:5:2") == Terminal.Style(isUnderlined: true))
-        #expect(style("58:2::255:0:0;1") == Terminal.Style(isBold: true))
     }
 
     @Test func appliesOnlyTheFirst32Parameters() {

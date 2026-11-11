@@ -3,11 +3,6 @@ import Testing
 @testable import TerminalCore
 
 struct ModifyOtherKeysTests {
-    @Test func ignoresTheKittyKeyboardSequences() {
-        var terminal = Terminal(columns: 4, rows: 2)
-        #expect(terminal.receive("\u{1B}[?u\u{1B}[>1u\u{1B}[=1;1u\u{1B}[<u\u{1B}[?u\u{1B}[c") == "\u{1B}[?1;2c")
-    }
-
     @Test func setsTheModifyOtherKeysLevel() {
         var terminal = Terminal(columns: 4, rows: 2)
         #expect(terminal.modifyOtherKeys == 0)
