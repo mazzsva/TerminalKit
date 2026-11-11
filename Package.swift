@@ -41,5 +41,10 @@ let package = Package(
             resources: [.copy("Recordings")],
             swiftSettings: swiftSettings,
         ),
+        .testTarget(
+            name: "BadInputTests",
+            dependencies: ["TerminalKit"],
+            swiftSettings: swiftSettings,
+        ),
     ]
 )
