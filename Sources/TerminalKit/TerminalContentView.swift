@@ -585,11 +585,10 @@ final class TerminalContentView: NSView {
 
         let cursor = cursorRect
         guard markedText.isEmpty else {
-            let text = NSMutableAttributedString(
-                string: markedText,
-                attributes: attributes.merging([.underlineStyle: NSUnderlineStyle.single.rawValue]) { $1 }
-            )
-            markedString.enumerateAttribute(.underlineStyle, in: NSRange(location: 0, length: text.length)) {
+            let text = NSMutableAttributedString(string: markedText, attributes: attributes)
+            let range = NSRange(location: 0, length: text.length)
+            text.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
+            markedString.enumerateAttribute(.underlineStyle, in: range) {
                 style, range, _ in
                 if let style {
                     text.addAttribute(.underlineStyle, value: style, range: range)
