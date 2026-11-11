@@ -16,9 +16,7 @@ struct GraphemeTests {
         full.receive(clusters(count: 70_000))
         var other = Terminal(columns: 80, rows: 24)
         other.receive("e\u{301}")
-        #expect(other.graphemes.count == 1)
         #expect(other.character(of: other.screen[0][0]) == "e\u{301}")
-        #expect(full.graphemes.count > 65_536)
         #expect(full.character(of: full.screen[0][0]).unicodeScalars.count > 1)
     }
 

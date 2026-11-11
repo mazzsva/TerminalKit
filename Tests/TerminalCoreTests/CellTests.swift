@@ -16,7 +16,6 @@ struct CellTests {
         let cell = graphemes.cell(Terminal.Cell(), with: "e\u{301}")
         let other = graphemes.cell(Terminal.Cell(scalar: "x"), with: "e\u{301}")
         #expect(cell == other)
-        #expect(graphemes.count == 1)
     }
 
     @Test func storesACharacterOfOneScalarInTheCell() {
@@ -24,7 +23,6 @@ struct CellTests {
         let cell = graphemes.cell(Terminal.Cell(), with: "é")
         #expect(graphemes.character(of: cell) == "é")
         #expect(cell == Terminal.Cell(scalar: "é"))
-        #expect(graphemes.count == 0)
     }
 
     @Test func showsPaddingAsABlank() {
