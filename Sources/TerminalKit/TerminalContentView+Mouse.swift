@@ -65,7 +65,7 @@ extension TerminalContentView {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        let terminal = session.terminal
+        let terminal = session.liveTerminal
         let bypasses = event.modifierFlags.contains(.function)
         let lines = Int(abs(event.deltaY).rounded(.up))
         if terminal.mouseTracking != .off, !bypasses {
@@ -92,15 +92,15 @@ extension TerminalContentView {
     }
 
     func reportsPressedButton(_ button: Int) -> Bool {
-        reportedButtons.contains(button) && session.terminal.mouseTracking != .off
+        reportedButtons.contains(button) && session.liveTerminal.mouseTracking != .off
     }
 
     func releasesButton(_ button: Int) -> Bool {
-        reportedButtons.remove(button) != nil && session.terminal.mouseTracking != .off
+        reportedButtons.remove(button) != nil && session.liveTerminal.mouseTracking != .off
     }
 
     func reportsMouse(for event: NSEvent) -> Bool {
-        session.terminal.mouseTracking != .off && !event.modifierFlags.contains(.function)
+        session.liveTerminal.mouseTracking != .off && !event.modifierFlags.contains(.function)
     }
 
     func reportMouse(_ event: NSEvent, button: Int, isRelease: Bool = false) {
@@ -109,7 +109,7 @@ extension TerminalContentView {
             .reduce(0) { event.modifierFlags.contains($1.0) ? $0 | $1.1 : $0 }
         lastMousePosition = position
         session.send(
-            session.terminal.mouseReport(
+            session.liveTerminal.mouseReport(
                 button: button | modifiers,
                 column: position.column,
                 row: position.row,
@@ -119,13 +119,13 @@ extension TerminalContentView {
     }
 
     func reportDrag(_ event: NSEvent, button: Int) {
-        if session.terminal.mouseTracking != .clicks, mousePosition(of: event) != lastMousePosition {
+        if session.liveTerminal.mouseTracking != .clicks, mousePosition(of: event) != lastMousePosition {
             reportMouse(event, button: button)
         }
     }
 
     func mousePosition(of event: NSEvent) -> Terminal.Position {
-        let terminal = session.terminal
+        let terminal = session.liveTerminal
         let location = convert(event.locationInWindow, from: nil)
         let row = Int((location.y - Self.topPadding) / cellSize.height) - terminal.scrollback.count
         let column = Int((location.x - Self.padding) / cellSize.width)

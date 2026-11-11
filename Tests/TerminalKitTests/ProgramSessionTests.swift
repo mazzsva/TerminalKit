@@ -12,8 +12,8 @@ struct ProgramSessionTests {
         "CSI 6n", "CSI >c", "CSI >4m", "CSI m", "CSI 0m", "CSI 1m", "CSI 2m", "CSI 4m", "CSI 7m", "CSI 22m",
         "CSI 23m", "CSI 24m", "CSI 27m", "CSI 32m", "CSI 33m", "CSI 36m", "CSI 38m", "CSI 39m", "CSI 48m", "CSI 49m",
         "CSI 94m", "CSI ?1h", "CSI ?1l", "CSI ?7h", "CSI ?25h", "CSI ?25l", "CSI ?1000l", "CSI ?1002l", "CSI ?1003l",
-        "CSI ?1004h", "CSI ?1004l", "CSI ?1006l", "CSI ?1049h", "CSI ?1049l", "CSI ?2004h", "CSI ?2004l", "OSC 0",
-        "OSC 2", "OSC 7", "OSC 10", "OSC 11", "CSI 22t", "CSI 23t", "CSI ?4m",
+        "CSI ?1004h", "CSI ?1004l", "CSI ?1006l", "CSI ?1049h", "CSI ?1049l", "CSI ?2004h", "CSI ?2004l", "CSI ?2026h",
+        "CSI ?2026l", "OSC 0", "OSC 2", "OSC 7", "OSC 10", "OSC 11", "CSI 22t", "CSI 23t", "CSI ?4m",
     ]
 
     static let ignored: Set<String> = [
@@ -252,6 +252,7 @@ struct ProgramSessionTests {
             #expect(try await session.exit() == .exit(0))
             #expect(await session.ruleRows.count <= 2)
             #expect(await session.lines.contains("Resume this session with:"))
+            #expect(await session.controlFunctions.isSuperset(of: ["CSI ?2026h", "CSI ?2026l"]))
         }
     }
 
