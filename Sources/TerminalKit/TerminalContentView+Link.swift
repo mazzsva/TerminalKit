@@ -217,7 +217,7 @@ extension TerminalContentView {
 
     override func mouseMoved(with event: NSEvent) {
         let location = convert(event.locationInWindow, from: nil)
-        if session.terminal.mouseTracking == .anyMotion,
+        if session.liveTerminal.mouseTracking == .anyMotion,
             visibleRect.intersection(bounds).contains(location),
             mousePosition(of: event) != lastMousePosition
         {

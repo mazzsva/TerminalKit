@@ -108,7 +108,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     func paste(text: String) {
         insertedText = ""
         var text = text
-        if session.terminal.usesBracketedPaste {
+        if session.liveTerminal.usesBracketedPaste {
             guard !TerminalSession.containsPasteEnd(text) else {
                 let alert = NSAlert()
                 alert.messageText =

@@ -74,7 +74,7 @@ struct ByteStreamTests {
 
     @MainActor
     private static func draw(_ terminal: Terminal) throws {
-        view.session.terminal = terminal
+        view.session.liveTerminal = terminal
         let top = view.rect(row: terminal.scrollback.count, columns: 0 ..< terminal.columns)
         let screen = top.union(top.offsetBy(dx: 0, dy: CGFloat(terminal.rows - 1) * top.height))
         view.frame = NSRect(

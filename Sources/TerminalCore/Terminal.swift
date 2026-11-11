@@ -55,6 +55,7 @@ package struct Terminal: Sendable {
     package internal(set) var changedColors = ChangedColors()
     package private(set) var usesSGRMouseEncoding = false
     package private(set) var modifyOtherKeys = 0
+    package private(set) var synchronizedOutputCount = 0
 
     package var normalScreenLines: [Line] {
         normalScreen?.lines ?? []
@@ -62,6 +63,20 @@ package struct Terminal: Sendable {
 
     package var isAlternateScreenActive: Bool {
         normalScreen != nil
+    }
+
+    package var isSynchronizingOutput: Bool {
+        !synchronizedSnapshot.isEmpty
+    }
+
+    package var displayed: Terminal {
+        guard var snapshot = synchronizedSnapshot.first else {
+            return self
+        }
+        snapshot.scrollback = scrollback
+        snapshot.removedScrollbackCount = removedScrollbackCount
+        snapshot.graphemes = graphemes
+        return snapshot
     }
 
     private var usesAutowrap = true
@@ -85,6 +100,7 @@ package struct Terminal: Sendable {
     private var normalScreen: (lines: [Line], savedCursor: SavedCursor)?
     private var alternateSavedCursor: SavedCursor?
     private var titleStack: [String] = []
+    private var synchronizedSnapshot: [Terminal] = []
 
     package init(columns: Int, rows: Int) {
         precondition(columns > 0 && rows > 0)
@@ -101,6 +117,7 @@ package struct Terminal: Sendable {
 
     mutating func resize(columns: Int, rows: Int, restoredRows: Int) {
         precondition(columns > 0 && rows > 0)
+        endSynchronizedOutput()
         isTextRunClipped = false
         isLastCharacterDropped = false
         isAfterPrint = false
@@ -260,6 +277,10 @@ package struct Terminal: Sendable {
             }
         }
         return replies
+    }
+
+    package mutating func endSynchronizedOutput() {
+        synchronizedSnapshot = []
     }
 
     package mutating func clearToStart() {
@@ -761,6 +782,7 @@ package struct Terminal: Sendable {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.bellCount = bellCount
+        terminal.synchronizedOutputCount = synchronizedOutputCount
         terminal.defaultColors = defaultColors
         terminal.changedColors = changedColors
         terminal.changedColors.indexed = [:]
@@ -928,6 +950,14 @@ package struct Terminal: Sendable {
         case (1049, false):
             exitAlternateScreen()
             restoreCursor()
+        case (2026, true) where synchronizedSnapshot.isEmpty:
+            var snapshot = self
+            snapshot.scrollback = Scrollback(columns: columns)
+            snapshot.graphemes = Graphemes()
+            synchronizedSnapshot = [snapshot]
+            synchronizedOutputCount += 1
+        case (2026, false):
+            endSynchronizedOutput()
         default:
             break
         }

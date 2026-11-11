@@ -22,11 +22,14 @@ public final class TerminalSession {
     public private(set) var bellCount = 0
     public private(set) var currentDirectoryURL: URL?
 
-    var terminal = Terminal(columns: 80, rows: 24) {
+    var liveTerminal = Terminal(columns: 80, rows: 24) {
         didSet {
             revision += 1
+            terminalDidChange?()
         }
     }
+    @ObservationIgnored var synchronizedOutputClock: any Clock<Duration> = ContinuousClock()
+    @ObservationIgnored var terminalDidChange: (() -> Void)?
     @ObservationIgnored private(set) var revision = 0
     @ObservationIgnored private(set) var resizeCount = 0
     @ObservationIgnored weak var sizingView: TerminalContentView?
@@ -36,6 +39,12 @@ public final class TerminalSession {
     @ObservationIgnored private var waitingInput: [UInt8]?
 
     @ObservationIgnored private(set) var pseudoTerminal: PseudoTerminal?
+    @ObservationIgnored private var synchronizedOutputTimer: Task<Void, Never>?
+    @ObservationIgnored private var timedSynchronizedOutputCount = 0
+
+    var terminal: Terminal {
+        liveTerminal.displayed
+    }
 
     public init(configuration: Configuration = .loginShell) {
         self.configuration = configuration
@@ -54,10 +63,10 @@ public final class TerminalSession {
             arguments: configuration.arguments,
             environment: configuration.environment,
             currentDirectoryURL: configuration.currentDirectoryURL,
-            columns: terminal.columns,
-            rows: terminal.rows,
-            pixelWidth: pixelWidth(columns: terminal.columns),
-            pixelHeight: pixelHeight(rows: terminal.rows)
+            columns: liveTerminal.columns,
+            rows: liveTerminal.rows,
+            pixelWidth: pixelWidth(columns: liveTerminal.columns),
+            pixelHeight: pixelHeight(rows: liveTerminal.rows)
         )
         self.pseudoTerminal = pseudoTerminal
         if let waitingInput {
@@ -78,13 +87,13 @@ public final class TerminalSession {
     func resize(columns: Int, rows: Int, cellSize: CGSize = CGSize(width: 7, height: 15)) {
         isSized = true
         defer { startIfWaiting() }
-        guard columns != terminal.columns || rows != terminal.rows || cellSize != self.cellSize else {
+        guard columns != liveTerminal.columns || rows != liveTerminal.rows || cellSize != self.cellSize else {
             return
         }
         self.cellSize = cellSize
-        if columns != terminal.columns || rows != terminal.rows {
+        if columns != liveTerminal.columns || rows != liveTerminal.rows {
             resizeCount += 1
-            terminal.resize(columns: columns, rows: rows)
+            liveTerminal.resize(columns: columns, rows: rows)
         }
         pseudoTerminal?
             .resize(
@@ -138,7 +147,7 @@ public final class TerminalSession {
     }
 
     public func paste(_ text: String) {
-        if let bytes = Self.pastedBytes(text, isBracketed: terminal.usesBracketedPaste) {
+        if let bytes = Self.pastedBytes(text, isBracketed: liveTerminal.usesBracketedPaste) {
             send(bytes)
         }
     }
@@ -155,7 +164,7 @@ public final class TerminalSession {
     }
 
     func clearToStart() {
-        terminal.clearToStart()
+        liveTerminal.clearToStart()
     }
 
     func send(_ bytes: [UInt8]) {
@@ -181,22 +190,37 @@ public final class TerminalSession {
         }
         state = .exited(Termination(termination))
         pseudoTerminal = nil
+        if liveTerminal.isSynchronizingOutput {
+            liveTerminal.endSynchronizedOutput()
+        }
     }
 
     private func receive(_ bytes: [UInt8]) {
-        if let view = sizingView, view.reportedColors != terminal.defaultColors {
-            terminal.defaultColors = view.reportedColors
+        if let view = sizingView, view.reportedColors != liveTerminal.defaultColors {
+            liveTerminal.defaultColors = view.reportedColors
         }
-        let replies = terminal.receive(bytes)
-        title = terminal.title
-        if bellCount != terminal.bellCount {
-            bellCount = terminal.bellCount
+        let replies = liveTerminal.receive(bytes)
+        title = liveTerminal.title
+        if bellCount != liveTerminal.bellCount {
+            bellCount = liveTerminal.bellCount
         }
-        if currentDirectoryURL != terminal.currentDirectory {
-            currentDirectoryURL = terminal.currentDirectory
+        if currentDirectoryURL != liveTerminal.currentDirectory {
+            currentDirectoryURL = liveTerminal.currentDirectory
         }
         if !replies.isEmpty {
             pseudoTerminal?.write(replies, isReply: true)
+        }
+        let count = liveTerminal.synchronizedOutputCount
+        if liveTerminal.isSynchronizingOutput, count != timedSynchronizedOutputCount {
+            timedSynchronizedOutputCount = count
+            synchronizedOutputTimer?.cancel()
+            synchronizedOutputTimer = Task { [weak self, synchronizedOutputClock] in
+                try? await synchronizedOutputClock.sleep(for: .seconds(1))
+                guard let self, !Task.isCancelled, liveTerminal.isSynchronizingOutput else {
+                    return
+                }
+                liveTerminal.endSynchronizedOutput()
+            }
         }
     }
 }

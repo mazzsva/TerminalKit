@@ -70,7 +70,7 @@ final class TerminalContentView: NSView {
                 return
             }
             needsDisplay = true
-            if session.terminal.usesFocusReporting {
+            if session.liveTerminal.usesFocusReporting {
                 session.send(Array((isFocused ? "\u{1B}[I" : "\u{1B}[O").utf8))
             }
         }
@@ -382,7 +382,7 @@ final class TerminalContentView: NSView {
 
     override func keyDown(with event: NSEvent) {
         let modifiers = event.modifierFlags.intersection([.shift, .control, .option, .command])
-        if markedText.isEmpty, !session.terminal.isAlternateScreenActive, scrollsView(for: event) {
+        if markedText.isEmpty, !session.liveTerminal.isAlternateScreenActive, scrollsView(for: event) {
             return
         }
         if markedText.isEmpty, event.charactersIgnoringModifiers == "\u{F739}",
@@ -399,7 +399,7 @@ final class TerminalContentView: NSView {
         }
         let sendsBytes = if case .bytes = input { true } else { false }
         guard !modifiers.contains(.command) || sendsBytes else {
-            if markedText.isEmpty, !session.terminal.isAlternateScreenActive, modifiers == .command,
+            if markedText.isEmpty, !session.liveTerminal.isAlternateScreenActive, modifiers == .command,
                 event.charactersIgnoringModifiers == "k"
             {
                 session.clearToStart()
@@ -438,11 +438,11 @@ final class TerminalContentView: NSView {
     }
 
     func modifiedInput(_ event: NSEvent) -> [UInt8]? {
-        event.otherKeyInput(level: session.terminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
+        event.otherKeyInput(level: session.liveTerminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
     }
 
     func keyInput(_ event: NSEvent) -> TerminalKeyInput {
-        let terminal = session.terminal
+        let terminal = session.liveTerminal
         return event.terminalKeyInput(
             TerminalKeyModes(
                 usesOptionAsMetaKey: usesOptionAsMetaKey,

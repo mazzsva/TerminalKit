@@ -75,7 +75,8 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "488", "PATH": "/bin",
+                "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "488", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1",
+                "PATH": "/bin",
             ])
     }
 
@@ -87,6 +88,7 @@ struct TerminalSessionTests {
         #expect(environment["PATH"] == inherited["PATH"])
         #expect(environment["TERM_PROGRAM"] == "Apple_Terminal")
         #expect(environment["TERM_PROGRAM_VERSION"] == "488")
+        #expect(environment["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] == inherited["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] ?? "1")
         #expect(environment["TERM_SESSION_ID"] == nil)
     }
 
@@ -113,6 +115,12 @@ struct TerminalSessionTests {
         #expect(!lines.contains { $0.contains("Saving session") })
         let sessions = home.appending(path: ".zsh_sessions").path(percentEncoded: false)
         #expect(!FileManager.default.fileExists(atPath: sessions))
+    }
+
+    @Test func keepsTheClaudeCodeSettingOfTheUser() {
+        let environment = TerminalSession.Configuration.terminalEnvironment(
+            inheriting: ["CLAUDE_CODE_FORCE_SYNC_OUTPUT": "0"])
+        #expect(environment["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] == "0")
     }
 
     @Test func keepsTheLanguageOfTheUser() {
@@ -156,7 +164,7 @@ struct TerminalSessionTests {
         #expect(
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
-                "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "488",
+                "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "488", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1",
                 "SSH_AUTH_SOCK": "/tmp/agent", "GIT_ASKPASS": "/tmp/askpass",
                 "VSCODE_GIT_IPC_HANDLE": "/tmp/vscode-git.sock",
             ])
@@ -228,17 +236,6 @@ struct TerminalSessionTests {
         try session.start()
         await session.waitForExit()
         #expect(session.title == "Title")
-    }
-
-    @Test func drawsSynchronizedOutputAtOnce() async throws {
-        let session = TerminalSession(running: "stty -echo; printf 'a\\033[?2026hb\\033]0;Title\\007'; read x")
-        try session.start()
-        for await title in Observations({ session.title }) where title == "Title" {
-            break
-        }
-        #expect(session.lines.first == "ab")
-        session.send(Array("\r".utf8))
-        await session.waitForExit()
     }
 
     @Test func showsTheCurrentDirectoryOfTheProcess() async throws {
