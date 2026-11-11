@@ -81,7 +81,7 @@ public final class TerminalSession {
             for await bytes in output {
                 let deadline = clock.now + .milliseconds(16)
                 self?.receive(bytes)
-                while clock.now < deadline {
+                while self?.sizingView?.isOnScreen == true, clock.now < deadline {
                     let bytes = output.takeAvailable()
                     guard !bytes.isEmpty else {
                         break
