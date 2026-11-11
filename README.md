@@ -59,13 +59,17 @@ Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalP
 
 To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, and `state` of `TerminalSession`.
 
+Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the session as Terminal.app, so the command changes the user's Terminal.app profile, not the host. Shift-Return makes a new line with no setup.
+
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
+
+macOS gives microphone access to the host app, not to the program in the terminal. To use Claude Code voice dictation, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement.
 
 The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalView` with the user's login shell. Build it with the `TerminalKitExample` scheme.
 
 ## Engineering decisions
 
-**A fixed list of programs.** The measure of done is the list of programs above, not parity with Terminal.app. The emulator acts on a control function when a listed program sends it, or when the macOS terminfo entry of `xterm-256color` holds it. Shift-Return makes a new line in Claude Code with no setup, through xterm's modifyOtherKeys.
+**A fixed list of programs.** The measure of done is the list of programs above, not parity with Terminal.app. The emulator acts on a control function when a listed program sends it, or when the macOS terminfo entry of `xterm-256color` holds it, and the known limits name each exception. Shift-Return makes a new line in Claude Code with no setup, through xterm's modifyOtherKeys.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 7,000 lines of Swift and C on POSIX and AppKit APIs.
 
