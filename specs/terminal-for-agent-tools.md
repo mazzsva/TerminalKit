@@ -76,3 +76,4 @@ Each one needs a test.
 - Decision "when the terminfo entry of `xterm-256color` on macOS holds it": TerminalKit ignores SGR 5 (blink), though the entry holds `blink`, because no listed program sends it in its script.
 - Requirement 7 "a link that a program marks or prints": a Command-click opens printed links only. TerminalKit ignores OSC 8, because no listed program sends it with the name `Apple_Terminal`.
 - Requirement 10: the bad input run is in its own test target, `BadInputTests`, so that it runs in a process of its own.
+- Requirement 2 "the cursor is at the expected position": for top, the test checks that the cursor is on the last row, at the end of its text, and does not check a fixed column, because that row shows live process data.

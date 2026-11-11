@@ -25,16 +25,26 @@ struct ProgramSessionTests {
     func loginShell() async throws {
         try await run { session in
             try await session.start()
-            try await session.wait { $0.lines[$0.cursor.row] == "%" && $0.cursor.column == 2 }
+            try await session.wait {
+                $0.lines[$0.cursor.row] == "%"
+                    && $0.cursor == Terminal.Position(row: $0.lines[0].hasPrefix("Last login:") ? 1 : 0, column: 2)
+            }
+            let start = await session.cursor.row
             await session.send("echo ${HOME:t} ${PWD:t} two\r")
-            try await session.wait { $0.lines.contains("home home two") && $0.lines[$0.cursor.row] == "%" }
-            let row = await session.cursor.row
+            try await session.wait {
+                $0.lines[start + 1] == "home home two" && $0.lines[start + 2] == "%"
+                    && $0.cursor == Terminal.Position(row: start + 2, column: 2)
+            }
+            let row = start + 2
             await session.press(.up)
             try await session.wait {
                 $0.lines[row] == "% echo ${HOME:t} ${PWD:t} two" && $0.cursor == Terminal.Position(row: row, column: 29)
             }
             await session.send("\u{17}three")
-            try await session.wait { $0.lines[row] == "% echo ${HOME:t} ${PWD:t} three" }
+            try await session.wait {
+                $0.lines[row] == "% echo ${HOME:t} ${PWD:t} three"
+                    && $0.cursor == Terminal.Position(row: row, column: 31)
+            }
             await session.press(.left)
             await session.press(.left)
             await session.send("X\u{5}.\r")
@@ -81,11 +91,17 @@ struct ProgramSessionTests {
         try await run { session in
             try session.write((1 ... 200).map { String(format: "line %03d\n", $0) }.joined(), to: "work/lines.txt")
             try await session.start(["/usr/bin/less", "lines.txt"])
-            try await session.wait { $0.lines[0] == "line 001" && $0.lines[22] == "line 023" && $0.cursor.row == 23 }
+            try await session.wait {
+                $0.lines[0] == "line 001" && $0.lines[22] == "line 023"
+                    && $0.cursor == Terminal.Position(row: 23, column: 9)
+            }
             await session.send(" ")
-            try await session.wait { $0.lines[0] == "line 024" && $0.lines[22] == "line 046" }
+            try await session.wait {
+                $0.lines[0] == "line 024" && $0.lines[22] == "line 046"
+                    && $0.cursor == Terminal.Position(row: 23, column: 1)
+            }
             await session.send("/line 150\r")
-            try await session.wait { $0.lines[0] == "line 150" }
+            try await session.wait { $0.lines[0] == "line 150" && $0.cursor == Terminal.Position(row: 23, column: 1) }
             await session.send("q")
             #expect(try await session.exit() == .exit(0))
             await expectNormalScreen(session)
@@ -98,7 +114,7 @@ struct ProgramSessionTests {
             try await session.start(["/usr/bin/man", "ls"])
             try await session.wait {
                 $0.lines.contains("NAME") && $0.lines.contains { $0.contains("list directory contents") }
-                    && $0.cursor.row == 23
+                    && $0.cursor == Terminal.Position(row: 23, column: 1)
             }
             await session.send("q")
             #expect(try await session.exit() == .exit(0))
@@ -110,7 +126,10 @@ struct ProgramSessionTests {
     func top() async throws {
         try await run { session in
             try await session.start(["/usr/bin/top"])
-            try await session.wait { $0.lines[0].hasPrefix("Processes:") && $0.lines.contains { $0.hasPrefix("PID") } }
+            try await session.wait {
+                $0.lines[0].hasPrefix("Processes:") && $0.lines.contains { $0.hasPrefix("PID") }
+                    && $0.cursor == Terminal.Position(row: 23, column: min($0.lines[23].count, 79))
+            }
             await session.send("q")
             #expect(try await session.exit() == .exit(0))
             await expectNormalScreen(session)
@@ -129,9 +148,15 @@ struct ProgramSessionTests {
                 $0.lines[2] == "hello from nano" && $0.cursor == Terminal.Position(row: 2, column: 15)
             }
             await session.send("\u{18}")
-            try await session.wait { $0.lines.contains { $0.contains("Save modified buffer") } }
+            try await session.wait {
+                $0.lines.contains { $0.contains("Save modified buffer") }
+                    && $0.cursor == Terminal.Position(row: 21, column: 61)
+            }
             await session.send("y")
-            try await session.wait { $0.lines.contains { $0.contains("File Name to write") } }
+            try await session.wait {
+                $0.lines.contains { $0.contains("File Name to write") }
+                    && $0.cursor == Terminal.Position(row: 21, column: 30)
+            }
             await session.send("\r")
             #expect(try await session.exit() == .exit(0))
             await expectNormalScreen(session)
@@ -157,7 +182,9 @@ struct ProgramSessionTests {
             let added = try #require(await session.lines.firstIndex(of: "+6"))
             #expect(await session.terminal.screen[added][0].style.foreground == .indexed(2))
             await session.send("/Change 2\r")
-            try await session.wait { $0.lines[0] == "    Change 2" }
+            try await session.wait {
+                $0.lines[0] == "    Change 2" && $0.cursor == Terminal.Position(row: 23, column: 5)
+            }
             await session.send("q")
             #expect(try await session.exit() == .exit(0))
             #expect(await !session.terminal.isAlternateScreenActive)
