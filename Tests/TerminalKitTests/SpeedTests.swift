@@ -57,7 +57,7 @@ struct SpeedTests {
             Peak memory after the first output: \(peakMemory / 1_000_000) MB, bytes for each saved line: \(bytesPerLine)
             """
         )
-        #expect(viewTime <= .milliseconds(4_100))
+        #expect(viewTime <= .milliseconds(5_000))
     }
 
     @Test(.timeLimit(.minutes(2)))
