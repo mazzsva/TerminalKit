@@ -22,7 +22,7 @@ public final class TerminalSession {
     public private(set) var bellCount = 0
     public private(set) var currentDirectoryURL: URL?
 
-    private(set) var terminal = Terminal(columns: 80, rows: 24) {
+    var terminal = Terminal(columns: 80, rows: 24) {
         didSet {
             revision += 1
         }
