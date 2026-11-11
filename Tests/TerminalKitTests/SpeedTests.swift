@@ -13,6 +13,7 @@ struct SpeedTests {
         defer { try? FileManager.default.removeItem(at: file) }
 
         var viewTimes: [Duration] = []
+        var drawCounts: [Int] = []
         var sessionTimes: [Duration] = []
         var bytesPerLine = 0
         var peakMemory = 0
@@ -23,6 +24,9 @@ struct SpeedTests {
             window.orderFrontRegardless()
             defer { window.orderOut(nil) }
             viewTimes.append(try await time(session))
+            let drawCount = scrollView.terminalView.drawCount
+            drawCounts.append(drawCount)
+            #expect(Double(drawCount) >= 10 * (viewTimes[viewTimes.count - 1] / .seconds(1)))
             scrollView.layoutSubtreeIfNeeded()
             let terminal = session.terminal
             let rows = widths.reduce(1) { $0 + max(1, ($1 + terminal.columns - 1) / terminal.columns) }
@@ -48,6 +52,7 @@ struct SpeedTests {
         print(
             """
             Output of 100 MB with a view: \(viewTimes), median \(viewTime), \(Int(100 / (viewTime / .seconds(1)))) MB/s
+            Draws during the output with a view: \(drawCounts)
             Output of 100 MB with no view: \(sessionTimes), median \(median(sessionTimes))
             Peak memory after the first output: \(peakMemory / 1_000_000) MB, bytes for each saved line: \(bytesPerLine)
             """

@@ -114,6 +114,7 @@ final class TerminalContentView: NSView {
     private var lastBellDate: Date?
     private var joinNumber = 0
     private static var joinCount = 0
+    private(set) var drawCount = 0
 
     private struct Colors {
         let foreground: NSColor
@@ -494,6 +495,7 @@ final class TerminalContentView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        drawCount += 1
         if accessibilityRevision != session.revision {
             accessibilityRevision = session.revision
             scheduleAccessibilityNotification()
