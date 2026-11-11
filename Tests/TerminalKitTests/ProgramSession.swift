@@ -13,14 +13,18 @@ actor ProgramSession {
 
     struct Timeout: Error {}
 
+    struct Event: Codable, Equatable {
+        var output: [String]?
+        var columns: Int?
+        var rows: Int?
+        var screen: [String]?
+        var cursor: [Int]?
+    }
+
     let folder = URL.temporaryDirectory.appending(path: "ProgramSession-" + UUID().uuidString)
-    private(set) var terminal = {
-        var terminal = Terminal(columns: 80, rows: 24)
-        let gray = Terminal.RGB(red: 0x8000, green: 0x8000, blue: 0x8000)
-        terminal.defaultColors = Terminal.DefaultColors(foreground: gray, background: gray, cursor: gray)
-        return terminal
-    }()
+    private(set) var terminal = newTerminal()
     private(set) var output: [UInt8] = []
+    private(set) var events: [(offset: Int, event: Event)] = []
     private(set) var isFinished = false
     private var pseudoTerminal: PseudoTerminal?
 
@@ -32,12 +36,19 @@ actor ProgramSession {
         try write("PS1='%# '\n", to: "zdot/.zshrc")
     }
 
+    static func newTerminal() -> Terminal {
+        var terminal = Terminal(columns: 80, rows: 24)
+        let gray = Terminal.RGB(red: 0x8000, green: 0x8000, blue: 0x8000)
+        terminal.defaultColors = Terminal.DefaultColors(foreground: gray, background: gray, cursor: gray)
+        return terminal
+    }
+
     var lines: [String] {
-        terminal.screen.map(text(of:))
+        Self.lines(of: terminal)
     }
 
     var scrollbackLines: [String] {
-        terminal.scrollback.map(text(of:))
+        terminal.scrollback.map { Self.text(of: $0, in: terminal) }
     }
 
     var cursor: Terminal.Position {
@@ -45,6 +56,10 @@ actor ProgramSession {
     }
 
     var controlFunctions: Set<String> {
+        Self.controlFunctions(in: output)
+    }
+
+    static func controlFunctions(in output: [UInt8]) -> Set<String> {
         var parser = EscapeSequenceParser()
         var names: Set<String> = []
         for scalar in String(decoding: output, as: UTF8.self).unicodeScalars {
@@ -176,6 +191,7 @@ actor ProgramSession {
 
     func resize(columns: Int, rows: Int) {
         terminal.resize(columns: columns, rows: rows)
+        events.append((output.count, Event(columns: columns, rows: rows)))
         pseudoTerminal?.resize(columns: columns, rows: rows)
     }
 
@@ -197,6 +213,7 @@ actor ProgramSession {
             }
             try await Task.sleep(for: .milliseconds(10))
         }
+        events.append((output.count, Self.checkpoint(terminal)))
     }
 
     func exit(sourceLocation: SourceLocation = #_sourceLocation) async throws -> PseudoTerminal.Termination? {
@@ -204,7 +221,15 @@ actor ProgramSession {
         return pseudoTerminal?.termination
     }
 
-    private func text(of line: Terminal.Line) -> String {
+    static func checkpoint(_ terminal: Terminal) -> Event {
+        Event(screen: lines(of: terminal), cursor: [terminal.cursor.row, terminal.cursor.column])
+    }
+
+    static func lines(of terminal: Terminal) -> [String] {
+        terminal.screen.map { text(of: $0, in: terminal) }
+    }
+
+    private static func text(of line: Terminal.Line, in terminal: Terminal) -> String {
         let text = line.filter { $0.width != 0 }.map { $0.isTab || $0.isTabGap ? " " : terminal.character(of: $0) }
         return String(text.joined().reversed().drop { $0 == " " }.reversed())
     }

@@ -195,7 +195,7 @@ struct ProgramSessionTests {
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["TERMINALKIT_CLAUDE_SESSION"] != nil && claudeURL != nil))
     func claudeCode() async throws {
-        let folder = URL.temporaryDirectory.appending(path: "TerminalKitClaudeSession")
+        let folder = URL(filePath: "/tmp/TerminalKitClaudeSession")
         try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var configuration = TerminalSession.Configuration(
@@ -206,7 +206,9 @@ struct ProgramSessionTests {
             currentDirectoryURL: folder
         )
         configuration.environment["DISABLE_AUTOUPDATER"] = "1"
-        try await run { session in
+        configuration.environment["IS_DEMO"] = "1"
+        configuration.environment["TZ"] = "UTC"
+        let session = try await run { session in
             try await session.start(configuration)
             try await session.wait(timeout: .seconds(30)) {
                 $0.lines.contains("  Yes, I trust this folder") || $0.isReady
@@ -238,7 +240,7 @@ struct ProgramSessionTests {
             try await session.wait(timeout: .seconds(60)) {
                 $0.isReady && $0.lines.contains { $0.hasPrefix("⏺ Write(note.txt)") }
             }
-            #expect(
+            try #require(
                 try String(contentsOf: folder.appending(path: "note.txt"), encoding: .utf8)
                     .trimmingCharacters(in: .newlines) == "tk-file")
 
@@ -254,7 +256,7 @@ struct ProgramSessionTests {
             try await session.pressShiftReturn()
             await session.send("beta")
             try await session.wait { $0.input == ["❯ alpha", "  beta"] }
-            #expect(await session.lines.filter { $0.contains("alpha") }.count == 1)
+            try #require(await session.lines.filter { $0.contains("alpha") }.count == 1)
             await session.send("\u{3}")
             try await session.wait { $0.isReady && !$0.lines.contains { $0.contains("again to exit") } }
 
@@ -266,7 +268,7 @@ struct ProgramSessionTests {
             await session.send("\u{3}")
             try await session.wait { $0.isReady && !$0.lines.contains { $0.contains("again to exit") } }
 
-            #expect(await session.scrollbackLines.contains { $0.lowercased() == "⏺ pineapple" })
+            try #require(await session.scrollbackLines.contains { $0.lowercased() == "⏺ pineapple" })
 
             for (columns, rows) in [(100, 30), (60, 20), (80, 24)] {
                 await session.resize(columns: columns, rows: rows)
@@ -277,14 +279,120 @@ struct ProgramSessionTests {
             }
 
             try await session.submit("/exit")
-            #expect(try await session.exit() == .exit(0))
-            #expect(await session.ruleRows.count <= 2)
-            #expect(await session.lines.contains("Resume this session with:"))
-            #expect(await session.controlFunctions.isSuperset(of: ["CSI ?2026h", "CSI ?2026l"]))
+            try #require(try await session.exit() == .exit(0))
+            try #require(await session.ruleRows.count <= 2)
+            try #require(await session.lines.contains("Resume this session with:"))
+            try #require(await session.controlFunctions.isSuperset(of: ["CSI ?2026h", "CSI ?2026l"]))
+        }
+        if ProcessInfo.processInfo.environment["TERMINALKIT_CLAUDE_SESSION"] == "record" {
+            try await record(session)
         }
     }
 
-    private func run(_ script: (ProgramSession) async throws -> Void) async throws {
+    @Test func claudeCodeRecording() throws {
+        let events = try JSONDecoder().decode([ProgramSession.Event].self, from: Data(contentsOf: recordingURL()))
+        var whole = ProgramSession.newTerminal()
+        var split = whole
+        var output: [UInt8] = []
+        for event in events {
+            if let text = event.output?.joined() {
+                let bytes = unescaped(text)
+                output += bytes
+                _ = whole.receive(bytes)
+                for byte in bytes {
+                    _ = split.receive([byte])
+                }
+            }
+            if let columns = event.columns, let rows = event.rows {
+                whole.resize(columns: columns, rows: rows)
+                split.resize(columns: columns, rows: rows)
+            }
+            if event.screen != nil {
+                #expect(ProgramSession.checkpoint(whole) == event)
+                #expect(split.screen == whole.screen && split.cursor == whole.cursor)
+            }
+        }
+        #expect(events.count { $0.screen != nil } > 10)
+        let unknown = ProgramSession.controlFunctions(in: output).subtracting(Self.handled).subtracting(Self.ignored)
+        #expect(unknown.isEmpty, "Not in a list: \(unknown.sorted())")
+    }
+
+    @Test func claudeCodeRecordingHasNoPrivateData() throws {
+        let text = try String(contentsOf: recordingURL(), encoding: .utf8)
+        for word in ["/Users/", "sk-ant", NSHomeDirectory(), NSUserName(), NSFullUserName()] where !word.isEmpty {
+            #expect(!text.contains(word))
+        }
+        #expect(text.firstMatch(of: /[\w.%+-]+@[\w-]+\.[\w.-]+/) == nil)
+        let uuids = text.matches(of: /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/)
+        #expect(uuids.allSatisfy { $0.output == uuidPlaceholder })
+        #expect(text.firstMatch(of: /[A-Za-z0-9_]{32,}/) == nil)
+    }
+
+    private func record(_ session: ProgramSession) async throws {
+        let output = await session.output
+        var text = try #require(String(validating: output, as: UTF8.self))
+        for (word, placeholder) in [
+            (NSHomeDirectory(), "/home/user/"), (NSFullUserName(), "Person "), (NSUserName(), "user"),
+        ]
+        where !word.isEmpty {
+            text = text.replacing(
+                word, with: String(repeating: placeholder, count: word.utf8.count).prefix(word.utf8.count))
+        }
+        text = text.replacing(/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/) { _ in
+            uuidPlaceholder
+        }
+        let bytes = Array(text.utf8)
+        try #require(bytes.count == output.count)
+        var live = ProgramSession.newTerminal()
+        var terminal = live
+        var events: [ProgramSession.Event] = []
+        var start = 0
+        for (offset, event) in await session.events {
+            if offset > start {
+                _ = live.receive(Array(output[start ..< offset]))
+                _ = terminal.receive(Array(bytes[start ..< offset]))
+                events.append(.init(output: escaped(bytes[start ..< offset]).split(separator: "\n").map(String.init)))
+                start = offset
+            }
+            if let columns = event.columns, let rows = event.rows {
+                live.resize(columns: columns, rows: rows)
+                terminal.resize(columns: columns, rows: rows)
+                events.append(event)
+            } else {
+                try #require(ProgramSession.checkpoint(live) == event)
+                events.append(ProgramSession.checkpoint(terminal))
+            }
+        }
+        try #require(unescaped(events.compactMap { $0.output?.joined() }.joined()) == Array(bytes[..<start]))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try encoder.encode(events)
+            .write(
+                to: URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Recordings/claude-code.json"))
+    }
+
+    private func recordingURL() throws -> URL {
+        try #require(Bundle.module.url(forResource: "claude-code", withExtension: "json", subdirectory: "Recordings"))
+    }
+
+    private func escaped(_ bytes: ArraySlice<UInt8>) -> String {
+        String(decoding: bytes, as: UTF8.self).unicodeScalars
+            .map { scalar in
+                scalar.value >= 0xA0 || (0x20 ..< 0x7F).contains(scalar.value) && scalar != "\\"
+                    ? String(scalar) : String(scalar).utf8.map { String(format: "\\x%02X", $0) }.joined()
+            }
+            .joined()
+            .replacing("\\x0A", with: "\\x0A\n")
+    }
+
+    private func unescaped(_ text: String) -> [UInt8] {
+        let pieces = text.components(separatedBy: "\\x")
+        return Array(pieces[0].utf8)
+            + pieces.dropFirst().flatMap { [UInt8($0.prefix(2), radix: 16) ?? 0] + Array($0.utf8.dropFirst(2)) }
+    }
+
+    @discardableResult
+    private func run(_ script: (ProgramSession) async throws -> Void) async throws -> ProgramSession {
         let session = try ProgramSession()
         do {
             try await script(session)
@@ -294,7 +402,8 @@ struct ProgramSessionTests {
         }
         await session.close()
         let unknown = await session.controlFunctions.subtracting(Self.handled).subtracting(Self.ignored)
-        #expect(unknown.isEmpty, "Not in a list: \(unknown.sorted())")
+        try #require(unknown.isEmpty, "Not in a list: \(unknown.sorted())")
+        return session
     }
 
     private func expectNormalScreen(_ session: ProgramSession, sourceLocation: SourceLocation = #_sourceLocation) async
@@ -339,6 +448,8 @@ extension ProgramSession {
         send("\r")
     }
 }
+
+private let uuidPlaceholder = "00000000-0000-0000-0000-000000000000"
 
 private func isInstalled(_ path: String) -> Bool {
     FileManager.default.isExecutableFile(atPath: path)
