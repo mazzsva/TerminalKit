@@ -300,7 +300,7 @@ struct TerminalSessionTests {
         await session.waitForText("end")
         let clock = ContinuousClock()
         let start = clock.now
-        for _ in 0 ..< 5 {
+        for _ in 0 ..< 2 {
             try await Task.sleep(for: .milliseconds(5))
         }
         let interrupt = clock.now
