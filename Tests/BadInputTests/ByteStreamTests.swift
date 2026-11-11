@@ -81,6 +81,7 @@ struct ByteStreamTests {
             x: 0, y: 0, width: screen.maxX + TerminalContentView.padding,
             height: screen.maxY + TerminalContentView.bottomPadding)
         view.cacheDisplay(in: screen, to: try #require(view.bitmapImageRepForCachingDisplay(in: screen)))
+        _ = view.accessibilityValue()
     }
 }
 

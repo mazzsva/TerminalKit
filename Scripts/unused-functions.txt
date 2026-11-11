@@ -1,0 +1,50 @@
+PseudoTerminal.Output.AsyncIterator.next()
+    AsyncIteratorProtocol requires it, and TerminalKit calls next(isolation:)
+
+closure #1 in Terminal.Line.columnCount(at:)
+    finds the end of a tab at the end of a selection or a Find match, and no counted test ends one on a tab
+
+Terminal.Scrollback.lines.getter
+    only TerminalCoreTests read it, to compare the saved lines with a full reflow
+
+Terminal.Scrollback.relaidCount.getter
+    only TerminalCoreTests read it, to compare the saved lines with a full reflow
+
+Terminal.Scrollback.firstLine.getter
+    removes the paragraphs that the scrollback dropped at its line limit, and no counted test gets to that step
+
+Terminal.Scrollback.map<A>(_:)
+    only the real Claude Code session uses it
+
+TerminalContentView.selectedRanges.getter
+    NSTextFinder reads it during Find in the view, and the tests only set it
+
+static TerminalContentView.performWithWorkspace(_:)
+    opens a link with NSWorkspace, and the tests replace it so that no app opens
+
+TerminalContentView.characterIndex(for:)
+    NSTextInputClient requires it, and only an input method of the system calls it
+
+TerminalContentView.writingToolsBehavior.setter
+    NSTextInputTraits requires a setter, and it does nothing
+
+TerminalContentView.paste(_:)
+    the Paste menu item calls it, and the tests call paste(from:) so that they do not change the general pasteboard
+
+closure #1 in variable initialization expression of TerminalContentView.ringBell
+    plays the system sound, and the tests replace it
+
+closure #1 in variable initialization expression of TerminalContentView.currentDate
+    reads the system clock, and the tests replace it
+
+closure #1 in variable initialization expression of TerminalContentView.pressedMouseButtons
+    reads the mouse buttons of the system, and the tests replace it
+
+closure #1 in variable initialization expression of TerminalContentView.presentsAlert
+    shows a modal alert, and the tests replace it because a modal alert stops a test
+
+TerminalPalette.bold.setter
+    host API that sets the bold color, and no test sets it
+
+static TerminalSession.Configuration.loginShell(running:)
+    host API that reads the shell of the user, and the tests give a fixed shell to loginShell(running:shellURL:)
