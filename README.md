@@ -2,6 +2,8 @@
 
 Native macOS terminal view for SwiftUI, built on AppKit.
 
+TerminalKit is a terminal view for Mac apps in which a login shell and agent tools such as Claude Code work as well as in the best Mac terminals. Terminal.app stays the model only for what a person does in the view: selection, copy, paste, drag and drop, scroll, Find, VoiceOver, and the default look.
+
 ## Core technologies
 
 <table>
@@ -14,8 +16,13 @@ Native macOS terminal view for SwiftUI, built on AppKit.
 
 ## Quality gates
 
-- **Tests:** 931 [Swift Testing](https://github.com/swiftlang/swift-testing) tests cover every layer, and many run real programs in pseudo terminals. One test plays byte streams recorded from Terminal.app and compares the screen, the replies, and the title. `Scripts/record-terminal-app.py` records them again in a test window of its own.
-- **CI:** GitHub Actions lints and runs the full suite on every pull request that is ready for review.
+- **Tests:** [Swift Testing](https://github.com/swiftlang/swift-testing) tests in three targets. `TerminalCoreTests` tests the emulator and plays byte streams recorded from Terminal.app. `TerminalKitTests` runs the listed programs in pseudo terminals and tests the view. `BadInputTests` sends 1,000,000 random byte streams in a process of its own.
+- **Programs:** The zsh login shell, vim, less, man, top, nano, git, and Claude Code each complete a fixed script in `ProgramSessionTests`. After each step, the test checks the screen.
+- **Claude Code:** The real session runs only on request, with Claude Code installed and signed in. Without `TERMINALKIT_CLAUDE_SESSION` or without Claude Code, the test reports that it did not run:
+  `TEST_RUNNER_TERMINALKIT_CLAUDE_SESSION=1 xcodebuild test -scheme TerminalKit -destination 'platform=macOS' -only-testing:'TerminalKitTests/ProgramSessionTests/claudeCode()'`
+- **Speed:** `TERMINALKIT_SPEED=1 swift test -c release -Xswiftc -enable-testing --filter SpeedTests` outputs 100 MB of text and resizes the view with 100,000 saved lines. It opens a Terminal.app window to compare the output time live.
+- **Coverage:** `TERMINALKIT_CLAUDE_SESSION=1 Scripts/unused-functions.sh` reports each function in `Sources` that no test uses. `Scripts/unused-functions.txt` lists the expected ones, with a reason for each.
+- **CI:** GitHub Actions lints, builds the example app, and runs the full suite on every pull request that is ready for review.
 - **Accessibility:** VoiceOver reads the terminal as a text area and gets a notification when the output changes.
 
 ## Usage example
@@ -23,7 +30,7 @@ Native macOS terminal view for SwiftUI, built on AppKit.
 Add the package with Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/mazzsva/TerminalKit", from: "1.0.0")
+.package(url: "https://github.com/mazzsva/TerminalKit", from: "2.0.0")
 ```
 
 Then show a terminal that runs Claude Code:
@@ -46,35 +53,57 @@ struct ContentView: View {
 
 Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent before `start()` is dropped.
 
-As in Terminal, in bracketed paste mode `paste(_:)` sends nothing when the text contains the end marker `ESC [201~`.
+In bracketed paste mode, `paste(_:)` sends nothing when the text contains the end marker `ESC [201~`, also when a combining mark follows it.
 
 Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
 
-Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the session as Terminal.app, so the command changes the user's Terminal.app profile, not the host. For Option-Return as a new line, turn on `terminalOptionAsMetaKey(_:)`.
+To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, and `state` of `TerminalSession`.
+
+Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the session as Terminal.app, so the command changes the user's Terminal.app profile, not the host. Shift-Return makes a new line with no setup.
 
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
 macOS gives microphone access to the host app, not to the program in the terminal. To use Claude Code voice dictation, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement.
 
+The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalView` with the user's login shell. Build it with the `TerminalKitExample` scheme.
+
 ## Engineering decisions
 
-**Terminal.app behavior.** The screen output, the replies, the colors, the font size, resize, and the login shell follow Terminal.app 2.15, as measured in Terminal.app. Keys, the mouse, and paste were compared with the same events posted to Terminal.app. TerminalKit also has one protocol that Terminal.app does not have, because the Claude Code docs use it: xterm's modifyOtherKeys.
+**A fixed list of programs.** The measure of done is the list of programs above, not parity with Terminal.app. The emulator acts on a control function when a listed program sends it, or when the macOS terminfo entry of `xterm-256color` holds it, and the known limits name each exception. Shift-Return makes a new line in Claude Code with no setup, through xterm's modifyOtherKeys.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 7,000 lines of Swift and C on POSIX and AppKit APIs.
 
 **A value-type emulator.** The full terminal state is one Swift struct. Tests feed it bytes and compare values.
 
-**Safe links.** A Command-click opens web, mail, FTP, and file links. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
+**Safe links.** A Command-click opens printed web, mail, FTP, and file links. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
 
 **The right size from the first frame.** When the host calls `start()` after it makes the view, as in the example, the process waits until the view has its size, so a full-screen program never draws its first frame at the wrong width and then redraws.
 
 **Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts.
 
-**Never touches the shell.** There are no shell integration scripts and no changes to startup files. As in Terminal, the user's own shell starts through `/usr/bin/login -pf`, and the view shows `[Process completed]` when the process ends. Programs see `TERM_PROGRAM=Apple_Terminal`, so they act as in Terminal, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file.
+**Never touches the shell.** There are no shell integration scripts and no changes to startup files. The user's own shell starts through `/usr/bin/login`. Programs see `TERM_PROGRAM=Apple_Terminal`, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file. The library also sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1`, so Claude Code uses synchronized output.
 
-## Known differences from Terminal.app
+## Known limits
 
-- Terminal.app draws with its private SF Mono Terminal font. TerminalKit uses the 12 pt system monospaced font in the same 7 by 15 point cell, so some glyph shapes differ a little.
-- Terminal.app leaves gaps and overlaps in some right-to-left text. TerminalKit does not copy them.
-- In bracketed paste mode, Terminal.app pastes the end marker `ESC [201~` when a combining mark follows it, so the pasted text can end the paste early. TerminalKit refuses this text too.
-- With about 1,000,000 saved lines of wrapped text that mixes wide characters and tabs, one resize step takes about 0.7 s in a release build. Terminal.app takes about 60 ms.
+- TerminalKit keeps at most 100,000 saved lines.
+- TerminalKit draws with the 12 pt system monospaced font in a 7 by 15 point cell, not with the font of Terminal.app, so some glyph shapes differ a little.
+- The listed programs send these control sequences, and TerminalKit ignores them on purpose. A query among them gets no answer.
+  - `ESC \`: the end of a DCS, APC, PM, or SOS string. TerminalKit ignores the string.
+  - `CSI 0%m`: an SGR sequence with the intermediate `%`.
+  - `CSI 29m`: TerminalKit has no crossed-out text.
+  - `CSI ?$p`: the query of a mode.
+  - `CSI ?12h` and `CSI ?12l`: the cursor never blinks.
+  - `CSI ?1034h`: the eighth bit for Meta. The host sets Option as Meta with `terminalOptionAsMetaKey(_:)`.
+  - `C0 0F`: SI. TerminalKit has no G1 character set.
+  - `CSI >q`: the query of the terminal version.
+  - `CSI ?u`: the query of the kitty keyboard flags.
+  - `CSI ?1016l`: mode 1016, mouse positions in pixels.
+  - `CSI ?2031h` and `CSI ?2031l`: mode 2031. Programs get no report when the appearance changes between light and dark.
+  - `OSC 7501`.
+- TerminalKit also ignores these, which no listed program sends:
+  - SGR 5 (blink), and colors with colon parameters, such as `CSI 38:2::255:0:0m`.
+  - OSC 8 marked links. A Command-click opens printed links only.
+  - OSC 4 queries, OSC 5, OSC 10 and 11 that set a color, OSC 13 to 19, and OSC 104, 105, 110, 111, and 117.
+  - The window reports `CSI 11t`, `CSI 13t`, `CSI 14t`, and `CSI 18t`, and DECREQTPARM.
+  - SO, LS2, LS3, the G1 to G3 character sets, and the national character sets.
+  - Mouse modes 1005 and 1015, DECOM, DECALN, mode 47, and LNM.

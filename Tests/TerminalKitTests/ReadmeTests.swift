@@ -9,4 +9,13 @@ struct ReadmeTests {
             contentsOf: tests.appending(path: "../../README.md").standardizedFileURL, encoding: .utf8)
         #expect(readme.contains("```swift\n" + example + "```\n"))
     }
+
+    @Test func namesEachIgnoredSequence() throws {
+        let readme = try String(
+            contentsOf: URL(filePath: #filePath).appending(path: "../../../README.md").standardizedFileURL,
+            encoding: .utf8)
+        for sequence in ProgramSessionTests.ignored {
+            #expect(readme.contains("`\(sequence)`"), "\(sequence)")
+        }
+    }
 }
