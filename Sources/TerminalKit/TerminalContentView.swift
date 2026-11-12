@@ -478,7 +478,8 @@ final class TerminalContentView: NSView {
             return false
         }
         let insets = clipView.contentInsets
-        let page = clipView.bounds.height - insets.top - insets.bottom - cellSize.height
+        let height = clipView.bounds.height - insets.top - insets.bottom - Self.topPadding - Self.bottomPadding
+        let page = CGFloat(max(Int(height / cellSize.height) - 1, 1)) * cellSize.height
         let step = byLine ? cellSize.height : page
         switch key {
         case .home where !byLine: scroll(CGPoint(x: 0, y: -insets.top))

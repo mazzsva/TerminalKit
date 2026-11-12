@@ -298,9 +298,32 @@ struct TerminalViewTests {
         let view = scrollView.terminalView
         view.scroll(CGPoint(x: 0, y: 600))
         let visibleHeight = scrollView.contentView.bounds.height
-        let position = 600 + pages * (visibleHeight - view.cellSize.height) + lines * view.cellSize.height
+        let visibleRows = Int(
+            (visibleHeight - TerminalContentView.topPadding - TerminalContentView.bottomPadding) / view.cellSize.height)
+        let position = 600 + pages * CGFloat(visibleRows - 1) * view.cellSize.height + lines * view.cellSize.height
         view.keyDown(with: try keyDown(key, modifierFlags: modifierFlags))
         #expect(scrollView.contentView.bounds.minY == min(max(position, 0), view.frame.height - visibleHeight))
+    }
+
+    @Test func keepsTheRowEdgeWithThePageKeys() async throws {
+        let session = TerminalSession(running: "seq 1 200")
+        let scrollView = TerminalScrollView(session: session)
+        let view = scrollView.terminalView
+        let height = TerminalContentView.topPadding + TerminalContentView.bottomPadding + 24 * view.cellSize.height
+        scrollView.frame = NSRect(x: 0, y: 0, width: 600, height: height)
+        scrollView.layoutSubtreeIfNeeded()
+        try session.start()
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        let clipView = scrollView.contentView
+        var previousTop = (clipView.bounds.minY + clipView.contentInsets.top) / view.cellSize.height
+        for _ in 1 ... 4 {
+            view.keyDown(with: try keyDown(NSPageUpFunctionKey, modifierFlags: [.command, .function]))
+            let top = (clipView.bounds.minY + clipView.contentInsets.top) / view.cellSize.height
+            #expect(top == top.rounded())
+            #expect(previousTop - top == 23)
+            previousTop = top
+        }
     }
 
     @Test(
@@ -343,7 +366,9 @@ struct TerminalViewTests {
         let view = scrollView.terminalView
         view.scroll(CGPoint(x: 0, y: 600))
         let visibleHeight = scrollView.contentView.bounds.height
-        let position = 600 + pages * (visibleHeight - view.cellSize.height)
+        let visibleRows = Int(
+            (visibleHeight - TerminalContentView.topPadding - TerminalContentView.bottomPadding) / view.cellSize.height)
+        let position = 600 + pages * CGFloat(visibleRows - 1) * view.cellSize.height
         view.keyDown(with: try keyDown(key, modifierFlags: .function))
         #expect(scrollView.contentView.bounds.minY == min(max(position, 0), view.frame.height - visibleHeight))
         session.send("x")
