@@ -455,7 +455,7 @@ struct TerminalViewTests {
         hostingView.layoutSubtreeIfNeeded()
         let scrollView = try #require(contentView(in: hostingView)?.enclosingScrollView)
         #expect(scrollView.hasVerticalScroller)
-        #expect(scrollView.autohidesScrollers)
+        #expect(!scrollView.autohidesScrollers)
     }
 
     @Test func usesTheTerminalFont() throws {
