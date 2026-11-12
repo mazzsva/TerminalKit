@@ -107,7 +107,16 @@ struct TerminalFindTests {
         )
         let view = scrollView.terminalView
         #expect((view.string as NSString).range(of: "jvim").location == NSNotFound)
-        #expect((view.string as NSString).range(of: "abcdefghij\nvim").location == 0)
+        #expect((view.string as NSString).range(of: "abcdefghijKLMNOP\n").location == 0)
+    }
+
+    @Test func findsTheNormalScreenOnTheAlternateScreen() async throws {
+        let scrollView = try await findView(running: "echo before; printf '\\033[?1049h\\033[Hvim'")
+        let view = scrollView.terminalView
+        let range = (view.string as NSString).range(of: "before")
+        #expect(range.location != NSNotFound)
+        view.selectedRanges = [NSValue(range: range)]
+        #expect(view.selectedText == "before")
     }
 
     @Test func drawsTheFoundCharacters() async throws {

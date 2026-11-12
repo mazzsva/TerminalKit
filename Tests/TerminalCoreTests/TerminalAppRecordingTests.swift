@@ -47,7 +47,7 @@ struct TerminalAppRecordingTests {
         #expect(escaped(reply) == recording.reply)
         #expect(terminal.title == recording.title ?? "")
         #expect(scalars(text(terminal.screen, of: terminal)) == scalars(recording.screen))
-        let history = terminal.scrollback + terminal.normalScreenLines + terminal.screen
+        let history = terminal.scrollback + terminal.screen
         #expect(scalars(text(history, of: terminal)) == scalars(recording.history ?? recording.screen))
     }
 

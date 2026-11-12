@@ -66,9 +66,6 @@ struct ByteStreamTests {
         {
             return "cursor at \(terminal.cursor)"
         }
-        if terminal.normalScreenLines.count > (terminal.isAlternateScreenActive ? terminal.rows : 0) {
-            return "\(terminal.normalScreenLines.count) normal screen lines"
-        }
         return nil
     }
 

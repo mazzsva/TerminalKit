@@ -15,6 +15,7 @@ extension TerminalContentView {
         let lines: [NSRange]
         let lineOfRow: [Int]
         private let resizeCount: Int
+        private let restoredNormalScreenCount: Int
         private let firstLine: Int
         private let scrollback: [Row]
 
@@ -26,8 +27,11 @@ extension TerminalContentView {
         ) {
             self.revision = revision
             self.resizeCount = resizeCount
+            restoredNormalScreenCount = terminal.restoredNormalScreenCount
             firstLine = terminal.removedScrollbackCount
-            let reusable = previous?.resizeCount == resizeCount ? previous : nil
+            let reusable =
+                previous?.resizeCount == resizeCount
+                    && previous?.restoredNormalScreenCount == restoredNormalScreenCount ? previous : nil
             let graphemes = terminal.graphemes
             scrollback = Array(terminal.scrollback).enumerated()
                 .map { index, line in

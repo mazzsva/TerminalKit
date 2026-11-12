@@ -398,6 +398,7 @@ struct TerminalMouseTests {
         async throws
     {
         let (view, session) = try await viewTyping("printf '\(modes)$ echo hello'")
+        let row = view.session.terminal.scrollback.count + row
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row, column: 2.5, in: view, modifierFlags: .option))
         view.mouseUp(with: try mouseEvent(.leftMouseUp, row: row, column: 2.5, in: view, modifierFlags: .option))
         session.send(Array("done\n".utf8))
