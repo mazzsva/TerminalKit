@@ -12,8 +12,8 @@ struct StyleTests {
 
     @Test func clearsEachTextStyle() {
         var style = Terminal.Style()
-        style.apply([1, 2, 3, 4, 7, 8])
-        style.apply([22, 23, 24, 27, 28])
+        style.apply([1, 2, 3, 4, 7])
+        style.apply([22, 23, 24, 27])
         #expect(style == Terminal.Style())
     }
 
@@ -117,12 +117,6 @@ struct StyleTests {
         #expect(style == Terminal.Style())
         style.apply([48, 2, 1, 300, 4, 1])
         #expect(style == Terminal.Style(isBold: true))
-    }
-
-    @Test func readsOnlyTheUnderlineSubparameters() {
-        #expect(style("4:3;31") == Terminal.Style(foreground: .indexed(1), isUnderlined: true))
-        #expect(style("4;4:0") == Terminal.Style())
-        #expect(style("38:2::255:0:0;1") == Terminal.Style(isBold: true))
     }
 
     @Test func appliesOnlyTheFirst32Parameters() {

@@ -58,9 +58,6 @@ struct EscapeSequenceParser: Sendable {
             enterEscape()
         }
         switch scalar {
-        case "\u{18}", "\u{1A}":
-            state = .ground
-            return nil
         case "\u{1B}" where isInOperatingSystemCommand:
             state = .operatingSystemCommandEscape
             return nil

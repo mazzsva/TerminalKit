@@ -20,12 +20,6 @@ struct EscapeSequenceParserTests {
         #expect(parse("\u{1B}(\r0") == [.execute("\r"), .escape(intermediates: "(", final: "0")])
     }
 
-    @Test(arguments: ["\u{18}", "\u{1A}"])
-    func cancelsASequence(cancel: String) {
-        #expect(parse("\(cancel)\u{1B}(\(cancel)B\u{1B}[1\(cancel)A") == [.print("B"), .print("A")])
-        #expect(parse("\u{1B}]0;Ti\(cancel)t\u{7}") == [.print("t"), .execute("\u{7}")])
-    }
-
     @Test func ignoresDeleteInASequence() {
         #expect(parse("\u{1B}(\u{7F}A") == [.escape(intermediates: "(", final: "A")])
         #expect(parse("\u{1B}[1\u{7F}A") == [controlSequence(parameters: [1], final: "A")])
@@ -154,11 +148,6 @@ struct EscapeSequenceParserTests {
     func ignoresStrings(introducer: String) {
         #expect(
             parse("\u{1B}\(introducer)1$q\n\u{7}\u{1B}\\A") == [.escape(intermediates: "", final: "\\"), .print("A")])
-    }
-
-    @Test(arguments: ["\u{18}", "\u{1A}"])
-    func cancelsStrings(cancel: String) {
-        #expect(parse("\u{1B}Pzz\(cancel)A") == [.print("A")])
     }
 }
 

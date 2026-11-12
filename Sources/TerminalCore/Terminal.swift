@@ -30,7 +30,6 @@ package struct Terminal: Sendable {
     }
 
     private static let maximumBytesPerCell = 1_024
-    private static let maximumRepeatCount = 1_000_000
     private static let maximumTitleStackDepth = 10
 
     package private(set) var columns: Int
@@ -90,7 +89,6 @@ package struct Terminal: Sendable {
     private var isAfterPrint = false
     private var style = Style()
     private var usesLineDrawing = false
-    private var lastCharacter: Unicode.Scalar? = " "
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
     private var hasScrollRegion = false
@@ -220,7 +218,6 @@ package struct Terminal: Sendable {
             }
             if case .print(let scalar) = action {
                 let printed = usesLineDrawing ? Self.lineDrawingCharacter(for: scalar) : scalar
-                lastCharacter = scalar.isASCII ? (printed == scalar ? scalar : " ") : nil
                 print(printed)
                 continue
             }
@@ -228,7 +225,7 @@ package struct Terminal: Sendable {
             isLastCharacterDropped = false
             isAfterPrint = false
             switch action {
-            case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
+            case .execute("\n"):
                 lineFeed()
             case .execute("\r"):
                 carriageReturn()
@@ -238,15 +235,10 @@ package struct Terminal: Sendable {
                 moveBackward(1)
             case .execute("\t"):
                 moveToNextTabStop()
-            case .escape(intermediates: "", final: "D"):
-                lineFeed()
-            case .escape(intermediates: "", final: "E"):
-                carriageReturn()
-                lineFeed()
             case .escape(intermediates: "", final: "c"):
                 reset()
             case .escape(intermediates: "", final: "H"):
-                tabStops.set(true, at: cursor.column)
+                tabStops.set(at: cursor.column)
             case .escape(intermediates: "", final: "M"):
                 reverseLineFeed()
             case .escape(intermediates: "(", final: "0"):
@@ -268,9 +260,6 @@ package struct Terminal: Sendable {
             default:
                 break
             }
-            isTextRunClipped = false
-            isLastCharacterDropped = false
-            isAfterPrint = false
         }
         return replies
     }
@@ -287,10 +276,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
-        guard
-            sequence.subparameters.isEmpty
-                || sequence.privateMarker == nil && sequence.intermediates.isEmpty && sequence.final == "m"
-        else {
+        guard sequence.subparameters.isEmpty else {
             return
         }
         if sequence.privateMarker == nil, sequence.intermediates == " ", sequence.final == "q" {
@@ -316,16 +302,10 @@ package struct Terminal: Sendable {
             }
             return
         }
-        if sequence.privateMarker == ">",
-            sequence.final == "m" && [nil, 4].contains(sequence.parameters.first)
-                || sequence.final == "n" && sequence.parameters.first == 4
-        {
-            let level = sequence.final == "m" ? sequence.parameter(at: 1, default: 0) : 0
+        if sequence.privateMarker == ">", sequence.final == "m" && [nil, 4].contains(sequence.parameters.first) {
+            let level = sequence.parameter(at: 1, default: 0)
             modifyOtherKeys = level <= 2 ? level : 0
             return
-        }
-        if sequence.privateMarker == "?", sequence.final == "n", sequence.parameters.first == 6 {
-            replies += "\u{1B}[?\(cursor.row + 1);\(cursor.column + 1)R".utf8
         }
         if sequence.privateMarker == "?", sequence.final == "m", sequence.parameters.first == 4 {
             replies += "\u{1B}[>4;\(modifyOtherKeys)m".utf8
@@ -369,13 +349,6 @@ package struct Terminal: Sendable {
             eraseInLine(sequence.parameter(at: 0, default: 0))
         case "@":
             insertCharacters(count)
-        case "b":
-            if let lastCharacter {
-                isWrapPending = false
-                for _ in 0 ..< min(count, Self.maximumRepeatCount) {
-                    place(lastCharacter)
-                }
-            }
         case "P":
             deleteCharacters(count)
         case "X":
@@ -395,15 +368,7 @@ package struct Terminal: Sendable {
                 usesInsertMode = sequence.final == "h"
             }
         case "m":
-            style.apply(
-                sequence.parameters.indices.map { index in
-                    switch (sequence.parameters[index], sequence.subparameters[index]) {
-                    case (let parameter, nil): parameter
-                    case (4, 0): 24
-                    case (4, _): 4
-                    default: -1
-                    }
-                })
+            style.apply(sequence.parameters)
         case "n":
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
@@ -807,7 +772,6 @@ package struct Terminal: Sendable {
         hasScrollRegion = false
         style = Style()
         usesLineDrawing = false
-        lastCharacter = " "
         savedCursor = SavedCursor()
         modifyOtherKeys = 0
     }
@@ -892,8 +856,6 @@ package struct Terminal: Sendable {
 
     private mutating func clearTabStops(_ mode: Int) {
         switch mode {
-        case 0:
-            tabStops.set(false, at: cursor.column)
         case 3:
             tabStops.removeAll()
         default:
@@ -981,8 +943,6 @@ package struct Terminal: Sendable {
 
     private mutating func reportStatus(_ request: Int) {
         switch request {
-        case 5:
-            replies += "\u{1B}[0n".utf8
         case 6:
             replies += "\u{1B}[\(cursor.row + 1);\(cursor.column + 1)R".utf8
         default:
@@ -1012,10 +972,6 @@ package struct Terminal: Sendable {
             }
             eraseInLine(0)
             screen.replaceSubrange(cursor.row + 1 ..< rows, with: blankLines(rows - cursor.row - 1))
-        case 1:
-            unwrapLine(before: 0)
-            screen.replaceSubrange(0 ..< cursor.row, with: blankLines(cursor.row))
-            eraseInLine(1)
         case 2:
             if normalScreen == nil {
                 keepInScrollback(screen[...])
