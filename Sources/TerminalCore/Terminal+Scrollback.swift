@@ -135,6 +135,9 @@ extension Terminal {
             }
             paragraphs[last].textCount += textCount
             paragraphs[last].lastRowTextCount = textCount
+            if paragraphs[last].rowOffsets != nil {
+                paragraphs[last].setRowOffsets(nil)
+            }
             paragraphs[last].isSimple = paragraphs[last].isSimple && isSimple
             if !paragraphs[last].isSimple {
                 paragraphs[last].updateWidths(of: storedLines[start...]) { $0.append(line[..<textCount]) }
