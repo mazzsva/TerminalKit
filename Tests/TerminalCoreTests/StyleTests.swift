@@ -12,8 +12,8 @@ struct StyleTests {
 
     @Test func clearsEachTextStyle() {
         var style = Terminal.Style()
-        style.apply([1, 2, 3, 4, 7])
-        style.apply([22, 23, 24, 27])
+        style.apply([1, 2, 3, 4, 7, 8])
+        style.apply([22, 23, 24, 27, 28])
         #expect(style == Terminal.Style())
     }
 

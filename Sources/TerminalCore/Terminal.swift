@@ -30,6 +30,7 @@ package struct Terminal: Sendable {
     }
 
     private static let maximumBytesPerCell = 1_024
+    private static let maximumRepeatCount = 1_000_000
     private static let maximumTitleStackDepth = 10
 
     package private(set) var columns: Int
@@ -89,6 +90,7 @@ package struct Terminal: Sendable {
     private var isAfterPrint = false
     private var style = Style()
     private var usesLineDrawing = false
+    private var lastCharacter: Unicode.Scalar? = " "
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
     private var hasScrollRegion = false
@@ -218,6 +220,7 @@ package struct Terminal: Sendable {
             }
             if case .print(let scalar) = action {
                 let printed = usesLineDrawing ? Self.lineDrawingCharacter(for: scalar) : scalar
+                lastCharacter = scalar.isASCII ? (printed == scalar ? scalar : " ") : nil
                 print(printed)
                 continue
             }
@@ -225,7 +228,7 @@ package struct Terminal: Sendable {
             isLastCharacterDropped = false
             isAfterPrint = false
             switch action {
-            case .execute("\n"):
+            case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
                 lineFeed()
             case .execute("\r"):
                 carriageReturn()
@@ -235,10 +238,15 @@ package struct Terminal: Sendable {
                 moveBackward(1)
             case .execute("\t"):
                 moveToNextTabStop()
+            case .escape(intermediates: "", final: "D"):
+                lineFeed()
+            case .escape(intermediates: "", final: "E"):
+                carriageReturn()
+                lineFeed()
             case .escape(intermediates: "", final: "c"):
                 reset()
             case .escape(intermediates: "", final: "H"):
-                tabStops.set(at: cursor.column)
+                tabStops.set(true, at: cursor.column)
             case .escape(intermediates: "", final: "M"):
                 reverseLineFeed()
             case .escape(intermediates: "(", final: "0"):
@@ -260,6 +268,9 @@ package struct Terminal: Sendable {
             default:
                 break
             }
+            isTextRunClipped = false
+            isLastCharacterDropped = false
+            isAfterPrint = false
         }
         return replies
     }
@@ -345,6 +356,13 @@ package struct Terminal: Sendable {
             eraseInLine(sequence.parameter(at: 0, default: 0))
         case "@":
             insertCharacters(count)
+        case "b":
+            if let lastCharacter {
+                isWrapPending = false
+                for _ in 0 ..< min(count, Self.maximumRepeatCount) {
+                    place(lastCharacter)
+                }
+            }
         case "P":
             deleteCharacters(count)
         case "X":
@@ -765,6 +783,7 @@ package struct Terminal: Sendable {
         hasScrollRegion = false
         style = Style()
         usesLineDrawing = false
+        lastCharacter = " "
         savedCursor = SavedCursor()
         modifyOtherKeys = 0
     }
@@ -824,6 +843,8 @@ package struct Terminal: Sendable {
 
     private mutating func clearTabStops(_ mode: Int) {
         switch mode {
+        case 0:
+            tabStops.set(false, at: cursor.column)
         case 3:
             tabStops.removeAll()
         default:
@@ -911,6 +932,8 @@ package struct Terminal: Sendable {
 
     private mutating func reportStatus(_ request: Int) {
         switch request {
+        case 5:
+            replies += "\u{1B}[0n".utf8
         case 6:
             replies += "\u{1B}[\(cursor.row + 1);\(cursor.column + 1)R".utf8
         default:
@@ -940,6 +963,10 @@ package struct Terminal: Sendable {
             }
             eraseInLine(0)
             screen.replaceSubrange(cursor.row + 1 ..< rows, with: blankLines(rows - cursor.row - 1))
+        case 1:
+            unwrapLine(before: 0)
+            screen.replaceSubrange(0 ..< cursor.row, with: blankLines(cursor.row))
+            eraseInLine(1)
         case 2:
             if normalScreen == nil {
                 keepInScrollback(screen[...])

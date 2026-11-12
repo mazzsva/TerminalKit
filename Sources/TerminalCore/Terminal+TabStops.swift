@@ -8,11 +8,11 @@ extension Terminal {
             column < stops.count ? stops[column] : hasDefaultStopsBeyond && column % Self.width == 0
         }
 
-        mutating func set(at column: Int) {
+        mutating func set(_ isStop: Bool, at column: Int) {
             while stops.count <= column {
                 stops.append(contains(stops.count))
             }
-            stops[column] = true
+            stops[column] = isStop
         }
 
         mutating func removeAll() {

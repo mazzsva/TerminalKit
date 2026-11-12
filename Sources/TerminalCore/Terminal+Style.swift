@@ -96,6 +96,8 @@ extension Terminal {
                     isUnderlined = false
                 case 27:
                     isInverse = false
+                case 28:
+                    isHidden = false
                 case 30 ... 37:
                     foreground = .indexed(UInt8(parameter - 30))
                 case 38:

@@ -101,9 +101,9 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
   - `CSI ?2031h` and `CSI ?2031l`: mode 2031. Programs get no report when the appearance changes between light and dark.
   - `OSC 7501`.
 - TerminalKit also ignores these, which no listed program sends:
-  - SGR 5 (blink), SGR 28, and each sequence with colon parameters, such as `CSI 38:2::255:0:0m` and `CSI 4:3m`.
-  - REP, IND, NEL, VT, FF, CAN, and SUB.
-  - `CSI 1J`, `CSI 0g`, `CSI 5n`, `CSI ?6n`, and `CSI >4n`.
+  - SGR 5 (blink), and each sequence with colon parameters, such as `CSI 38:2::255:0:0m` and `CSI 4:3m`.
+  - CAN and SUB. They do not cancel a sequence.
+  - `CSI ?6n` and `CSI >4n`.
   - Colors in the `rgbi:` form.
   - OSC 8 marked links. A Command-click opens printed links only.
   - OSC 9 and OSC 777, the notification requests of programs. A host gets no notification event from a program. The bell is the only signal, through `bellCount`.

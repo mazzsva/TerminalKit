@@ -89,7 +89,7 @@ struct TerminalTests {
         #expect(!terminal.screen[0].isWrapped, "\(reason)")
     }
 
-    @Test(arguments: ["\u{1B}[T"])
+    @Test(arguments: ["\u{1B}[1J", "\u{1B}[T"])
     func unwrapsTheScrollbackWhenTheFirstLineChanges(sequence: String) {
         var terminal = Terminal(columns: 5, rows: 1)
         terminal.receive("AAAAABBB\(sequence)")
@@ -275,9 +275,10 @@ struct TerminalTests {
         #expect(lines(terminal) == ["abed", "    "])
     }
 
-    @Test func movesDownALine() {
+    @Test(arguments: ["\n", "\u{B}", "\u{C}"])
+    func movesDownALine(character: String) {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("ab\nc")
+        terminal.receive("ab\(character)c")
         #expect(lines(terminal) == ["ab  ", "  c "])
     }
 
@@ -486,6 +487,12 @@ struct TerminalTests {
         #expect(lines(terminal) == ["    x              y"])
     }
 
+    @Test func clearsATabStop() {
+        var terminal = Terminal(columns: 20, rows: 1)
+        terminal.receive("\u{1B}[9G\u{1B}[g\r\tx")
+        #expect(lines(terminal) == ["                x   "])
+    }
+
     @Test func movesByTabStops() {
         var terminal = Terminal(columns: 20, rows: 1)
         terminal.receive("\u{1B}[2Ix\u{1B}[2Zy\u{1B}[3Zz")
@@ -569,6 +576,7 @@ struct TerminalTests {
     @Test(arguments: [
         ("\u{1B}[J", ["abcd", "e   ", "    "]),
         ("\u{1B}[0J", ["abcd", "e   ", "    "]),
+        ("\u{1B}[1J", ["    ", "  gh", "ijkl"]),
         ("\u{1B}[2J", ["    ", "    ", "    "]),
         ("\u{1B}[?J", ["abcd", "efgh", "ijkl"]),
     ])
@@ -588,7 +596,8 @@ struct TerminalTests {
     }
 
     @Test(arguments: [
-        ("\u{1B}[J", ["ab", "c ", "  "], [false, false, false, true, true, true], [true, false, false])
+        ("\u{1B}[J", ["ab", "c ", "  "], [false, false, false, true, true, true], [true, false, false]),
+        ("\u{1B}[1J", ["  ", "  ", "ef"], [true, true, true, true, false, false], [false, false, false]),
     ])
     func erasesRowsWithTheBackgroundColor(sequence: String, screen: [String], erased: [Bool], wrapped: [Bool]) {
         var terminal = Terminal(columns: 2, rows: 3)
@@ -1099,6 +1108,12 @@ struct TerminalTests {
         #expect(lines(terminal) == [" ", "a", " "])
     }
 
+    @Test func indexesWithAnEscapeSequence() {
+        var terminal = Terminal(columns: 2, rows: 2)
+        terminal.receive("ab\u{1B}Dc\u{1B}Ed")
+        #expect(lines(terminal) == [" c", "d "])
+    }
+
     @Test func movesUpWithAReverseIndex() {
         var terminal = Terminal(columns: 1, rows: 3)
         terminal.receive("a\r\nb\u{1B}Mc")
@@ -1287,6 +1302,12 @@ struct TerminalTests {
         #expect(terminal.receive("\u{1B}[=c") == "")
     }
 
+    @Test func limitsTheRepeats() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive("a\u{1B}[2147483647b")
+        #expect(terminal.cursor.column == 1)
+    }
+
     @Test func acceptsTheLargestParameterForEachFinal() {
         for final in (0x40 ... 0x7E).compactMap(UnicodeScalar.init) {
             var terminal = Terminal(columns: 4, rows: 2)
@@ -1382,7 +1403,7 @@ struct TerminalTests {
         #expect(scrollback(terminal) == ["a", "", "", "  ", "  ", "  "])
     }
 
-    @Test(arguments: ["\u{20}", "\u{1B}[X", "\u{1B}[1K", "\u{1B}[@"])
+    @Test(arguments: ["\u{20}", "\u{1B}[X", "\u{1B}[1K", "\u{1B}[1J", "\u{1B}[@"])
     func writesSpaces(sequence: String) {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("a\u{1B}[3Gb\u{1B}[G" + sequence)
