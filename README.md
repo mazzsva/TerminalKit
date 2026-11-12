@@ -51,6 +51,8 @@ struct ContentView: View {
 }
 ```
 
+Call `terminate()` when the window closes, as the example app does in `onDisappear`. macOS can keep a closed window that it restored, and the `@State` session of that window keeps its shell alive until the app quits.
+
 Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent before `start()` is dropped.
 
 In bracketed paste mode, `paste(_:)` sends nothing when the text contains the end marker `ESC [201~`, also when a combining mark follows it.
