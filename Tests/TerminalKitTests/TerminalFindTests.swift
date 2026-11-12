@@ -79,6 +79,27 @@ struct TerminalFindTests {
         #expect((0 ... 5).contains(top))
     }
 
+    @Test func scrollsTheFoundRowToTheMiddleOnARowEdge() async throws {
+        let scrollView = try await findView(running: "seq 1 29; echo needle; seq 31 100")
+        let view = scrollView.terminalView
+        let window = KeyWindow(contentView: scrollView)
+        window.makeFirstResponder(view)
+        scrollView.textFinder.performAction(.showFindInterface)
+        let field = try #require(scrollView.findBarView.flatMap { searchField(in: $0) })
+        window.makeFirstResponder(field)
+        let editor = try #require(window.firstResponder as? NSTextView)
+        editor.insertText("needle", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(sendFindPanelAction(.next, in: window))
+        let clipView = scrollView.contentView
+        let insets = clipView.contentInsets
+        let rows = Int(
+            (clipView.bounds.height - insets.top - insets.bottom - TerminalContentView.topPadding
+                - TerminalContentView.bottomPadding) / view.cellSize.height)
+        let top = (clipView.bounds.minY + insets.top) / view.cellSize.height
+        #expect(top == top.rounded())
+        #expect(29 - Int(top) == rows / 2)
+    }
+
     @Test func findsTextAfterTheScrollbackIsErased() async throws {
         let scrollView = try await findView(running: "seq 1 11500; printf '\\033[3J'")
         let view = scrollView.terminalView

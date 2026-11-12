@@ -38,10 +38,14 @@ extension TerminalContentView: NSTextFinderClient {
     }
 
     func scrollRangeToVisible(_ range: NSRange) {
-        guard let rect = characterRects(for: range).first else {
+        guard let rect = characterRects(for: range).first, let clipView = superview as? NSClipView else {
             return
         }
-        scrollToVisible(rect.insetBy(dx: 0, dy: -cellSize.height))
+        let insets = clipView.contentInsets
+        let height = clipView.bounds.height - insets.top - insets.bottom - Self.topPadding - Self.bottomPadding
+        let row = Int((rect.minY - Self.topPadding) / cellSize.height)
+        let top = row - Int(height / cellSize.height) / 2
+        scroll(CGPoint(x: 0, y: CGFloat(top) * cellSize.height - insets.top))
     }
 
     func rects(forCharacterRange range: NSRange) -> [NSValue]? {
