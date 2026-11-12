@@ -193,9 +193,27 @@ struct ProgramSessionTests {
         }
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["TERMINALKIT_CLAUDE_SESSION"] != nil && claudeURL != nil))
+    @Test(.enabled(if: isClaudeSessionRequested))
     func claudeCode() async throws {
-        let folder = URL(filePath: "/tmp/TerminalKitClaudeSession")
+        let session = try await run { session in
+            try await runClaudeCode(session, in: "/tmp/TerminalKitClaudeSession")
+            try #require(await session.controlFunctions.isSuperset(of: ["CSI ?2026h", "CSI ?2026l"]))
+        }
+        if ProcessInfo.processInfo.environment["TERMINALKIT_CLAUDE_SESSION"] == "record" {
+            try await record(session)
+        }
+    }
+
+    @Test(.enabled(if: isClaudeSessionRequested))
+    @MainActor
+    func claudeCodeInWindow() async throws {
+        let session = WindowSession()
+        defer { session.close() }
+        try await runClaudeCode(session, in: "/tmp/TerminalKitClaudeWindowSession")
+    }
+
+    private func runClaudeCode(_ session: some ClaudeSession, in path: String) async throws {
+        let folder = URL(filePath: path)
         try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var configuration = TerminalSession.Configuration(
@@ -209,85 +227,80 @@ struct ProgramSessionTests {
         configuration.environment["DISABLE_AUTOUPDATER"] = "1"
         configuration.environment["IS_DEMO"] = "1"
         configuration.environment["TZ"] = "UTC"
-        let session = try await run { session in
-            try await session.start(configuration)
-            try await session.wait(timeout: .seconds(30)) {
-                $0.lines.contains("  Yes, I trust this folder") || $0.isReady
-            }
-            if await session.lines.contains("  Yes, I trust this folder") {
-                await session.press(.down)
-                try await session.wait { $0.lines.contains("❯ Yes, I trust this folder") }
-                await session.send("\r")
-            }
-            try await session.wait(timeout: .seconds(30)) { $0.isReady }
-
-            try await session.submit("Reply with the single word pineapple and nothing else.")
-            try await session.wait(timeout: .seconds(60)) {
-                $0.isReady && $0.lines.contains { $0.lowercased() == "⏺ pineapple" }
-            }
-
-            try await session.submit("Run in Bash: echo tk-$((6*7))")
-            try await session.wait(timeout: .seconds(60)) {
-                $0.isReady && $0.lines.contains("⏺ Bash(echo tk-$((6*7)))")
-                    && $0.lines.contains { $0.contains("⎿") && $0.hasSuffix("tk-42") }
-            }
-
-            try await session.submit("Create the file note.txt with the content tk-file. Use the Write tool.")
-            try await session.wait(timeout: .seconds(60)) {
-                $0.lines.contains { $0.contains("Do you want to create note.txt?") }
-                    && $0.lines.contains { $0.trimmingCharacters(in: .whitespaces) == "❯ 1. Yes" }
-            }
+        try await session.start(configuration)
+        try await session.wait(timeout: .seconds(30)) {
+            $0.lines.contains("  Yes, I trust this folder") || $0.isReady
+        }
+        if await session.terminal.lines.contains("  Yes, I trust this folder") {
+            await session.press(.down)
+            try await session.wait { $0.lines.contains("❯ Yes, I trust this folder") }
             await session.send("\r")
-            try await session.wait(timeout: .seconds(60)) {
-                $0.isReady && $0.lines.contains { $0.hasPrefix("⏺ Write(note.txt)") }
-            }
-            try #require(
-                try String(contentsOf: folder.appending(path: "note.txt"), encoding: .utf8)
-                    .trimmingCharacters(in: .newlines) == "tk-file")
+        }
+        try await session.wait(timeout: .seconds(30)) { $0.isReady }
 
-            await session.send("/")
-            try await session.wait { $0.input == ["❯ /"] && $0.menuRows.count >= 5 }
-            await session.send("\u{1B}")
-            try await session.wait { $0.input == ["❯ /"] && $0.menuRows.isEmpty }
-            await session.send("\u{7F}")
-            try await session.wait { $0.isReady && $0.menuRows.isEmpty }
+        try await session.submit("Reply with the single word pineapple and nothing else.")
+        try await session.wait(timeout: .seconds(60)) {
+            $0.isReady && $0.lines.contains { $0.lowercased() == "⏺ pineapple" }
+        }
 
-            await session.send("alpha")
-            try await session.wait { $0.input == ["❯ alpha"] }
-            try await session.pressShiftReturn()
-            await session.send("beta")
-            try await session.wait { $0.input == ["❯ alpha", "  beta"] }
-            try #require(await session.lines.filter { $0.contains("alpha") }.count == 1)
-            await session.send("\u{3}")
-            try await session.wait { $0.isReady && !$0.lines.contains { $0.contains("again to exit") } }
+        try await session.submit("Run in Bash: echo tk-$((6*7))")
+        try await session.wait(timeout: .seconds(60)) {
+            $0.isReady && $0.lines.contains("⏺ Bash(echo tk-$((6*7)))")
+                && $0.lines.contains { $0.contains("⎿") && $0.hasSuffix("tk-42") }
+        }
 
-            await session.paste("日本語 paste\n🇮🇹 1️⃣ 👨‍👩‍👧 👍🏽 end")
+        try await session.submit("Create the file note.txt with the content tk-file. Use the Write tool.")
+        try await session.wait(timeout: .seconds(60)) {
+            $0.lines.contains { $0.contains("Do you want to create note.txt?") }
+                && $0.lines.contains { $0.trimmingCharacters(in: .whitespaces) == "❯ 1. Yes" }
+        }
+        await session.send("\r")
+        try await session.wait(timeout: .seconds(60)) {
+            $0.isReady && $0.lines.contains { $0.hasPrefix("⏺ Write(note.txt)") }
+        }
+        try #require(
+            try String(contentsOf: folder.appending(path: "note.txt"), encoding: .utf8)
+                .trimmingCharacters(in: .newlines) == "tk-file")
+
+        await session.send("/")
+        try await session.wait { $0.input == ["❯ /"] && $0.menuRows.count >= 5 }
+        await session.send("\u{1B}")
+        try await session.wait { $0.input == ["❯ /"] && $0.menuRows.isEmpty }
+        await session.send("\u{7F}")
+        try await session.wait { $0.isReady && $0.menuRows.isEmpty }
+
+        await session.send("alpha")
+        try await session.wait { $0.input == ["❯ alpha"] }
+        try await session.pressShiftReturn()
+        await session.send("beta")
+        try await session.wait { $0.input == ["❯ alpha", "  beta"] }
+        try #require(await session.terminal.lines.filter { $0.contains("alpha") }.count == 1)
+        await session.send("\u{3}")
+        try await session.wait { $0.isReady && !$0.lines.contains { $0.contains("again to exit") } }
+
+        await session.paste("日本語 paste\n🇮🇹 1️⃣ 👨‍👩‍👧 👍🏽 end")
+        try await session.wait {
+            $0.input == ["❯ 日本語 paste", "  🇮🇹 1️⃣ 👨‍👩‍👧 👍🏽 end"] && $0.cursor.column == 17
+                && $0.lines[$0.cursor.row].hasSuffix(" end")
+        }
+        await session.send("\u{3}")
+        try await session.wait { $0.isReady && !$0.lines.contains { $0.contains("again to exit") } }
+
+        try #require(try await session.scrollsBack { $0.lowercased() == "⏺ pineapple" })
+
+        for (columns, rows) in [(100, 30), (60, 20), (80, 24)] {
+            await session.resize(columns: columns, rows: rows)
             try await session.wait {
-                $0.input == ["❯ 日本語 paste", "  🇮🇹 1️⃣ 👨‍👩‍👧 👍🏽 end"] && $0.cursor.column == 17
-                    && $0.lines[$0.cursor.row].hasSuffix(" end")
+                $0.columns == columns && $0.rows == rows && $0.isReady
+                    && $0.lines.filter { $0.contains("? for shortcuts") }.count == 1
+                    && $0.lines.filter { $0.lowercased() == "⏺ pineapple" }.count <= 1
             }
-            await session.send("\u{3}")
-            try await session.wait { $0.isReady && !$0.lines.contains { $0.contains("again to exit") } }
-
-            try #require(await session.scrollbackLines.contains { $0.lowercased() == "⏺ pineapple" })
-
-            for (columns, rows) in [(100, 30), (60, 20), (80, 24)] {
-                await session.resize(columns: columns, rows: rows)
-                try await session.wait {
-                    $0.isReady && $0.lines.filter { $0.contains("? for shortcuts") }.count == 1
-                        && $0.lines.filter { $0.lowercased() == "⏺ pineapple" }.count <= 1
-                }
-            }
-
-            try await session.submit("/exit")
-            try #require(try await session.exit() == .exit(0))
-            try #require(await session.ruleRows.count <= 2)
-            try #require(await session.lines.contains("Resume this session with:"))
-            try #require(await session.controlFunctions.isSuperset(of: ["CSI ?2026h", "CSI ?2026l"]))
         }
-        if ProcessInfo.processInfo.environment["TERMINALKIT_CLAUDE_SESSION"] == "record" {
-            try await record(session)
-        }
+
+        try await session.submit("/exit")
+        let terminal = try #require(try await session.exitedTerminal())
+        try #require(terminal.ruleRows.count <= 2)
+        try #require(terminal.lines.contains("Resume this session with:"))
     }
 
     @Test func claudeCodeRecording() throws {
@@ -439,14 +452,69 @@ private let claudeURL =
     .map { URL(filePath: $0).appending(path: "claude") }
     .first { FileManager.default.isExecutableFile(atPath: $0.path(percentEncoded: false)) }
 
-extension ProgramSession {
+private let isClaudeSessionRequested =
+    ProcessInfo.processInfo.environment["TERMINALKIT_CLAUDE_SESSION"] != nil && claudeURL != nil
+
+protocol ClaudeSession: Sendable {
+    var terminal: Terminal { get async }
+    func start(_ configuration: TerminalSession.Configuration) async throws
+    func send(_ text: String) async
+    func press(_ key: ProgramSession.Key) async
+    func pressShiftReturn() async throws
+    func paste(_ text: String) async
+    func resize(columns: Int, rows: Int) async
+    func scrollsBack(to line: @Sendable (String) -> Bool) async throws -> Bool
+    func waitForScreen(_ timeout: Duration, _ condition: @Sendable (Terminal) -> Bool, _ sourceLocation: SourceLocation)
+        async throws
+    func exitedTerminal() async throws -> Terminal?
+}
+
+extension ClaudeSession {
+    fileprivate func wait(
+        timeout: Duration = .seconds(10),
+        _ condition: @Sendable (Terminal) -> Bool,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async throws {
+        try await waitForScreen(timeout, condition, sourceLocation)
+    }
+
+    fileprivate func submit(_ text: String, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        await send(text)
+        try await wait({ $0.input == ["❯ " + text] }, sourceLocation: sourceLocation)
+        await send("\r")
+    }
+}
+
+extension ProgramSession: ClaudeSession {
+    func waitForScreen(
+        _ timeout: Duration,
+        _ condition: @Sendable (Terminal) -> Bool,
+        _ sourceLocation: SourceLocation
+    ) async throws {
+        try await wait(timeout: timeout, { condition($0.terminal) }, sourceLocation: sourceLocation)
+    }
+
+    func scrollsBack(to line: @Sendable (String) -> Bool) -> Bool {
+        scrollbackLines.contains(where: line)
+    }
+
+    func exitedTerminal() async throws -> Terminal? {
+        try await exit() == .exit(0) ? terminal : nil
+    }
+}
+
+extension Terminal {
+    fileprivate var lines: [String] {
+        ProgramSession.lines(of: self)
+    }
+
     fileprivate var ruleRows: [Int] {
         lines.indices.filter { !lines[$0].isEmpty && lines[$0].allSatisfy { $0 == "─" } }
     }
 
     fileprivate var input: [String]? {
         let rules = ruleRows
-        guard rules.count == 2, rules.allSatisfy({ lines[$0].count == terminal.columns }) else {
+        guard rules.count == 2, rules.allSatisfy({ lines[$0].count == columns }) else {
             return nil
         }
         return lines[rules[0] + 1 ..< rules[1]]
@@ -459,12 +527,6 @@ extension ProgramSession {
 
     fileprivate var menuRows: [String] {
         lines.filter { $0.hasPrefix("    /") || $0.hasPrefix("  ❯ /") }
-    }
-
-    fileprivate func submit(_ text: String) async throws {
-        send(text)
-        try await wait { $0.input == ["❯ " + text] }
-        send("\r")
     }
 }
 
