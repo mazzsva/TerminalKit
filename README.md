@@ -51,7 +51,7 @@ struct ContentView: View {
 }
 ```
 
-Call `terminate()` when the window closes, as the example app does in `onDisappear`. macOS can keep a closed window that it restored, and the `@State` session of that window keeps its shell alive until the app quits.
+Call `terminate()` when the window closes, as the example app does in `onDisappear`. macOS can keep a closed window that it restored, and the `@State` session of that window keeps its shell alive until the app quits. `onDisappear` also runs when a container such as a `TabView` hides the view, and it does not run when an AppKit window closes. In such a host, call `terminate()` when the host closes the window or the tab of the session.
 
 Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent before `start()` is dropped.
 
@@ -59,9 +59,11 @@ In bracketed paste mode, `paste(_:)` sends nothing when the text contains the en
 
 Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
 
-To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, and `state` of `TerminalSession`.
+To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, and `state` of `TerminalSession`. A login shell runs under `/usr/bin/login`, so its `state` at the end is an exit with status 0, also when the shell ends with another status or by a signal. A configuration with an executable of its own gives the real status.
 
-Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the session as Terminal.app, so the command changes the user's Terminal.app profile, not the host. Shift-Return makes a new line with no setup.
+Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the session as Terminal.app, so the command changes the user's Terminal.app profile, not the host. Shift-Return makes a new line with no setup. Claude Code names that command when an Option shortcut does nothing. For those shortcuts, turn on `terminalOptionAsMetaKey(_:)`.
+
+With its default setting, Claude Code rings the bell only when the Terminal.app profile of the user has the audible bell off. To get the bell for a permission request and for a finished task in each case, start it with `claude --settings '{"preferredNotifChannel":"terminal_bell"}'`. The bell comes some seconds after the request, and one minute after the end of the task.
 
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
