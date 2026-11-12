@@ -13,9 +13,6 @@ Terminal.Scrollback.relaidCount.getter
 Terminal.Scrollback.firstLine.getter
     removes the paragraphs that the scrollback dropped at its line limit, and no counted test gets to that step
 
-Terminal.Scrollback.map<A>(_:)
-    only the real Claude Code session uses it
-
 TerminalContentView.selectedRanges.getter
     NSTextFinder reads it during Find in the view, and the tests only set it
 

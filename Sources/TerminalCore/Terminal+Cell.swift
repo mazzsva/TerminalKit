@@ -87,12 +87,7 @@ extension Terminal {
 
         mutating func cell(_ cell: Cell, with character: String) -> Cell {
             var cell = cell
-            let scalars = character.unicodeScalars
-            if let scalar = scalars.first, scalars.dropFirst().isEmpty {
-                cell.content = scalar.value
-            } else {
-                cell.content = Cell.firstGraphemeIndex + index(of: character)
-            }
+            cell.content = Cell.firstGraphemeIndex + index(of: character)
             return cell
         }
 

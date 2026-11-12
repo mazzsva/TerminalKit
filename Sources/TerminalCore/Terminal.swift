@@ -834,9 +834,6 @@ package struct Terminal: Sendable {
         while start > 0, screen[row][start].isTabGap {
             start -= 1
         }
-        if !screen[row][start].isTab {
-            start += 1
-        }
         var end = column + 1
         while end < screen[row].count, screen[row][end].isTabGap {
             end += 1
