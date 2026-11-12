@@ -3,6 +3,8 @@ import Synchronization
 
 extension PseudoTerminal {
     package struct Output: AsyncSequence, Sendable {
+        package static let capacity = 65_536
+
         let wakeUps: AsyncStream<Void>
         let buffer: OutputBuffer
 
@@ -41,8 +43,6 @@ extension PseudoTerminal {
             var isCancelled = false
         }
 
-        private static let capacity = 65_536
-
         private let source: any DispatchSourceRead
         private let wakeUp: AsyncStream<Void>.Continuation
         private let state = Mutex(State())
@@ -58,7 +58,7 @@ extension PseudoTerminal {
                     wakeUp.yield()
                 }
                 state.bytes += bytes
-                if state.bytes.count >= Self.capacity, !state.isSuspended, !state.isCancelled {
+                if state.bytes.count >= Output.capacity, !state.isSuspended, !state.isCancelled {
                     state.isSuspended = true
                     source.suspend()
                 }
