@@ -74,6 +74,7 @@ Each one needs a test.
 - Synchronized output (mode 2026): TerminalKit sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1` in the environment, unless the host sets it, because Claude Code does not use mode 2026 with the name `Apple_Terminal` without it.
 - Requirement 9 "takes no longer than in Terminal.app": the test compares live and passes when the TerminalKit time is at most 1.1 times the Terminal.app time, because the 10% is for measurement noise.
 - Decision "when the terminfo entry of `xterm-256color` on macOS holds it": TerminalKit ignores SGR 5 (blink), `CSI ?1034l`, the media copy sequences `CSI i`, `CSI 4i`, and `CSI 5i`, the memory lock `ESC l` and `ESC m`, and modes 3 and 4, which `is2` and `rs2` reset, though the entry holds them, because no listed program sends them in its script.
+- Requirement 5 "answers each query": TerminalKit gives no answer to the queries `CSI ?$p`, `CSI >q`, and `CSI ?u`, because each listed program completes its script with no answer to them. The README names them.
 - Requirement 7 "a link that a program marks or prints": a Command-click opens printed links only. TerminalKit ignores OSC 8, because no listed program sends it with the name `Apple_Terminal`.
 - Requirement 10: the bad input run is in its own test target, `BadInputTests`, so that it runs in a process of its own.
 - Requirement 2 "the cursor is at the expected position": for top, the test checks that the cursor is on the last row, at the end of its text, and does not check a fixed column, because that row shows live process data.
