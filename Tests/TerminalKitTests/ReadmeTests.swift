@@ -10,11 +10,12 @@ struct ReadmeTests {
         #expect(readme.contains("```swift\n" + example + "```\n"))
     }
 
-    @Test func namesEachIgnoredSequence() throws {
+    @Test func namesEachIgnoredSequenceThatTerminalActsOn() throws {
+        #expect(ProgramSessionTests.ignoredThatTerminalActsOn.isSubset(of: ProgramSessionTests.ignored))
         let readme = try String(
             contentsOf: URL(filePath: #filePath).appending(path: "../../../README.md").standardizedFileURL,
             encoding: .utf8)
-        for sequence in ProgramSessionTests.ignored {
+        for sequence in ProgramSessionTests.ignoredThatTerminalActsOn {
             #expect(readme.contains("`\(sequence)`"), "\(sequence)")
         }
     }

@@ -22,6 +22,8 @@ struct ProgramSessionTests {
         "CSI ?1034h", "C0 0F", "CSI >q", "CSI ?u", "CSI ?1016l", "CSI ?2031h", "CSI ?2031l", "OSC 7501",
     ]
 
+    static let ignoredThatTerminalActsOn: Set<String> = ["C0 0F"]
+
     @Test(.enabled(if: getpwuid(getuid()).map { String(cString: $0.pointee.pw_shell) } == "/bin/zsh"))
     func loginShell() async throws {
         try await run { session in
