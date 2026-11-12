@@ -90,6 +90,14 @@ final class TerminalContentView: NSView {
         }
     }
     var hoveredLinkRevision = 0
+    var hidesScrollback = false {
+        didSet {
+            guard hidesScrollback != oldValue else {
+                return
+            }
+            needsDisplay = true
+        }
+    }
     var isOpeningLink = false
     private var fittedColumns: Int?
     var lastMousePosition: Terminal.Position?
@@ -509,7 +517,10 @@ final class TerminalContentView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: colors.foreground]
         let graphemes = terminal.graphemes
         let lineCount = terminal.scrollback.count + terminal.rows
-        let firstRow = max(Int((dirtyRect.minY - Self.topPadding) / cellSize.height) - 1, 0)
+        let firstRow = max(
+            Int((dirtyRect.minY - Self.topPadding) / cellSize.height) - 1,
+            hidesScrollback ? terminal.scrollback.count : 0
+        )
         let lastRow = min(Int((dirtyRect.maxY - Self.topPadding) / cellSize.height), lineCount - 1)
         let rows = firstRow ..< max(lastRow + 1, firstRow)
         var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor, VisualOrder?, JoinedCells?)] = []
@@ -786,7 +797,8 @@ final class TerminalContentView: NSView {
         }
         let lineCount = session.terminal.scrollback.count + session.terminal.rows
         let height = CGFloat(lineCount) * cellSize.height + Self.topPadding + Self.bottomPadding
-        setFrameSize(CGSize(width: size.width, height: max(size.height, height)))
+        let screenHeight = CGFloat(session.terminal.rows) * cellSize.height + Self.topPadding + Self.bottomPadding
+        setFrameSize(CGSize(width: size.width, height: max(size.height, height + max(size.height - screenHeight, 0))))
     }
 
     func rect(row: Int, columns: Range<Int>) -> CGRect {
