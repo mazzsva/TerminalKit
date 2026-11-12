@@ -322,11 +322,7 @@ package struct Terminal: Sendable {
         case "C":
             moveCursor(row: cursor.row, column: cursor.column + count)
         case "D":
-            if isWrapPending {
-                moveBackwardFromWrap(count)
-            } else {
-                moveBackward(count)
-            }
+            moveBackward(count)
         case "E":
             moveCursor(row: cursor.row + count, column: 0)
         case "F":
@@ -731,9 +727,7 @@ package struct Terminal: Sendable {
         case (10 ... 12, let text?):
             changeDynamicColors(text, from: number)
         case (112, _):
-            if text?.isEmpty != false {
-                changedColors.cursor = nil
-            }
+            changedColors.cursor = nil
         default:
             break
         }
@@ -754,7 +748,6 @@ package struct Terminal: Sendable {
         terminal.removedScrollbackCount = removedScrollbackCount
         terminal.decoder = decoder
         terminal.replies = replies
-        terminal.isWrapPending = isWrapPending
         terminal.usesAutowrap = usesAutowrap
         self = terminal
     }
@@ -818,32 +811,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func moveBackward(_ count: Int) {
-        var row = cursor.row
-        var column = cursor.column - count
-        while column < 0, row > 0, screen[row - 1].isWrapped {
-            row -= 1
-            column += columns
-        }
-        if column < 0, row == 0, normalScreen == nil, scrollback.isLastRowWrapped {
-            column += columns
-        }
-        moveCursor(row: row, column: column)
-    }
-
-    private mutating func moveBackwardFromWrap(_ count: Int) {
-        guard cursor.column == columns - 1 else {
-            moveCursor(row: cursor.row, column: 1)
-            return
-        }
-        let rowCount = count / columns
-        var row = cursor.row
-        for _ in 0 ..< min(rowCount, rows) {
-            guard row > 0, screen[row - 1].isWrapped else {
-                break
-            }
-            row -= 1
-        }
-        moveCursor(row: row, column: columns - 1 - max(count - 1 - rowCount * columns, 0))
+        moveCursor(row: cursor.row, column: cursor.column - count)
     }
 
     private mutating func moveBackward(tabStops count: Int) {

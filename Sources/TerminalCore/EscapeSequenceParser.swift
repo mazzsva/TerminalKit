@@ -116,7 +116,7 @@ struct EscapeSequenceParser: Sendable {
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)
         default:
-            return .print(scalar)
+            break
         }
         return nil
     }
@@ -129,7 +129,7 @@ struct EscapeSequenceParser: Sendable {
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)
         default:
-            return .print(scalar)
+            break
         }
         return nil
     }
@@ -172,8 +172,6 @@ struct EscapeSequenceParser: Sendable {
             state = .controlSequenceIntermediate
         case "@" ... "~":
             return finishControlSequence(scalar)
-        case "\u{80}"...:
-            return .print(scalar)
         default:
             break
         }
@@ -189,7 +187,7 @@ struct EscapeSequenceParser: Sendable {
         case "@" ... "~":
             return finishControlSequence(scalar)
         default:
-            return .print(scalar)
+            break
         }
         return nil
     }
@@ -198,8 +196,6 @@ struct EscapeSequenceParser: Sendable {
         switch scalar {
         case "@" ... "~":
             state = .ground
-        case "\u{80}"...:
-            return .print(scalar)
         default:
             break
         }
@@ -207,9 +203,6 @@ struct EscapeSequenceParser: Sendable {
     }
 
     private mutating func operatingSystemCommandNumber(_ scalar: Unicode.Scalar) -> Action? {
-        if scalar.value >= 0x80 {
-            return .print(scalar)
-        }
         if !("0" ... "9").contains(scalar) {
             state = .operatingSystemCommand
         }

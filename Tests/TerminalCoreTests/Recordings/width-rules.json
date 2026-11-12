@@ -1,5 +1,4 @@
 [
-{"name": "osc number then joiner", "input": "\\x1B]2\\xE2\\x80\\x8D;x\\x07X", "reply": "\\x1B[1;3R", "screen": ["‍X"], "title": "x"},
 {"name": "decawm off emoji then off", "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\\xE2\\x98\\x9D\\x1B[?7l\\xF0\\x9F\\x8F\\xBD\\x1B[6n\\x1B[?7h", "reply": "\\x1B[1;40R\\x1B[1;40R", "screen": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA☝"]},
 {"name": "w marks 1", "input": "a\\xCC\\x81b", "reply": "\\x1B[1;3R", "screen": ["áb"]},
 {"name": "w marks 2", "input": "a\\xCC\\x81\\xCC\\x81b", "reply": "\\x1B[1;3R", "screen": ["á́b"]},
