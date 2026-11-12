@@ -749,7 +749,7 @@ final class TerminalContentView: NSView {
             context.fill(
                 spans.map {
                     backingAlignedRect(
-                        CGRect(x: $0.minX, y: baseline - font.underlinePosition, width: $0.width, height: thickness),
+                        CGRect(x: $0.minX, y: top + cellSize.height - thickness, width: $0.width, height: thickness),
                         options: .alignAllEdgesNearest)
                 })
         }

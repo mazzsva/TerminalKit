@@ -342,7 +342,7 @@ struct TerminalContentViewTests {
         }
         let font = view.fonts.regular
         let underline = CGRect(
-            x: 10, y: 7 + font.ascender - font.underlinePosition, width: view.cellSize.width,
+            x: 10, y: 7 + view.cellSize.height - max(font.underlineThickness, 1), width: view.cellSize.width,
             height: max(font.underlineThickness, 1)
         )
         .insetBy(dx: 0, dy: -1)
@@ -447,7 +447,7 @@ struct TerminalContentViewTests {
     @Test func underlinesARunWithAWideCharacter() async throws {
         let view = try await drawnView(running: "printf '\\033[4ma\\344\\270\\255b\\033[m\\r'")
         let font = view.fonts.regular
-        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + view.cellSize.height - max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
         let background = color(in: representation, at: CGPoint(x: 190, y: 90))
         let underline = stride(from: 10 + view.cellSize.width / 4, to: 10 + view.cellSize.width * 3.75, by: 1)
@@ -462,7 +462,7 @@ struct TerminalContentViewTests {
         window.scale = scale
         view.palette = highContrastPalette
         let font = view.fonts.regular
-        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + view.cellSize.height - max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
         let underline = try stride(from: 10, to: 9 + 2 * view.cellSize.width, by: 1 / scale)
             .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
@@ -486,10 +486,25 @@ struct TerminalContentViewTests {
         #expect(pixels.allSatisfy { isClose($0, to: foreground) || isClose($0, to: background) })
     }
 
+    @Test(arguments: [1, 2] as [CGFloat])
+    func drawsTheUnderlineInTheLastPointOfTheCell(scale: CGFloat) async throws {
+        let view = try await drawnView(running: "printf '\\033[?25l\\033[4;31m \\033[m\\n'")
+        let window = ScaledWindow(contentView: view)
+        window.scale = scale
+        view.palette = highContrastPalette
+        let representation = try representation(of: view)
+        let background = color(in: representation, at: CGPoint(x: 190, y: 90))
+        let bottom = 7 + view.cellSize.height
+        let last = try pixels(in: CGRect(x: 10, y: bottom - 1, width: view.cellSize.width, height: 1), of: view)
+        let above = try pixels(in: CGRect(x: 10, y: bottom - 2, width: view.cellSize.width, height: 1), of: view)
+        #expect(last.allSatisfy { !isClose($0, to: background) })
+        #expect(above.allSatisfy { isClose($0, to: background) })
+    }
+
     @Test func drawsTheUnderlineUnderTheCursorInTheTextColor() async throws {
         let (view, window) = try await focusedView(running: "printf '\\033[4;32mX\\033[m\\b'")
         let font = view.fonts.regular
-        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + view.cellSize.height - max(font.underlineThickness, 1) / 2
         let representation = try representation(of: view)
         let underline = try stride(from: view.cursorRect.minX, to: view.cursorRect.maxX, by: 1)
             .map { try #require(color(in: representation, at: CGPoint(x: $0, y: y))?.usingColorSpace(.sRGB)) }
@@ -516,7 +531,7 @@ struct TerminalContentViewTests {
             (window.contentView as? TerminalContentView)?.palette = highContrastPalette
         }
         let font = view.fonts.regular
-        let y = 7 + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = 7 + view.cellSize.height - max(font.underlineThickness, 1) / 2
         let representations = try [representation(of: plain), representation(of: view)]
         for x in stride(from: 10, to: 9 + 2 * view.cellSize.width, by: 1 / scale) {
             let point = CGPoint(x: x, y: y)
@@ -733,8 +748,8 @@ struct TerminalContentViewTests {
 
     @Test(arguments: ["1", "2", "3", "4"])
     func drawsTheTextStyle(parameter: String) async throws {
-        let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
-        let styled = try image(of: try await drawnView(running: "printf '\\033[\(parameter)mX\\r'"))
+        let plain = try image(of: try await drawnView(running: "printf 'X\\n'"))
+        let styled = try image(of: try await drawnView(running: "printf '\\033[\(parameter)mX\\n'"))
         #expect(styled != plain)
     }
 
