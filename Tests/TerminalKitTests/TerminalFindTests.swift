@@ -154,7 +154,7 @@ struct TerminalFindTests {
         }
         #expect(pixels(rect).contains { $0 < 0.5 })
         let font = view.fonts.regular
-        let y = rect.minY + font.ascender - font.underlinePosition + max(font.underlineThickness, 1) / 2
+        let y = rect.maxY - max(font.underlineThickness, 1) / 2
         #expect(pixels(CGRect(x: rect.minX, y: y, width: rect.width, height: 1 / scale)).allSatisfy { $0 < 0.5 })
         #expect(pixels(view.rect(row: 0, columns: 0 ..< 3)).allSatisfy { $0 > 0.5 })
         #expect(pixels(view.rect(row: 0, columns: 4 ..< 6)).allSatisfy { $0 > 0.5 })
