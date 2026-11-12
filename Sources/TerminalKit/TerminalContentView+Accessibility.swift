@@ -35,8 +35,7 @@ extension TerminalContentView {
             let graphemes = terminal.graphemes
             scrollback = Array(terminal.scrollback).enumerated()
                 .map { index, line in
-                    let continues =
-                        line.isWrapped && (index != terminal.scrollback.count - 1 || !terminal.isAlternateScreenActive)
+                    let continues = line.isWrapped
                     if let reusable,
                         case let cached = terminal.removedScrollbackCount + index - reusable.firstLine,
                         reusable.scrollback.indices.contains(cached),
