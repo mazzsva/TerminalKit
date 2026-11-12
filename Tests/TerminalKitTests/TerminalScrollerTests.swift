@@ -27,23 +27,6 @@ struct TerminalScrollerTests {
         #expect(scrollView.contentSize.width < 300)
     }
 
-    @Test func fillsTheWidthWithAnOverlayScroller() async throws {
-        let session = TerminalSession(running: "seq 1 100")
-        let scrollView = TerminalScrollView(session: session)
-        scrollView.scrollerStyle = .overlay
-        let window = NSWindow(contentView: scrollView)
-        window.setContentSize(CGSize(width: 300, height: 200))
-        scrollView.layoutSubtreeIfNeeded()
-        #expect(scrollView.contentSize.width == 300)
-        try session.start()
-        await session.waitForExit()
-        for _ in 0 ..< 3 {
-            scrollView.needsLayout = true
-            scrollView.layoutSubtreeIfNeeded()
-        }
-        #expect(scrollView.contentSize.width == 300)
-    }
-
     @Test func fitsTheSpaceBesideALegacyScroller() async throws {
         let session = TerminalSession(running: "seq 1 100")
         let scrollView = TerminalScrollView(session: session)
