@@ -157,7 +157,7 @@ struct TerminalStartSizeTests {
     }
 
     @Test func terminatesTheProcessThatStartsAfterTheLayout() async throws {
-        let session = TerminalSession(running: "echo ready; exec /bin/sleep 33")
+        let session = TerminalSession(running: "echo ready; exec /bin/sleep 120")
         let scrollView = TerminalScrollView(session: session)
         scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         try session.start()

@@ -10,7 +10,7 @@ struct TerminalSessionControlTests {
     @Test func terminatesTheProcessAndItsChildren() async throws {
         let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let session = TerminalSession(
-            running: "/bin/sleep 33 & echo $! > '\(file.path(percentEncoded: false))'; echo ready; wait")
+            running: "/bin/sleep 120 & echo $! > '\(file.path(percentEncoded: false))'; echo ready; wait")
         try session.start()
         await session.waitForText("ready")
         let childIdentifier = try #require(
@@ -24,7 +24,7 @@ struct TerminalSessionControlTests {
     }
 
     @Test func killsAProcessThatIgnoresTheHangUp() async throws {
-        let session = TerminalSession(running: "trap '' HUP; echo ready; exec /bin/sleep 33")
+        let session = TerminalSession(running: "trap '' HUP; echo ready; exec /bin/sleep 120")
         try session.start()
         await session.waitForText("ready")
         session.terminate()
