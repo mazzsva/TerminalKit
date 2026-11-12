@@ -92,6 +92,7 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
 
     override func reflectScrolledClipView(_ clipView: NSClipView) {
         super.reflectScrolledClipView(clipView)
+        terminalView.hidesScrollback = isAtBottom
         terminalView.updateHoveredLink()
     }
 

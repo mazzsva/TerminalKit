@@ -193,9 +193,8 @@ struct TerminalViewTests {
         await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         let view = scrollView.terminalView
-        let lineCount = session.terminal.scrollback.count + session.terminal.rows
         #expect(session.terminal.scrollback.count > 0)
-        #expect(view.frame.height == CGFloat(lineCount) * view.cellSize.height + 17)
+        #expect(view.frame.height == CGFloat(session.terminal.scrollback.count) * view.cellSize.height + 300)
     }
 
     @Test func followsNewOutputAtTheBottom() async throws {
@@ -204,6 +203,32 @@ struct TerminalViewTests {
         await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
         #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
+    }
+
+    @Test func keepsTheFirstRowAtTheTopPaddingAtTheBottom() async throws {
+        let session = TerminalSession(running: "printf ready; read line; seq 1 100")
+        let scrollView = TerminalScrollView(session: session)
+        let view = scrollView.terminalView
+        let height = TerminalContentView.topPadding + TerminalContentView.bottomPadding + 20.5 * view.cellSize.height
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: height)
+        scrollView.layoutSubtreeIfNeeded()
+        let firstRowTop = {
+            view.rect(row: session.terminal.scrollback.count, columns: 0 ..< 1).minY
+                - scrollView.contentView.bounds.minY
+        }
+        try session.start()
+        await session.waitForText("ready")
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(session.terminal.scrollback.isEmpty)
+        #expect(firstRowTop() == TerminalContentView.topPadding)
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(session.terminal.scrollback.count > 0)
+        #expect(firstRowTop() == TerminalContentView.topPadding)
+        #expect(view.hidesScrollback)
+        view.scroll(CGPoint(x: 0, y: scrollView.contentView.bounds.minY - 1))
+        #expect(!view.hidesScrollback)
     }
 
     @Test func keepsThePositionWhenScrolledBack() async throws {
