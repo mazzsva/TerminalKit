@@ -119,6 +119,66 @@ struct TerminalFindTests {
         #expect(view.selectedText == "before")
     }
 
+    @Test(arguments: [true, false])
+    func readsASelectionOfTheAlternateScreenAfterTheExit(selectsAll: Bool) throws {
+        let session = TerminalSession(running: "true")
+        let scrollView = TerminalScrollView(session: session)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        let view = scrollView.terminalView
+        let window = KeyWindow(contentView: scrollView)
+        window.makeFirstResponder(view)
+        scrollView.layoutSubtreeIfNeeded()
+        let normal = "normal text http://example.com/a"
+        _ = session.liveTerminal.receive(
+            Array((normal + "\r\n\u{1B}[?1049h\u{1B}[Halt one\r\nalt two\r\nhttp://example.com/b").utf8))
+        scrollView.layoutSubtreeIfNeeded()
+        let rows = session.terminal.rows
+        if selectsAll {
+            view.selectAll(nil)
+        } else {
+            view.mouseDown(with: try mouseEvent(.leftMouseDown, row: rows, column: 0, in: view))
+            view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: rows + 2, column: 20, in: view))
+            view.mouseUp(with: try mouseEvent(.leftMouseUp, row: rows + 2, column: 20, in: view))
+        }
+        #expect(view.selectedText?.hasSuffix("alt one\nalt two\nhttp://example.com/b") == true)
+        let stale = view.selection
+
+        _ = session.liveTerminal.receive(Array("\u{1B}[?1049l".utf8))
+        scrollView.layoutSubtreeIfNeeded()
+        draw(view)
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("TerminalFindTests-" + UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        view.copySelection(to: pasteboard)
+        let kept = normal + String(repeating: "\n", count: rows - 1)
+        let length = (view.string as NSString).length
+        #expect(pasteboard.string(forType: .string) == (selectsAll ? kept : nil))
+        #expect(view.accessibilitySelectedText() == (selectsAll ? kept : ""))
+        let range = selectsAll ? NSRange(location: 0, length: length) : NSRange(location: length, length: 0)
+        #expect(view.accessibilitySelectedTextRange() == range)
+        #expect(view.selectedRanges == [NSValue(range: range)])
+
+        scrollView.textFinder.performAction(.showFindInterface)
+        let field = try #require(scrollView.findBarView.flatMap { searchField(in: $0) })
+        window.makeFirstResponder(field)
+        let editor = try #require(window.firstResponder as? NSTextView)
+        editor.insertText("normal", replacementRange: NSRange(location: NSNotFound, length: 0))
+        view.selection = stale
+        #expect(sendFindPanelAction(.next, in: window))
+        #expect(view.firstSelectedRange == NSRange(location: 0, length: 6))
+
+        view.selection = stale
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 3, in: view, modifierFlags: .shift))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 0, column: 3, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == String(kept.dropFirst(3)))
+
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: rows + 2, column: 5, in: view, modifierFlags: .command))
+        #expect(view.hoveredLink == nil)
+        view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 15, in: view, modifierFlags: .command))
+        #expect(view.hoveredLink?.url == URL(string: "http://example.com/a"))
+        draw(view)
+    }
+
     @Test func drawsTheFoundCharacters() async throws {
         let scrollView = try await findView(running: "printf '\\033[31ma\\033[0m c\\033[4mb\\033[0md\\033[31me'")
         let view = scrollView.terminalView
