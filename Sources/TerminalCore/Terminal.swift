@@ -175,6 +175,11 @@ package struct Terminal: Sendable {
             row = target?.row ?? lines.count + cursor.row - usedRows + (cursor.column > 0 ? 1 : 0)
             if target == nil {
                 top = max(top, min(row - rows + 1, lines.count - usedRows + self.rows - 2 * rows))
+                if rows < self.rows, row >= top + rows, top + rows <= lines.count, lines[top + rows - 1].textCount > 0 {
+                    row = lines.count + cursor.row - usedRows
+                    column = cursor.column
+                    top = max(top, row - rows + 1)
+                }
                 lines += Array(repeating: Line(), count: max(top - lines.count, 0))
             }
         }
