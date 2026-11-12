@@ -66,10 +66,10 @@ Each one needs a test.
 - In the example app, type `claude` and press Return: the start screen of Claude Code shows
 
 ## Deviations
-- Constraint "A real session runs with an empty home folder": the real Claude Code test uses the real home folder and an empty project folder, because the account of Claude Code lives in the home folder.
-- Requirement 3 "In the example app": the real Claude Code session runs with no window and no app. The test runs Claude Code in a pseudo terminal with the TerminalKit emulator, the session configuration, the paste code, and the key code of the view, because a test of the app would need posted key and mouse events.
-- Requirement 3 "a scroll of the transcript": the test checks that the earlier answer is in the saved lines, and does not scroll a view, because the session has no view.
-- Edge case "No account for Claude Code": the real session test runs only when `TERMINALKIT_CLAUDE_SESSION` is set and Claude Code is installed, and otherwise reports that it did not run. With the variable set and no account, it fails, because the test has no check for an account.
+- Constraint "A real session runs with an empty home folder": the real Claude Code tests use the real home folder and an empty project folder, because the account of Claude Code lives in the home folder.
+- Requirement 3 "In the example app": the real Claude Code session runs in a window of the test process that hosts the same `TerminalView` as the example app, not in the example app itself, because a test that drives the app needs the Accessibility permission. The test sends key and scroll wheel events through the window, pastes with the paste function of `TerminalSession`, and resizes the window. The same script also runs with no window, in a pseudo terminal with the TerminalKit emulator, and that session is the one that the recorder records.
+- Requirement 3 "a scroll of the transcript": the window test scrolls the view until the earlier answer shows, and then back to the bottom. The test with no window only checks that the earlier answer is in the saved lines, because that session has no view.
+- Edge case "No account for Claude Code": the real session tests run only when `TERMINALKIT_CLAUDE_SESSION` is set and Claude Code is installed, and otherwise report that they did not run. With the variable set and no account, they fail, because the tests have no check for an account.
 - Requirement 8 "a notification that a program requests": the host gets no separate notification event. It observes `bellCount` of `TerminalSession`, and TerminalKit ignores OSC 9 and OSC 777, because no listed program sends them in its script.
 - Synchronized output (mode 2026): TerminalKit sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1` in the environment, unless the host sets it, because Claude Code does not use mode 2026 with the name `Apple_Terminal` without it.
 - Requirement 9 "takes no longer than in Terminal.app": the test compares live and passes when the TerminalKit time is at most 1.1 times the Terminal.app time, because the 10% is for measurement noise.
@@ -77,3 +77,4 @@ Each one needs a test.
 - Requirement 7 "a link that a program marks or prints": a Command-click opens printed links only. TerminalKit ignores OSC 8, because no listed program sends it with the name `Apple_Terminal`.
 - Requirement 10: the bad input run is in its own test target, `BadInputTests`, so that it runs in a process of its own.
 - Requirement 2 "the cursor is at the expected position": for top, the test checks that the cursor is on the last row, at the end of its text, and does not check a fixed column, because that row shows live process data.
+- Check "In the example app, type `claude` and press Return": it was checked one time in the example app, with key events posted to its process. The window test is the automatic proof.
