@@ -20,6 +20,12 @@ extension Terminal {
             (lastIndex(where: \.isContent) ?? -1) + 1
         }
 
+        mutating func writeSkippedCellsAtEnd() {
+            for index in textCount ..< count {
+                self[index] = .writtenSpace(style: self[index].style)
+            }
+        }
+
         package func columnCount(at column: Int) -> Int {
             guard self[column].isTab else {
                 return Swift.max(Int(self[column].width), 1)

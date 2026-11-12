@@ -54,6 +54,7 @@ extension Terminal {
                 let width = cell.isTab ? cells[(offset + 1)...].prefix(while: \.isTabGap).count + 1 : Int(cell.width)
                 if !isInTab, width > 0, used > 0, used + width > columns {
                     var line = Line(cells[rowStarts[rowStarts.count - 1] ..< offset], isWrapped: true)
+                    line.writeSkippedCellsAtEnd()
                     line.append(contentsOf: repeatElement(.padding, count: max(columns - used, 0)))
                     result.append(line)
                     rowStarts.append(offset)
