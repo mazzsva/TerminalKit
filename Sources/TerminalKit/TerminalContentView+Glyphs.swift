@@ -1,6 +1,29 @@
 import AppKit
 import CoreText
 
+extension TerminalContentView {
+    static func drawsSeparator(_ character: String, in rect: CGRect, context: CGContext) -> Bool {
+        guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first,
+            (0xE0B0 ... 0xE0B3).contains(scalar.value)
+        else {
+            return false
+        }
+        let (edge, tip) = scalar.value < 0xE0B2 ? (rect.minX, rect.maxX) : (rect.maxX, rect.minX)
+        context.saveGState()
+        context.clip(to: rect)
+        context.move(to: CGPoint(x: edge, y: rect.minY))
+        context.addLine(to: CGPoint(x: tip, y: rect.midY))
+        context.addLine(to: CGPoint(x: edge, y: rect.maxY))
+        if scalar.value.isMultiple(of: 2) {
+            context.fillPath()
+        } else {
+            context.strokePath()
+        }
+        context.restoreGState()
+        return true
+    }
+}
+
 final class GlyphCache {
     struct Run {
         let font: CTFont

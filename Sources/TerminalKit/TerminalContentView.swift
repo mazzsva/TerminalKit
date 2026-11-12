@@ -712,6 +712,7 @@ final class TerminalContentView: NSView {
         let top = Self.topPadding + CGFloat(row) * cellSize.height
         let baseline = top + font.ascender
         context.setFillColor(color.cgColor)
+        context.setStrokeColor(color.cgColor)
         context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
         defer { context.textMatrix = .identity }
         var batchFont: CTFont?
@@ -730,9 +731,13 @@ final class TerminalContentView: NSView {
             }
             let character = joined?.heads[column]?.text ?? graphemes.character(of: line[column])
             let visual = order?.columns[column] ?? column
+            let x = Self.padding + CGFloat(visual) * cellSize.width
+            let cell = CGRect(origin: CGPoint(x: x, y: top), size: cellSize)
+            if Self.drawsSeparator(character, in: cell, context: context) {
+                continue
+            }
             let entry = fonts.glyphs.entry(
                 for: character, font: font, index: index, isMirrored: order?.isReversed[column] == true)
-            let x = Self.padding + CGFloat(visual) * cellSize.width
             for run in entry.runs {
                 if let current = batchFont, !CFEqual(current, run.font) {
                     flush()
