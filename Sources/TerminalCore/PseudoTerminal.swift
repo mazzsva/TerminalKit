@@ -84,9 +84,10 @@ package final class PseudoTerminal: Sendable {
     }
 
     deinit {
+        let group = readSource.isCancelled ? -1 : tcgetpgrp(fileDescriptor)
         cancelSources()
         wakeUp.finish()
-        killLater()
+        killLater(foregroundGroup: group > 0 ? group : nil)
     }
 
     package var foregroundProcessGroup: pid_t? {
@@ -106,10 +107,11 @@ package final class PseudoTerminal: Sendable {
     }
 
     package func hangUp() {
+        let group = foregroundProcessGroup
         queue.async { [weak self] in
             self?.cancelSources()
         }
-        killLater()
+        killLater(foregroundGroup: group)
     }
 
     package func write(_ bytes: [UInt8], isReply: Bool = false) {
@@ -173,15 +175,42 @@ package final class PseudoTerminal: Sendable {
         }
     }
 
-    private func killLater() {
+    private func killLater(foregroundGroup: pid_t?) {
         let processIdentifier = processIdentifier
+        let time = Date.now.timeIntervalSince1970
+        let groups = child.isReaped.withLock { $0 } ? [] : Set([processIdentifier, foregroundGroup].compactMap(\.self))
         queue.asyncAfter(deadline: .now() + Self.killDelay) { [child] in
             child.isReaped.withLock { isReaped in
                 if !isReaped {
                     kill(-processIdentifier, SIGKILL)
                 }
             }
+            for group in groups {
+                for member in Self.processes(inGroup: group, ofSession: processIdentifier, startedBefore: time) {
+                    kill(member, SIGKILL)
+                }
+            }
         }
+    }
+
+    private static func processes(
+        inGroup group: pid_t,
+        ofSession session: pid_t,
+        startedBefore time: TimeInterval
+    ) -> [pid_t] {
+        var members = [pid_t](repeating: 0, count: 1_024)
+        let count = proc_listpgrppids(group, &members, Int32(members.count * MemoryLayout<pid_t>.size))
+        return members.prefix(max(Int(count), 0))
+            .filter { member in
+                var information = proc_bsdinfo()
+                let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+                guard member > 0, getsid(member) == session,
+                    proc_pidinfo(member, PROC_PIDTBSDINFO, 0, &information, size) == size
+                else {
+                    return false
+                }
+                return Double(information.pbi_start_tvsec) + Double(information.pbi_start_tvusec) / 1_000_000 <= time
+            }
     }
 
     private func monitorExit(secondary: Int32) {

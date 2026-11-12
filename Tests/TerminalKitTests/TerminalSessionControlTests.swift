@@ -46,6 +46,54 @@ struct TerminalSessionControlTests {
         }
     }
 
+    @Test func killsAChildThatIgnoresTheHangUpAfterTheProcessEnds() async throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let session = TerminalSession(
+            running:
+                "(trap '' HUP; exec /bin/sleep 120) & echo $! > '\(file.path(percentEncoded: false))'; echo ready; wait"
+        )
+        try session.start()
+        await session.waitForText("ready")
+        let childIdentifier = try #require(
+            pid_t(String(contentsOf: file, encoding: .utf8).trimmingCharacters(in: .newlines)))
+        session.terminate()
+        await session.waitForExit()
+        #expect(session.state == .exited(.uncaughtSignal(SIGHUP)))
+        while kill(childIdentifier, 0) == 0 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
+    @Test(arguments: [true, false])
+    func killsAForegroundJobThatIgnoresTheHangUp(terminates: Bool) async throws {
+        let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        var session: TerminalSession? = TerminalSession(
+            configuration: .init(
+                executableURL: URL(filePath: "/bin/zsh"),
+                arguments: ["-f", "-i"],
+                environment: ["HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"]
+            )
+        )
+        try session?.start()
+        session?
+            .send(
+                "/bin/sh -c 'trap \"\" HUP; echo $$ > \"\(file.path(percentEncoded: false))\"; exec /bin/sleep 120'\r")
+        var jobIdentifier: pid_t?
+        while jobIdentifier == nil {
+            try await Task.sleep(for: .milliseconds(20))
+            jobIdentifier = (try? String(contentsOf: file, encoding: .utf8))
+                .flatMap { pid_t($0.trimmingCharacters(in: .newlines)) }
+        }
+        if terminates {
+            session?.terminate()
+        } else {
+            session = nil
+        }
+        while let jobIdentifier, kill(jobIdentifier, 0) == 0 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
     @Test func terminatesAnInteractiveShell() async throws {
         let session = TerminalSession(
             configuration: .init(
