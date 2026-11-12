@@ -98,6 +98,7 @@ package struct Terminal: Sendable {
     private var normalSavedCursor: SavedCursor?
     private var alternateSavedCursor: SavedCursor?
     private var titleStack: [String] = []
+    private var repeatsLeft = 0
     private var synchronizedSnapshot: [Terminal] = []
 
     package init(columns: Int, rows: Int) {
@@ -202,6 +203,7 @@ package struct Terminal: Sendable {
 
     package mutating func receive(_ bytes: [UInt8]) -> [UInt8] {
         defer { replies.removeAll() }
+        repeatsLeft = Self.maximumRepeatCount
         for scalar in decoder.decode(bytes) {
             guard let action = parser.advance(scalar) else {
                 continue
@@ -347,7 +349,9 @@ package struct Terminal: Sendable {
         case "b":
             if let lastCharacter {
                 isWrapPending = false
-                for _ in 0 ..< min(count, Self.maximumRepeatCount) {
+                let repeats = min(count, repeatsLeft)
+                repeatsLeft -= repeats
+                for _ in 0 ..< repeats {
                     place(lastCharacter)
                 }
             }
@@ -756,6 +760,7 @@ package struct Terminal: Sendable {
         terminal.restoredNormalScreenCount = restoredNormalScreenCount
         terminal.decoder = decoder
         terminal.replies = replies
+        terminal.repeatsLeft = repeatsLeft
         terminal.usesAutowrap = usesAutowrap
         self = terminal
     }

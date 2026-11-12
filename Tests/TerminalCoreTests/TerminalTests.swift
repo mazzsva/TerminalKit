@@ -1316,6 +1316,14 @@ struct TerminalTests {
         #expect(terminal.cursor.column == 1)
     }
 
+    @Test func limitsTheRepeatsOfEachReceive() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive("a" + String(repeating: "\u{1B}[1000000b", count: 3))
+        #expect(terminal.scrollback.count + terminal.removedScrollbackCount == 99_999)
+        terminal.receive("\u{1B}[1000000b")
+        #expect(terminal.scrollback.count + terminal.removedScrollbackCount == 199_999)
+    }
+
     @Test func acceptsTheLargestParameterForEachFinal() {
         for final in (0x40 ... 0x7E).compactMap(UnicodeScalar.init) {
             var terminal = Terminal(columns: 4, rows: 2)
