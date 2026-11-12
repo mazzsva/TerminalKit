@@ -77,11 +77,7 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
         let removedLines = terminalView.session.terminal.removedScrollbackCount - removedScrollbackCount
         removedScrollbackCount = terminalView.session.terminal.removedScrollbackCount
         super.layout()
-        let size = contentSize
         terminalView.fit(to: insetContentSize)
-        if contentSize != size {
-            terminalView.fit(to: insetContentSize)
-        }
         if isAtBottom {
             terminalView.scrollToBottom()
         } else if removedLines > 0 {
