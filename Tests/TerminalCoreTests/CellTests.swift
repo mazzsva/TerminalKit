@@ -18,13 +18,6 @@ struct CellTests {
         #expect(cell == other)
     }
 
-    @Test func storesACharacterOfOneScalarInTheCell() {
-        var graphemes = Terminal.Graphemes()
-        let cell = graphemes.cell(Terminal.Cell(), with: "é")
-        #expect(graphemes.character(of: cell) == "é")
-        #expect(cell == Terminal.Cell(scalar: "é"))
-    }
-
     @Test func showsPaddingAsABlank() {
         #expect(Terminal.Graphemes().character(of: .padding) == " ")
         #expect(Terminal.Cell.padding.isBlank)

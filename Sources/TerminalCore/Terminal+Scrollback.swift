@@ -115,15 +115,6 @@ extension Terminal {
             Iterator(scrollback: self)
         }
 
-        package func map<T>(_ transform: (Line) throws -> T) rethrows -> [T] {
-            var result: [T] = []
-            result.reserveCapacity(count)
-            for line in self {
-                result.append(try transform(line))
-            }
-            return result
-        }
-
         @discardableResult
         mutating func append(_ line: Line) -> Int {
             let textCount = line.textCount
@@ -144,9 +135,6 @@ extension Terminal {
             }
             paragraphs[last].textCount += textCount
             paragraphs[last].lastRowTextCount = textCount
-            if paragraphs[last].rowOffsets != nil {
-                paragraphs[last].setRowOffsets(nil)
-            }
             paragraphs[last].isSimple = paragraphs[last].isSimple && isSimple
             if !paragraphs[last].isSimple {
                 paragraphs[last].updateWidths(of: storedLines[start...]) { $0.append(line[..<textCount]) }
@@ -493,14 +481,8 @@ extension Terminal {
 
             private mutating func extendLastUnit(width: Int32) {
                 let last = runs.count - 1
-                if runs[last].count > 1 {
-                    runs[last].count -= 1
-                    runs.append(
-                        Run(kind: runs[last].kind, width: runs[last].width + width, cells: runs[last].cells + 1))
-                } else {
-                    runs[last].width += width
-                    runs[last].cells += 1
-                }
+                runs[last].width += width
+                runs[last].cells += 1
             }
 
             func rowCount(columns: Int) -> (rows: Int, used: Int) {

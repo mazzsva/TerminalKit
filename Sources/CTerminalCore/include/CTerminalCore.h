@@ -1,5 +1,4 @@
 #include <spawn.h>
-#include <stdint.h>
 
 int terminalkit_spawn_in_terminal(
     pid_t *pid,
