@@ -21,6 +21,9 @@ struct ContentView: View {
             .task {
                 try? session.start()
             }
+            .onDisappear {
+                session.terminate()
+            }
     }
 }
 
