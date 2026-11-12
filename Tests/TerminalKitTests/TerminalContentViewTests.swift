@@ -731,6 +731,29 @@ struct TerminalContentViewTests {
         #expect(red != plain)
     }
 
+    @Test(arguments: [1, 2] as [CGFloat])
+    func drawsThePowerlineArrowsAcrossTheCell(scale: CGFloat) async throws {
+        let view = try await drawnView(running: "printf '\\033[?25l\\356\\202\\260 \\356\\202\\262\\n'")
+        let window = ScaledWindow(contentView: view)
+        window.scale = scale
+        view.palette = highContrastPalette
+        let representation = try representation(of: view)
+        let foreground: [CGFloat] = [0, 0, 0]
+        let background: [CGFloat] = [1, 1, 1]
+        let inset = 0.5 / scale
+        for (column, edge, tip) in [(0, 0, 1), (2, 1, 0)] as [(Int, CGFloat, CGFloat)] {
+            let cell = view.rect(row: 0, columns: column ..< column + 1).insetBy(dx: inset, dy: inset)
+            let edgeX = cell.minX + edge * cell.width
+            let tipX = cell.minX + tip * cell.width
+            for y in stride(from: cell.minY + 1, through: cell.maxY - 1, by: 1 / scale) {
+                #expect(isClose(color(in: representation, at: CGPoint(x: edgeX, y: y)), to: foreground))
+            }
+            #expect(!isClose(color(in: representation, at: CGPoint(x: tipX, y: cell.midY)), to: background))
+            #expect(isClose(color(in: representation, at: CGPoint(x: tipX, y: cell.minY)), to: background))
+            #expect(isClose(color(in: representation, at: CGPoint(x: tipX, y: cell.maxY)), to: background))
+        }
+    }
+
     @Test(arguments: ["1", "2", "3", "4"])
     func drawsTheTextStyle(parameter: String) async throws {
         let plain = try image(of: try await drawnView(running: "printf 'X\\r'"))
