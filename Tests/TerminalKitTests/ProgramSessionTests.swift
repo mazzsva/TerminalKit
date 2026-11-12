@@ -324,12 +324,12 @@ struct ProgramSessionTests {
         #expect(found.isEmpty, "Private data: \(found)")
     }
 
-    private func privateData(in events: [ProgramSession.Event], fullName: String = NSFullUserName()) -> [String] {
+    private func privateData(in events: [ProgramSession.Event]) -> [String] {
         let output = String(decoding: unescaped(events.compactMap { $0.output?.joined() }.joined()), as: UTF8.self)
         let raw = ([output] + events.compactMap { $0.screen?.joined(separator: "\n") }).joined(separator: "\n")
         let text = raw + "\n" + raw.replacing(/\u{1B}(?:\[[0-?]*[ -\/]*[@-~]|[ -\/]*[0-~])/, with: " ")
-        let words = fullName.split { !$0.isLetter }.map(String.init).filter { $0.count >= 3 }
-        let names = [NSHomeDirectory(), NSUserName(), fullName] + words
+        let words = NSFullUserName().split { !$0.isLetter }.map(String.init).filter { $0.count >= 3 }
+        let names = [NSHomeDirectory(), NSUserName(), NSFullUserName()] + words
         var found = names.filter { !$0.isEmpty && text.contains($0) }.map { _ in "user name" }
         let checks: [(String, Regex<Substring>)] = [
             ("plan", /\b(?:Max|Pro|Team|Enterprise)\b/), ("usage", /resets|% of/), ("amount", /[$€£¥]\d/),
