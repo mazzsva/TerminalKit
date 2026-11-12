@@ -795,6 +795,30 @@ struct TerminalTests {
         #expect(lines(terminal) == ["abc def ", "        "])
     }
 
+    @Test(arguments: [
+        ("\u{1B}[10;1Hz\u{1B}[11;1H", "\u{1B}[6;1R", ["", "", "", "", "z", "X"]),
+        ("\u{1B}[10;1Hz\u{1B}[11;5H", "\u{1B}[6;5R", ["", "", "", "", "z", "    X"]),
+        ("\u{1B}[6;1Hz\u{1B}[9;6H", "\u{1B}[6;6R", ["", "", "z", "", "", "     X"]),
+        ("R1\r\nR2\r\nR3\r\nR4\r\nR5\r\nR6\r\nR7\r\nR8\u{1B}[9;H", "\u{1B}[6;1R", ["R4", "R5", "R6", "R7", "R8", "X"]),
+    ])
+    func keepsTheRowOfTheCursorBelowTheTextOnAShrink(input: String, reply: String, screen: [String]) {
+        var terminal = Terminal(columns: 10, rows: 12)
+        terminal.receive(input)
+        terminal.resize(columns: 10, rows: 6)
+        #expect(terminal.receive("\u{1B}[6n") == reply)
+        terminal.receive("X")
+        #expect(lines(terminal).map { $0.replacing(/\s+$/, with: "") } == screen)
+    }
+
+    @Test func keepsALineBreakOfAStreamOnAShrink() {
+        var terminal = Terminal(columns: 10, rows: 31)
+        terminal.receive((1 ... 29).map { "L\($0)\r\n" }.joined())
+        terminal.resize(columns: 10, rows: 26)
+        terminal.receive("L30\r\n")
+        let history = (scrollback(terminal) + lines(terminal)).map { $0.replacing(/\s+$/, with: "") }
+        #expect(history.suffix(3) == ["L29", "L30", ""])
+    }
+
     @Test func keepsAClearedScreen() {
         var terminal = Terminal(columns: 10, rows: 4)
         terminal.receive((0 ..< 8).map { "line\($0)\r\n" }.joined() + "\u{1B}[H\u{1B}[2J$ ")
