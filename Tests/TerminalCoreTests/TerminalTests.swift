@@ -1603,6 +1603,21 @@ struct TerminalTests {
         }
     }
 
+    @Test func readsTheRowsOfALongWideSavedLineQuickly() {
+        var terminal = Terminal(columns: 200, rows: 24)
+        terminal.receive(String(repeating: "中a", count: 200_000) + String(repeating: "\r\nx", count: 200))
+        terminal.resize(columns: 199, rows: 24)
+        let scrollback = terminal.scrollback
+        let duration = ContinuousClock()
+            .measure {
+                for row in stride(from: 0, to: scrollback.count, by: 10) {
+                    _ = scrollback[row]
+                }
+            }
+        #expect(scrollback.count > 2_000)
+        #expect(duration < .milliseconds(500))
+    }
+
     @Test func laysOutRandomSavedCellsLikeAFullReflow() {
         let red = Terminal.Style(background: .indexed(1))
         var state: UInt64 = 0x0F1E_2D3C
