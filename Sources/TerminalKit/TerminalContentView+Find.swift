@@ -9,10 +9,6 @@ extension TerminalContentView: NSTextFinderClient {
         accessibilityText.string
     }
 
-    var isSelectable: Bool {
-        true
-    }
-
     var firstSelectedRange: NSRange {
         accessibilitySelectedTextRange()
     }

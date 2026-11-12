@@ -700,8 +700,8 @@ final class TerminalContentView: NSView {
         style: Terminal.Style,
         foreground: NSColor,
         graphemes: Terminal.Graphemes,
-        order: VisualOrder? = nil,
-        joined: JoinedCells? = nil
+        order: VisualOrder?,
+        joined: JoinedCells?
     ) {
         guard !style.isHidden, let context = NSGraphicsContext.current?.cgContext
         else {
