@@ -11,7 +11,7 @@ struct ContentView: View {
             .navigationTitle(session.title.isEmpty ? "Terminal" : session.title)
             .navigationSubtitle(session.currentDirectoryURL?.path(percentEncoded: false) ?? "")
             .onChange(of: session.bellCount) {
-                NSSound.beep()
+                NSApp.requestUserAttention(.informationalRequest)
             }
             .onChange(of: session.state) {
                 if case .exited = session.state {
