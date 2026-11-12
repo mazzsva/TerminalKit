@@ -99,7 +99,7 @@ actor ProgramSession {
         case "c", "J", "K", "m", "n", "t":
             return Array(parameters.prefix(1))
         default:
-            return []
+            return sequence.subparameters.isEmpty ? [] : [parameters.joined(separator: ";")]
         }
     }
 
