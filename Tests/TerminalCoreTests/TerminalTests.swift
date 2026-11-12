@@ -787,6 +787,14 @@ struct TerminalTests {
         #expect(lines(terminal) == ["$     "])
     }
 
+    @Test func keepsASkippedCellAtTheEndOfAReflowedRow() {
+        var terminal = Terminal(columns: 8, rows: 2)
+        terminal.receive("abc\u{1B}[5Gdef")
+        terminal.resize(columns: 4, rows: 2)
+        terminal.resize(columns: 8, rows: 2)
+        #expect(lines(terminal) == ["abc def ", "        "])
+    }
+
     @Test func keepsAClearedScreen() {
         var terminal = Terminal(columns: 10, rows: 4)
         terminal.receive((0 ..< 8).map { "line\($0)\r\n" }.joined() + "\u{1B}[H\u{1B}[2J$ ")

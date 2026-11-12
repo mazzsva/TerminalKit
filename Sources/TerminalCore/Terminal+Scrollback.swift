@@ -321,6 +321,7 @@ extension Terminal {
             var line = cells(bounds.cells, of: paragraph, storedRange: range)
             if row < rows - 1 {
                 line.isWrapped = true
+                line.writeSkippedCellsAtEnd()
                 line.append(contentsOf: repeatElement(.padding, count: Swift.max(columns - bounds.used, 0)))
                 return line
             }
