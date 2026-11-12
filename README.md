@@ -63,6 +63,8 @@ Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the s
 
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
+A held letter key with accents, such as E, shows the accent menu of macOS and does not repeat, as in a text view. For a key that repeats as in Terminal, register `ApplePressAndHoldEnabled` as `false` in the `UserDefaults` of the host app, as the example app does.
+
 macOS gives microphone access to the host app, not to the program in the terminal. To use Claude Code voice dictation, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement.
 
 The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalView` with the user's login shell. Build it with the `TerminalKitExample` scheme.
@@ -87,6 +89,7 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 
 - TerminalKit keeps at most 100,000 saved lines.
 - TerminalKit draws with the 12 pt system monospaced font in a 7 by 15 point cell, not with the font of Terminal.app, so some glyph shapes differ a little.
+- A person cannot drag the selected text out of the view to another app, as Terminal.app permits.
 - Terminal.app acts on these, and TerminalKit ignores them, because no listed program needs them:
   - SGR 5 (blink). The text does not blink.
   - The G1 to G3 character sets with SO, SI (`C0 0F`), LS2, and LS3, and the national character sets. Line drawing works in G0, with `ESC ( 0`.
