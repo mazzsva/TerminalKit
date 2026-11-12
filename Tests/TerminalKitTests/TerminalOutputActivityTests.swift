@@ -25,8 +25,9 @@ struct TerminalOutputActivityTests {
         #expect(session.outputActivity === activity)
 
         clock.advance(by: .milliseconds(400))
-        await yieldToTheTimer()
-        #expect(session.outputActivity == nil)
+        while session.outputActivity != nil {
+            await Task.yield()
+        }
     }
 
     @Test func endsTheActivityWhenTheSessionEnds() async throws {
