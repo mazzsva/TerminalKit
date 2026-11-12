@@ -108,3 +108,7 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
   - The window reports `CSI 11t`, `CSI 13t`, `CSI 14t`, and `CSI 18t`, and DECREQTPARM.
   - SO, LS2, LS3, the G1 to G3 character sets, and the national character sets.
   - Mouse modes 1005 and 1015, DECOM, DECALN, mode 47, and LNM.
+  - `CSI ?1034l`: the end of the eighth bit for Meta.
+  - `CSI i`, `CSI 4i`, and `CSI 5i`: media copy. TerminalKit has no printer.
+  - `ESC l` and `ESC m`: memory lock and unlock.
+  - Modes 3 (132 columns) and 4 (smooth scroll). TerminalKit never has them, and the terminfo reset strings only reset them.
