@@ -123,6 +123,7 @@ struct TerminalFindTests {
     func readsASelectionOfTheAlternateScreenAfterTheExit(selectsAll: Bool) throws {
         let session = TerminalSession(running: "true")
         let scrollView = TerminalScrollView(session: session)
+        scrollView.scrollerStyle = .overlay
         scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
         let view = scrollView.terminalView
         let window = KeyWindow(contentView: scrollView)
