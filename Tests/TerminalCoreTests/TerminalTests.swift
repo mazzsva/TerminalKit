@@ -1216,11 +1216,6 @@ struct TerminalTests {
         #expect(terminal.receive("\u{1B}[7n\u{1B}[?7n") == "")
     }
 
-    @Test func reportsTheExtendedCursorPosition() {
-        var terminal = Terminal(columns: 10, rows: 5)
-        #expect(terminal.receive("\u{1B}[3;7H\u{1B}[?6n") == "\u{1B}[?3;7R")
-    }
-
     @Test func reportsTheDeviceAttributes() {
         var terminal = Terminal(columns: 1, rows: 1)
         #expect(terminal.receive("\u{1B}[c") == "\u{1B}[?1;2c")

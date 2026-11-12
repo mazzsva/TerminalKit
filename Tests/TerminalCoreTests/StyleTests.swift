@@ -119,12 +119,6 @@ struct StyleTests {
         #expect(style == Terminal.Style(isBold: true))
     }
 
-    @Test func readsOnlyTheUnderlineSubparameters() {
-        #expect(style("4:3;31") == Terminal.Style(foreground: .indexed(1), isUnderlined: true))
-        #expect(style("4;4:0") == Terminal.Style())
-        #expect(style("38:2::255:0:0;1") == Terminal.Style(isBold: true))
-    }
-
     @Test func appliesOnlyTheFirst32Parameters() {
         let parameters = ["31"] + Array(repeating: "1", count: 31) + Array(repeating: "0", count: 8)
         #expect(style(parameters.joined(separator: ";")) == Terminal.Style(foreground: .indexed(1), isBold: true))

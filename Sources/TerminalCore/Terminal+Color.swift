@@ -84,9 +84,6 @@ extension Terminal {
         if specification.hasPrefix("rgb:") {
             return components(of: specification.dropFirst(4), scaledBy: scaledHexComponent)
         }
-        if specification.hasPrefix("rgbi:") {
-            return components(of: specification.dropFirst(5), scaledBy: intensityComponent)
-        }
         return nil
     }
 
@@ -127,11 +124,6 @@ extension Terminal {
         }
         let maximum = UInt32(1) << (4 * bytes.count) - 1
         return UInt16((value * 65_535 + maximum / 2) / maximum)
-    }
-
-    private static func intensityComponent(_ part: Substring) -> UInt16? {
-        let value = NSString(string: String(part)).doubleValue
-        return (0 ... 1).contains(value) ? UInt16((value * 65_535).rounded()) : nil
     }
 
     private static func hexValue(_ digits: ArraySlice<UInt8>) -> UInt32? {

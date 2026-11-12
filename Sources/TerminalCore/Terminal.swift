@@ -275,10 +275,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func perform(_ sequence: EscapeSequenceParser.ControlSequence) {
-        guard
-            sequence.subparameters.isEmpty
-                || sequence.privateMarker == nil && sequence.intermediates.isEmpty && sequence.final == "m"
-        else {
+        guard sequence.subparameters.isEmpty else {
             return
         }
         if sequence.privateMarker == nil, sequence.intermediates == " ", sequence.final == "q" {
@@ -304,16 +301,10 @@ package struct Terminal: Sendable {
             }
             return
         }
-        if sequence.privateMarker == ">",
-            sequence.final == "m" && [nil, 4].contains(sequence.parameters.first)
-                || sequence.final == "n" && sequence.parameters.first == 4
-        {
-            let level = sequence.final == "m" ? sequence.parameter(at: 1, default: 0) : 0
+        if sequence.privateMarker == ">", sequence.final == "m" && [nil, 4].contains(sequence.parameters.first) {
+            let level = sequence.parameter(at: 1, default: 0)
             modifyOtherKeys = level <= 2 ? level : 0
             return
-        }
-        if sequence.privateMarker == "?", sequence.final == "n", sequence.parameters.first == 6 {
-            replies += "\u{1B}[?\(cursor.row + 1);\(cursor.column + 1)R".utf8
         }
         if sequence.privateMarker == "?", sequence.final == "m", sequence.parameters.first == 4 {
             replies += "\u{1B}[>4;\(modifyOtherKeys)m".utf8
@@ -330,11 +321,7 @@ package struct Terminal: Sendable {
         case "C":
             moveCursor(row: cursor.row, column: cursor.column + count)
         case "D":
-            if isWrapPending {
-                moveBackwardFromWrap(count)
-            } else {
-                moveBackward(count)
-            }
+            moveBackward(count)
         case "E":
             moveCursor(row: cursor.row + count, column: 0)
         case "F":
@@ -383,15 +370,7 @@ package struct Terminal: Sendable {
                 usesInsertMode = sequence.final == "h"
             }
         case "m":
-            style.apply(
-                sequence.parameters.indices.map { index in
-                    switch (sequence.parameters[index], sequence.subparameters[index]) {
-                    case (let parameter, nil): parameter
-                    case (4, 0): 24
-                    case (4, _): 4
-                    default: -1
-                    }
-                })
+            style.apply(sequence.parameters)
         case "n":
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
@@ -754,9 +733,7 @@ package struct Terminal: Sendable {
         case (10 ... 12, let text?):
             changeDynamicColors(text, from: number)
         case (112, _):
-            if text?.isEmpty != false {
-                changedColors.cursor = nil
-            }
+            changedColors.cursor = nil
         default:
             break
         }
@@ -779,7 +756,6 @@ package struct Terminal: Sendable {
         terminal.restoredNormalScreenCount = restoredNormalScreenCount
         terminal.decoder = decoder
         terminal.replies = replies
-        terminal.isWrapPending = isWrapPending
         terminal.usesAutowrap = usesAutowrap
         self = terminal
     }
@@ -844,32 +820,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func moveBackward(_ count: Int) {
-        var row = cursor.row
-        var column = cursor.column - count
-        while column < 0, row > 0, screen[row - 1].isWrapped {
-            row -= 1
-            column += columns
-        }
-        if column < 0, row == 0, normalSavedCursor == nil, scrollback.isLastRowWrapped {
-            column += columns
-        }
-        moveCursor(row: row, column: column)
-    }
-
-    private mutating func moveBackwardFromWrap(_ count: Int) {
-        guard cursor.column == columns - 1 else {
-            moveCursor(row: cursor.row, column: 1)
-            return
-        }
-        let rowCount = count / columns
-        var row = cursor.row
-        for _ in 0 ..< min(rowCount, rows) {
-            guard row > 0, screen[row - 1].isWrapped else {
-                break
-            }
-            row -= 1
-        }
-        moveCursor(row: row, column: columns - 1 - max(count - 1 - rowCount * columns, 0))
+        moveCursor(row: cursor.row, column: cursor.column - count)
     }
 
     private mutating func moveBackward(tabStops count: Int) {

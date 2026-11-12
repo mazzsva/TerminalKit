@@ -38,7 +38,6 @@
 {"name": "reset 111 semi", "input": "\\x1B]11;#102030\\x07\\x1B]111;\\x07\\x1B]11;?\\x07", "reply": "\\x1B]11;rgb:213d/2743/33e7\\x07\\x1B[1;1R", "screen": []},
 {"name": "reset 112", "input": "\\x1B]12;#102030\\x07\\x1B]112\\x07\\x1B]12;?\\x07", "reply": "\\x1B]12;rgb:9d2c/9d2c/9d2c\\x07\\x1B[1;1R", "screen": []},
 {"name": "reset 112 semi", "input": "\\x1B]12;#102030\\x07\\x1B]112;\\x07\\x1B]12;?\\x07", "reply": "\\x1B]12;rgb:9d2c/9d2c/9d2c\\x07\\x1B[1;1R", "screen": []},
-{"name": "reset 112 arg", "input": "\\x1B]12;#102030\\x07\\x1B]112;1\\x07\\x1B]12;?\\x07", "reply": "\\x1B]12;rgb:1000/2000/3000\\x07\\x1B[1;1R", "screen": []},
 {"name": "oscnum 010", "input": "\\x1B]010;?\\x07", "reply": "\\x1B]10;rgb:e6ce/e6ce/e6ce\\x07\\x1B[1;1R", "screen": []},
 {"name": "oscnum 0010", "input": "\\x1B]0010;?\\x07", "reply": "\\x1B]10;rgb:e6ce/e6ce/e6ce\\x07\\x1B[1;1R", "screen": []},
 {"name": "oscnum 011", "input": "\\x1B]011;?\\x07", "reply": "\\x1B]11;rgb:213d/2743/33e7\\x07\\x1B[1;1R", "screen": []},

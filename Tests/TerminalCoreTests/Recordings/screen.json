@@ -286,8 +286,6 @@
 {"name": "ris alt", "input": "ab\\x1B[?1049hX\\x1Bc\\x1B[6nY", "reply": "\\x1B[1;1R\\x1B[1;2R", "screen": ["Y"]},
 {"name": "ris alt then enter", "input": "\\x1B[?47hX\\x1Bc\\x1B[?47h\\x1B[6n\\x1B[?47l", "reply": "\\x1B[1;1R\\x1B[1;1R", "screen": []},
 {"name": "decaln alt", "input": "\\x1B[?1049h\\x1B#8\\x1B[?1049l", "reply": "\\x1B[1;1R", "screen": []},
-{"name": "home pending cub 1049", "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\\x1B[?1049h\\x1B[D\\x1B[6nX", "reply": "\\x1B[1;2R\\x1B[1;3R", "screen": [" X"], "history": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "", "", "", "", "", "", "", "", "", "", "", " X"]},
-{"name": "home pending cub 3 1049", "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\\x1B[?1049h\\x1B[3D\\x1B[6nX", "reply": "\\x1B[1;2R\\x1B[1;3R", "screen": [" X"], "history": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "", "", "", "", "", "", "", "", "", "", "", " X"]},
 {"name": "home pending modifier 1049", "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\\x1B[?1049h\\xF0\\x9F\\x8F\\xBD\\x1B[6n", "reply": "\\x1B[2;3R\\x1B[2;3R", "screen": ["🏽"], "history": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "", "", "", "", "", "", "", "", "", "", "", "🏽"]},
 {"name": "home pending rep 1049", "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\\x1B[?1049h\\x1B[2b\\x1B[6n", "reply": "\\x1B[1;3R\\x1B[1;3R", "screen": ["AA"], "history": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "", "", "", "", "", "", "", "", "", "", "", "AA"]},
 {"name": "home pending text 1049", "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\\x1B[?1049hXY\\x1B[6n", "reply": "\\x1B[2;3R\\x1B[2;3R", "screen": ["XY"], "history": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "", "", "", "", "", "", "", "", "", "", "", "XY"]},
