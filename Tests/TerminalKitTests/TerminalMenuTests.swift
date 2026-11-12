@@ -109,7 +109,7 @@ struct TerminalMenuTests {
         session.send("echo re\"\"ady\r")
         await session.waitForText("ready")
         #expect(!session.hasForegroundProcess)
-        session.send("sleep 30\r")
+        session.send("cat\r")
         while !session.hasForegroundProcess {
             try await Task.sleep(for: .milliseconds(10))
         }
@@ -128,7 +128,7 @@ struct TerminalMenuTests {
             configuration: .init(
                 executableURL: zsh,
                 arguments: TerminalSession.Configuration.shellArguments(
-                    running: ["/bin/sh", "-c", "echo running; exec /bin/sleep 30"], shellURL: zsh),
+                    running: ["/bin/sh", "-c", "echo running; exec /bin/cat"], shellURL: zsh),
                 environment: TerminalSession.Configuration.terminalEnvironment(
                     inheriting: ["HOME": "/nonexistent", "HISTFILE": "/dev/null", "PATH": "/usr/bin:/bin"])
             ))
@@ -142,7 +142,7 @@ struct TerminalMenuTests {
     }
 
     @Test func reportsTheProgramAsAForegroundProcess() async throws {
-        let session = TerminalSession(running: "echo running; exec /bin/sleep 30")
+        let session = TerminalSession(running: "echo running; exec /bin/cat")
         #expect(!session.hasForegroundProcess)
         try session.start()
         await session.waitForText("running")
