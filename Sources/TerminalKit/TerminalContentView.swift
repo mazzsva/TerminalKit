@@ -123,6 +123,7 @@ final class TerminalContentView: NSView {
     private var joinNumber = 0
     private static var joinCount = 0
     private(set) var drawCount = 0
+    private var isOccluded = false
 
     private struct Colors {
         let foreground: NSColor
@@ -305,6 +306,9 @@ final class TerminalContentView: NSView {
         }
         NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: window)
         NotificationCenter.default.removeObserver(self, name: NSWindow.didResignKeyNotification, object: window)
+        NotificationCenter.default.removeObserver(
+            self, name: NSWindow.didChangeOcclusionStateNotification, object: window)
+        isOccluded = false
         if let newWindow {
             for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
                 NotificationCenter.default.addObserver(
@@ -313,6 +317,30 @@ final class TerminalContentView: NSView {
                     name: name,
                     object: newWindow
                 )
+            }
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowOcclusionStateDidChange),
+                name: NSWindow.didChangeOcclusionStateNotification,
+                object: newWindow
+            )
+        }
+    }
+
+    @objc private func windowOcclusionStateDidChange() {
+        isOccluded = window?.occlusionState.contains(.visible) == false
+        if !isOccluded {
+            needsDisplay = true
+        }
+    }
+
+    override var needsDisplay: Bool {
+        get {
+            super.needsDisplay
+        }
+        set {
+            if !isOccluded || !newValue {
+                super.needsDisplay = newValue
             }
         }
     }
@@ -503,13 +531,18 @@ final class TerminalContentView: NSView {
         }
     }
 
+    func noteRevision() {
+        guard accessibilityRevision != session.revision else {
+            return
+        }
+        accessibilityRevision = session.revision
+        scheduleAccessibilityNotification()
+        textFinder?.noteClientStringWillChange()
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         drawCount += 1
-        if accessibilityRevision != session.revision {
-            accessibilityRevision = session.revision
-            scheduleAccessibilityNotification()
-            textFinder?.noteClientStringWillChange()
-        }
+        noteRevision()
         let terminal = session.terminal
         let colors = currentColors(for: terminal)
         colors.background.setFill()
