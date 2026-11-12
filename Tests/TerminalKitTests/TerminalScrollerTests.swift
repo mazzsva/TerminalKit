@@ -6,21 +6,42 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct TerminalScrollerTests {
-    @Test func fitsTheSpaceAfterALegacyScrollerHides() {
-        let session = TerminalSession(running: "exit")
+    @Test func keepsTheColumnsOfALegacyScrollerWithoutScrollback() async throws {
+        let session = TerminalSession(running: "seq 1 100")
         let scrollView = TerminalScrollView(session: session)
         scrollView.scrollerStyle = .legacy
         let window = NSWindow(contentView: scrollView)
-        scrollView.layoutSubtreeIfNeeded()
         window.setContentSize(CGSize(width: 300, height: 200))
+        scrollView.layoutSubtreeIfNeeded()
+        let columns = session.terminal.columns
+        try session.start()
+        await session.waitForExit()
         for _ in 0 ..< 3 {
+            scrollView.needsLayout = true
             scrollView.layoutSubtreeIfNeeded()
         }
         let cellWidth = scrollView.terminalView.cellSize.width
+        #expect(session.terminal.columns == columns)
         #expect(
-            session.terminal.columns
-                == Int((scrollView.contentSize.width - 2 * TerminalContentView.padding) / cellWidth))
-        #expect(scrollView.terminalView.frame.width == scrollView.contentSize.width)
+            columns == Int((scrollView.contentSize.width - 2 * TerminalContentView.padding) / cellWidth))
+        #expect(scrollView.contentSize.width < 300)
+    }
+
+    @Test func fillsTheWidthWithAnOverlayScroller() async throws {
+        let session = TerminalSession(running: "seq 1 100")
+        let scrollView = TerminalScrollView(session: session)
+        scrollView.scrollerStyle = .overlay
+        let window = NSWindow(contentView: scrollView)
+        window.setContentSize(CGSize(width: 300, height: 200))
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(scrollView.contentSize.width == 300)
+        try session.start()
+        await session.waitForExit()
+        for _ in 0 ..< 3 {
+            scrollView.needsLayout = true
+            scrollView.layoutSubtreeIfNeeded()
+        }
+        #expect(scrollView.contentSize.width == 300)
     }
 
     @Test func fitsTheSpaceBesideALegacyScroller() async throws {

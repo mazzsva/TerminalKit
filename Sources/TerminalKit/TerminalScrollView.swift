@@ -11,7 +11,7 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
         super.init(frame: .zero)
         documentView = terminalView
         hasVerticalScroller = true
-        autohidesScrollers = true
+        autohidesScrollers = false
         drawsBackground = false
         textFinder.client = terminalView
         textFinder.findBarContainer = self
