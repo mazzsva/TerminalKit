@@ -41,6 +41,9 @@ public final class TerminalSession {
     @ObservationIgnored private(set) var pseudoTerminal: PseudoTerminal?
     @ObservationIgnored private var synchronizedOutputTimer: Task<Void, Never>?
     @ObservationIgnored private var timedSynchronizedOutputCount = 0
+    @ObservationIgnored var outputActivityClock: any Clock<Duration> = ContinuousClock()
+    @ObservationIgnored private(set) var outputActivity: (any NSObjectProtocol)?
+    @ObservationIgnored private var outputActivityTimer: Task<Void, Never>?
 
     var terminal: Terminal {
         liveTerminal.displayed
@@ -202,9 +205,42 @@ public final class TerminalSession {
         if liveTerminal.isSynchronizingOutput {
             liveTerminal.endSynchronizedOutput()
         }
+        endOutputActivity()
     }
 
-    private func receive(_ bytes: [UInt8]) {
+    private func beginOutputActivity() {
+        let activity =
+            outputActivity
+            ?? ProcessInfo.processInfo.beginActivity(
+                options: .userInitiatedAllowingIdleSystemSleep, reason: "Terminal output")
+        outputActivity = activity
+        outputActivityTimer?.cancel()
+        outputActivityTimer = Task { [weak self, outputActivityClock] in
+            try? await outputActivityClock.sleep(for: .seconds(1))
+            guard !Task.isCancelled else {
+                return
+            }
+            guard let self else {
+                ProcessInfo.processInfo.endActivity(activity)
+                return
+            }
+            endOutputActivity()
+        }
+    }
+
+    private func endOutputActivity() {
+        outputActivityTimer?.cancel()
+        outputActivityTimer = nil
+        if let outputActivity {
+            ProcessInfo.processInfo.endActivity(outputActivity)
+        }
+        outputActivity = nil
+    }
+
+    func receive(_ bytes: [UInt8]) {
+        if bytes.count >= PseudoTerminal.Output.capacity {
+            beginOutputActivity()
+        }
         if let view = sizingView, view.reportedColors != liveTerminal.defaultColors {
             liveTerminal.defaultColors = view.reportedColors
         }
