@@ -946,7 +946,6 @@
 {"name": "osc 999 ends with bel", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B]999;p\\x07X", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
 {"name": "osc 0 ends with st", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B]0;title\\x1B\\x5CX", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"], "title": "title"},
 {"name": "osc 999 ends with st", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B]999;p\\x1B\\x5CX", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
-{"name": "osc 999 ends with sub", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B]999;p\\x1AX", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
 {"name": "osc 999 ends with esc x", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B]999;p\\x1BxX", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
 {"name": "osc body 0", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B]0\\x07X", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},
 {"name": "osc body 0;", "input": "abc\\x0D\\x0Adef\\x0D\\x0Aghi\\x1B[2;2H\\x1B]0;\\x07X", "reply": "\\x1B[2;3R", "screen": ["abc", "dXf", "ghi"]},

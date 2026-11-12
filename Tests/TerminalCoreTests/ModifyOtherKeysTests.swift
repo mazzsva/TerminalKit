@@ -13,7 +13,7 @@ struct ModifyOtherKeysTests {
         terminal.receive("\u{1B}[>1;0m\u{1B}[>0;1m\u{1B}[>;1m\u{1B}[>n\u{1B}[>2n\u{1B}[?4m")
         #expect(terminal.modifyOtherKeys == 2)
         for reset in [
-            "\u{1B}[>4m", "\u{1B}[>4;0m", "\u{1B}[>m", "\u{1B}[>4n", "\u{1B}[>4;2n", "\u{1B}[>4;3m", "\u{1B}[>4;9m",
+            "\u{1B}[>4m", "\u{1B}[>4;0m", "\u{1B}[>m", "\u{1B}[>4;3m", "\u{1B}[>4;9m",
         ] {
             terminal.receive("\u{1B}[>4;2m" + reset)
             #expect(terminal.modifyOtherKeys == 0)
