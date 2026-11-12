@@ -57,7 +57,8 @@ struct TerminalInsetTests {
         let insets = scrollView.contentView.contentInsets
         let top = scrollView.contentView.bounds.minY + insets.top
         view.keyDown(with: try keyDown(NSPageUpFunctionKey, modifierFlags: [.command, .function]))
-        #expect(scrollView.contentView.bounds.maxY - insets.bottom == top + view.cellSize.height)
+        let page = CGFloat(visibleRows(in: scrollView) - 1) * view.cellSize.height
+        #expect(scrollView.contentView.bounds.minY + insets.top == top - page)
         view.keyDown(with: try keyDown(NSHomeFunctionKey, modifierFlags: [.command, .function]))
         #expect(view.convert(view.rect(row: 0, columns: 0 ..< 1), to: nil).maxY <= window.contentLayoutRect.maxY)
     }
@@ -130,7 +131,8 @@ struct TerminalInsetTests {
         let view = scrollView.terminalView
         let top = scrollView.contentView.bounds.minY
         view.keyDown(with: try keyDown(NSPageUpFunctionKey, modifierFlags: [.command, .function]))
-        #expect(scrollView.contentView.bounds.maxY - 40 == top + view.cellSize.height)
+        #expect(
+            scrollView.contentView.bounds.minY == top - CGFloat(visibleRows(in: scrollView) - 1) * view.cellSize.height)
         view.keyDown(with: try keyDown(NSEndFunctionKey, modifierFlags: [.command, .function]))
         #expect(scrollView.contentView.bounds.maxY == view.frame.height + 40)
     }
