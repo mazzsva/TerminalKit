@@ -1440,7 +1440,7 @@ struct TerminalTests {
     @Test func keepsNoLinesFromTheAlternateScreen() {
         var terminal = Terminal(columns: 1, rows: 2)
         terminal.receive("\u{1B}[?1049ha\r\nb\r\nc\u{1B}[S")
-        #expect(terminal.scrollback.isEmpty)
+        #expect(scrollback(terminal) == ["", ""])
     }
 
     @Test func keepsTheScreenInTheScrollbackOnEraseInDisplay() {
@@ -1459,7 +1459,7 @@ struct TerminalTests {
     @Test func keepsNothingOnEraseInDisplayOnTheAlternateScreen() {
         var terminal = Terminal(columns: 2, rows: 3)
         terminal.receive("\u{1B}[?1049ha\u{1B}[2J")
-        #expect(terminal.scrollback.isEmpty)
+        #expect(scrollback(terminal) == ["", "", ""])
     }
 
     @Test func keepsTheLinesThatAResizeRemoves() {
@@ -1473,7 +1473,41 @@ struct TerminalTests {
         var terminal = Terminal(columns: 1, rows: 3)
         terminal.receive("a\r\nb\r\nc\u{1B}[?1049h")
         terminal.resize(columns: 1, rows: 1)
+        #expect(scrollback(terminal) == ["a", "b", "c"])
+        terminal.receive("\u{1B}[?1049l")
         #expect(scrollback(terminal) == ["a", "b"])
+        #expect(lines(terminal) == ["c"])
+    }
+
+    @Test func keepsTheNormalScreenInTheScrollbackOnTheAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("1\r\n2\r\na\r\nb\r\n\u{1B}[?1049hx")
+        #expect(scrollback(terminal) == ["1", "2", "a", "b", ""])
+        #expect(lines(terminal) == ["x   ", "    ", "    "])
+        terminal.receive("\u{1B}[?1049l")
+        #expect(scrollback(terminal) == ["1", "2"])
+        #expect(lines(terminal) == ["a   ", "b   ", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 2, column: 0))
+    }
+
+    @Test func keepsTheBlankRowsOfTheNormalScreenOnTheAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("a\r\n\u{1B}[?1049h")
+        #expect(scrollback(terminal) == ["a", "", ""])
+        terminal.receive("\u{1B}[?1049l")
+        #expect(terminal.scrollback.isEmpty)
+        #expect(lines(terminal) == ["a   ", "    ", "    "])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 0))
+    }
+
+    @Test func wrapsTheNormalScreenInTheScrollbackOnTheAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("ab\r\ncdef\u{1B}[?1049h")
+        terminal.resize(columns: 2, rows: 2)
+        #expect(scrollback(terminal) == ["ab", "cd", "ef"])
+        terminal.receive("\u{1B}[?1049l")
+        #expect(scrollback(terminal) == ["ab"])
+        #expect(lines(terminal) == ["cd", "ef"])
     }
 
     @Test func survivesRandomOutputAndResizes() {
@@ -1576,7 +1610,6 @@ struct TerminalTests {
             full.resize(columns: columns, rows: rows, restoredRows: .max)
             #expect(terminal.screen == full.screen)
             #expect(terminal.cursor == full.cursor)
-            #expect(terminal.normalScreenLines == full.normalScreenLines)
             #expect(Array(terminal.scrollback) == Array(full.scrollback))
             if terminal.scrollback.count > 300 {
                 terminal.receive("\u{1B}[3J")

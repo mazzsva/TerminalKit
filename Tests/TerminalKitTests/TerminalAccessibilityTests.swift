@@ -50,8 +50,8 @@ struct TerminalAccessibilityTests {
 
     @Test func endsTheScrollbackLineAtTheAlternateScreen() async throws {
         let view = try await accessibleView(running: "printf 'abcdefghijKLMNOP\\nx\\ny\\033[?1049h\\033[Hvim'")
-        #expect(view.accessibilityValue() as? String == "abcdefghij\nvim\n\n")
-        #expect(view.accessibilityRange(forLine: 0) == NSRange(location: 0, length: 11))
+        #expect(view.accessibilityValue() as? String == "abcdefghijKLMNOP\nx\ny\nvim\n\n")
+        #expect(view.accessibilityRange(forLine: 2) == NSRange(location: 19, length: 2))
     }
 
     @Test func rebuildsTheLastScrollbackRowForTheAlternateScreen() {
@@ -60,7 +60,16 @@ struct TerminalAccessibilityTests {
         let before = TerminalContentView.AccessibilityText(terminal, revision: 0)
         _ = terminal.receive(Array("\u{1B}[?1049h\u{1B}[Hvim".utf8))
         let after = TerminalContentView.AccessibilityText(terminal, revision: 1, reusing: before)
-        #expect(after.string == "abcdefghij0123456789\nvim\n\n")
+        #expect(after.string == "abcdefghij0123456789KLM\nx\ny\nvim\n\n")
+    }
+
+    @Test func rebuildsTheScrollbackRowsAfterTheAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        _ = terminal.receive(Array("a\r\nb\u{1B}[?1049h".utf8))
+        let before = TerminalContentView.AccessibilityText(terminal, revision: 0)
+        _ = terminal.receive(Array("\u{1B}[?1049l\u{1B}[Hc\r\nd\r\ne".utf8))
+        let after = TerminalContentView.AccessibilityText(terminal, revision: 1, reusing: before)
+        #expect(after.string == "c\nd\ne")
     }
 
     @Test func leavesOutThePaddingOfAWideCharacterThatWraps() async throws {

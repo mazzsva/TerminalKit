@@ -276,9 +276,10 @@ struct TerminalSelectionTests {
                 + "while [ $i -lt $((2*c+3)) ]; do printf a; i=$((i+1)); done; "
                 + "i=1; while [ $i -lt $r ]; do printf '\\n'; i=$((i+1)); done; printf '\\033[?1049h\\033[Hbbb'"
         )
+        let alternateRow = view.session.terminal.scrollback.count
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
-        #expect(view.selectedText == String(repeating: "a", count: 2 * view.session.terminal.columns))
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, clickCount: 3))
+        #expect(view.selectedText == String(repeating: "a", count: 2 * view.session.terminal.columns + 3))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: alternateRow, column: 1, in: view, clickCount: 3))
         #expect(view.selectedText == "bbb")
     }
 
@@ -289,9 +290,14 @@ struct TerminalSelectionTests {
                 + "while [ $i -lt $((2*c+3)) ]; do printf a; i=$((i+1)); done; "
                 + "i=1; while [ $i -lt $r ]; do printf '\\n'; i=$((i+1)); done; printf '\\033[?1049h\\033[Hbbb'"
         )
+        let terminal = view.session.terminal
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0, in: view))
-        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 2, column: 3, in: view))
-        #expect(view.selectedText == String(repeating: "a", count: 2 * view.session.terminal.columns) + "\nbbb")
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: terminal.scrollback.count, column: 3, in: view))
+        #expect(
+            view.selectedText
+                == String(repeating: "a", count: 2 * terminal.columns + 3)
+                + String(repeating: "\n", count: terminal.rows)
+                + "bbb")
     }
 
     @Test func copiesAWrappedLineOnTheAlternateScreen() async throws {
@@ -300,8 +306,9 @@ struct TerminalSelectionTests {
                 "c=$(stty size | cut -d' ' -f2); printf '\\033[?1049h\\033[H'; "
                 + "i=0; while [ $i -lt $((c+3)) ]; do printf b; i=$((i+1)); done"
         )
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0, in: view))
-        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 3, in: view))
+        let alternateRow = view.session.terminal.scrollback.count
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: alternateRow, column: 0, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: alternateRow + 1, column: 3, in: view))
         #expect(view.selectedText == String(repeating: "b", count: view.session.terminal.columns + 3))
     }
 

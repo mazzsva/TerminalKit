@@ -56,13 +56,10 @@ package struct Terminal: Sendable {
     package private(set) var usesSGRMouseEncoding = false
     package private(set) var modifyOtherKeys = 0
     package private(set) var synchronizedOutputCount = 0
-
-    package var normalScreenLines: [Line] {
-        normalScreen?.lines ?? []
-    }
+    package private(set) var restoredNormalScreenCount = 0
 
     package var isAlternateScreenActive: Bool {
-        normalScreen != nil
+        normalSavedCursor != nil
     }
 
     package var isSynchronizingOutput: Bool {
@@ -75,6 +72,7 @@ package struct Terminal: Sendable {
         }
         snapshot.scrollback = scrollback
         snapshot.removedScrollbackCount = removedScrollbackCount
+        snapshot.restoredNormalScreenCount = restoredNormalScreenCount
         snapshot.graphemes = graphemes
         return snapshot
     }
@@ -97,7 +95,7 @@ package struct Terminal: Sendable {
     private var hasMovedCursorForFullRow = false
     private var tabStops = TabStops()
     var replies: [UInt8] = []
-    private var normalScreen: (lines: [Line], savedCursor: SavedCursor)?
+    private var normalSavedCursor: SavedCursor?
     private var alternateSavedCursor: SavedCursor?
     private var titleStack: [String] = []
     private var synchronizedSnapshot: [Terminal] = []
@@ -122,19 +120,9 @@ package struct Terminal: Sendable {
         isLastCharacterDropped = false
         isAfterPrint = false
         let rowChange = rows - self.rows
-        if var normalScreen {
-            normalScreen.lines =
-                relaidScreen(
-                    normalScreen.lines,
-                    usedRows: normalScreen.lines.count,
-                    cursor: nil,
-                    columns: columns,
-                    rows: rows,
-                    restoredRows: restoredRows
-                )
-                .screen
-            normalScreen.savedCursor.position.row += rowChange
-            self.normalScreen = normalScreen
+        if normalSavedCursor != nil {
+            removedScrollbackCount += scrollback.relayOut(columns: columns)
+            normalSavedCursor?.position.row += rowChange
             screen = Self.resizedAlternateScreen(screen, columns: columns, rows: rows)
             cursor = Position(row: min(cursor.row, rows - 1), column: min(cursor.column, columns - 1))
         } else {
@@ -672,7 +660,7 @@ package struct Terminal: Sendable {
 
     private mutating func scrollRegionUp(_ count: Int) {
         let region = scrollRegion.clamped(to: 0 ..< rows)
-        if region.lowerBound == 0, normalScreen == nil {
+        if region.lowerBound == 0, normalSavedCursor == nil {
             keepInScrollback(screen.prefix(min(count, region.count)))
         }
         scrollUp(count, in: region)
@@ -707,7 +695,7 @@ package struct Terminal: Sendable {
     private mutating func unwrapLine(before row: Int) {
         if row > 0 {
             screen[row - 1].isWrapped = false
-        } else if normalScreen == nil {
+        } else if normalSavedCursor == nil {
             scrollback.unwrapLastRow()
         }
     }
@@ -752,6 +740,7 @@ package struct Terminal: Sendable {
     }
 
     private mutating func reset() {
+        exitAlternateScreen()
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.bellCount = bellCount
@@ -764,6 +753,7 @@ package struct Terminal: Sendable {
         scrollback = Scrollback(columns: columns)
         terminal.unwrapLine(before: 0)
         terminal.removedScrollbackCount = removedScrollbackCount
+        terminal.restoredNormalScreenCount = restoredNormalScreenCount
         terminal.decoder = decoder
         terminal.replies = replies
         terminal.usesAutowrap = usesAutowrap
@@ -908,23 +898,30 @@ package struct Terminal: Sendable {
     }
 
     private mutating func enterAlternateScreen() {
-        guard normalScreen == nil else {
+        guard normalSavedCursor == nil else {
             return
         }
-        normalScreen = (screen, savedCursor)
+        keepInScrollback(screen[...])
+        normalSavedCursor = savedCursor
         savedCursor = alternateSavedCursor ?? SavedCursor()
     }
 
     private mutating func exitAlternateScreen() {
-        guard let normalScreen else {
+        guard let normalSavedCursor else {
             return
         }
         alternateSavedCursor = savedCursor
+        let lines =
+            Self.reflow(scrollback.removeLast(coveringRows: rows, columns: columns), columns: columns, cursor: nil)
+            .lines
+        let top = max(lines.count - rows, 0)
+        keepInScrollback(lines[..<top])
         screen =
-            normalScreen.lines
-            + Array(repeating: Self.blankLine(columns: columns), count: rows - normalScreen.lines.count)
-        savedCursor = normalScreen.savedCursor
-        self.normalScreen = nil
+            lines[top...].map { Self.padded($0, columns: columns) }
+            + Array(repeating: Self.blankLine(columns: columns), count: rows - lines.count + top)
+        savedCursor = normalSavedCursor
+        self.normalSavedCursor = nil
+        restoredNormalScreenCount += 1
     }
 
     private mutating func reportStatus(_ request: Int) {
@@ -965,13 +962,12 @@ package struct Terminal: Sendable {
             screen.replaceSubrange(0 ..< cursor.row, with: blankLines(cursor.row))
             eraseInLine(1)
         case 2:
-            if normalScreen == nil {
+            if normalSavedCursor == nil {
                 keepInScrollback(screen[...])
             }
             unwrapLine(before: 0)
             screen = blankLines(rows)
         case 3:
-            normalScreen?.lines = Array(repeating: Self.blankLine(columns: columns), count: rows)
             removedScrollbackCount += scrollback.count
             scrollback.removeAll()
         default:
