@@ -69,7 +69,7 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 
 ## Engineering decisions
 
-**A fixed list of programs.** The measure of done is the list of programs above, not parity with Terminal.app. The emulator acts on a control function when a listed program sends it, or when the macOS terminfo entry of `xterm-256color` holds it, and the known limits name each exception. Shift-Return makes a new line in Claude Code with no setup, through xterm's modifyOtherKeys.
+**A fixed list of programs.** The measure of done is the list of programs above, not parity with Terminal.app. The emulator acts on a control function when a listed program sends it, or when the macOS terminfo entry of `xterm-256color` holds it, and the known limits name each exception that Terminal.app does not share, or that a host app must know. Shift-Return makes a new line in Claude Code with no setup, through xterm's modifyOtherKeys.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 7,000 lines of Swift and C on POSIX and AppKit APIs.
 
@@ -87,31 +87,12 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 
 - TerminalKit keeps at most 100,000 saved lines.
 - TerminalKit draws with the 12 pt system monospaced font in a 7 by 15 point cell, not with the font of Terminal.app, so some glyph shapes differ a little.
-- The listed programs send these control sequences, and TerminalKit ignores them on purpose. A query among them gets no answer.
-  - `ESC \`: the end of a DCS, APC, PM, or SOS string. TerminalKit ignores the string.
-  - `CSI 0%m`: an SGR sequence with the intermediate `%`.
-  - `CSI 29m`: TerminalKit has no crossed-out text.
-  - `CSI ?$p`: the query of a mode.
-  - `CSI ?12h` and `CSI ?12l`: the cursor never blinks.
-  - `CSI ?1034h`: the eighth bit for Meta. The host sets Option as Meta with `terminalOptionAsMetaKey(_:)`.
-  - `C0 0F`: SI. TerminalKit has no G1 character set.
-  - `CSI >q`: the query of the terminal version.
-  - `CSI ?u`: the query of the kitty keyboard flags.
-  - `CSI ?1016l`: mode 1016, mouse positions in pixels.
-  - `CSI ?2031h` and `CSI ?2031l`: mode 2031. Programs get no report when the appearance changes between light and dark.
-  - `OSC 7501`.
-- TerminalKit also ignores these, which no listed program sends:
-  - SGR 5 (blink), and each sequence with colon parameters, such as `CSI 38:2::255:0:0m` and `CSI 4:3m`.
-  - CAN and SUB. They do not cancel a sequence.
-  - `CSI ?6n` and `CSI >4n`.
-  - Colors in the `rgbi:` form.
+- Terminal.app acts on these, and TerminalKit ignores them, because no listed program needs them:
+  - SGR 5 (blink). The text does not blink.
+  - The G1 to G3 character sets with SO, SI (`C0 0F`), LS2, and LS3, and the national character sets. Line drawing works in G0, with `ESC ( 0`.
+  - The color queries OSC 4, OSC 5, and OSC 13 to 19, OSC 10 and OSC 11 that set a color, and OSC 104, 110, and 111 that reset a color.
+  - The window reports `CSI 11t`, `CSI 13t`, `CSI 14t`, and `CSI 18t`, and DECREQTPARM (`CSI x`).
+  - DECOM, DECALN, mode 47, and LNM.
+- Terminal.app does not have these either, but a host app for agent tools must know them:
   - OSC 8 marked links. A Command-click opens printed links only.
   - OSC 9 and OSC 777, the notification requests of programs. A host gets no notification event from a program. The bell is the only signal, through `bellCount`.
-  - OSC 4 queries, OSC 5, OSC 10 and 11 that set a color, OSC 13 to 19, and OSC 104, 105, 110, 111, and 117.
-  - The window reports `CSI 11t`, `CSI 13t`, `CSI 14t`, and `CSI 18t`, and DECREQTPARM.
-  - SO, LS2, LS3, the G1 to G3 character sets, and the national character sets.
-  - Mouse modes 1005 and 1015, DECOM, DECALN, mode 47, and LNM.
-  - `CSI ?1034l`: the end of the eighth bit for Meta.
-  - `CSI i`, `CSI 4i`, and `CSI 5i`: media copy. TerminalKit has no printer.
-  - `ESC l` and `ESC m`: memory lock and unlock.
-  - Modes 3 (132 columns) and 4 (smooth scroll). TerminalKit never has them, and the terminfo reset strings only reset them.
