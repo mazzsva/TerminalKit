@@ -33,8 +33,8 @@ struct TerminalSynchronizedOutputTests {
         let session = TerminalSession(
             running: """
                 stty raw -echo; exec /usr/bin/perl -e '$| = 1; my $n = 0; do { my $c = chr(97 + $n++); \
-                my $f = "\\e[?2026h\\e[H" . join("\\r\\n", ($c x 200) x 60) . "\\e[?2026l"; my $s = int(length($f) / 4) + 1; \
-                for my $i (0 .. 3) { syswrite(STDOUT, substr($f, $i * $s, $s)); select(undef, undef, undef, 0.02) } \
+                my $f = "\\e[?2026h\\e[H" . join("\\r\\n", ($c x 200) x 60) . "\\e[?2026l"; my $s = int(length($f) / 2); \
+                syswrite(STDOUT, substr($f, 0, $s)); sysread(STDIN, my $k, 1); syswrite(STDOUT, substr($f, $s)) \
                 } while (sysread(STDIN, my $k, 1))'
                 """
         )
@@ -52,6 +52,11 @@ struct TerminalSynchronizedOutputTests {
         try session.start()
         let characters = (0 ... 10).map { String(UnicodeScalar(UInt8(97 + $0))) }
         for character in characters {
+            for await isSynchronizing in Observations({ session.liveTerminal.isSynchronizingOutput })
+            where isSynchronizing {
+                break
+            }
+            session.send("x")
             let line = String(repeating: character, count: 200)
             for await lines in Observations({ session.lines }) where lines.allSatisfy({ $0 == line }) {
                 break
