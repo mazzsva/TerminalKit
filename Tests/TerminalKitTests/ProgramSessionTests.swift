@@ -319,16 +319,28 @@ struct ProgramSessionTests {
     }
 
     @Test func claudeCodeRecordingHasNoPrivateData() throws {
-        let text = try String(contentsOf: recordingURL(), encoding: .utf8)
-        for word in ["/Users/", "sk-ant", NSHomeDirectory(), NSUserName(), NSFullUserName()] where !word.isEmpty {
-            #expect(!text.contains(word))
+        let events = try JSONDecoder().decode([ProgramSession.Event].self, from: Data(contentsOf: recordingURL()))
+        let found = privateData(in: events)
+        #expect(found.isEmpty, "Private data: \(found)")
+    }
+
+    private func privateData(in events: [ProgramSession.Event]) -> [String] {
+        let output = String(decoding: unescaped(events.compactMap { $0.output?.joined() }.joined()), as: UTF8.self)
+        let raw = ([output] + events.compactMap { $0.screen?.joined(separator: "\n") }).joined(separator: "\n")
+        let text = raw + "\n" + raw.replacing(/\u{1B}(?:\[[0-?]*[ -\/]*[@-~]|[ -\/]*[0-~])/, with: " ")
+        let words = NSFullUserName().split { !$0.isLetter }.map(String.init).filter { $0.count >= 3 }
+        let names = [NSHomeDirectory(), NSUserName(), NSFullUserName()] + words
+        var found = names.filter { !$0.isEmpty && text.contains($0) }.map { _ in "user name" }
+        let checks: [(String, Regex<Substring>)] = [
+            ("plan", /\b(?:Max|Pro|Team|Enterprise)\b/), ("usage", /resets|% of/), ("amount", /[$€£¥]\d/),
+            ("organization", /[Oo]rganization/), ("email", /[\w.%+-]+@[\w-]+\.[\w.-]+/),
+            ("key", /sk-ant|Tip:|\/Users\//),
+        ]
+        found += checks.filter { text.contains($0.1) }.map(\.0)
+        if text.matches(of: /[A-Za-z0-9_-]{32,}/).contains(where: { $0.output != uuidPlaceholder }) {
+            found.append("token")
         }
-        #expect(text.firstMatch(of: /[\w.%+-]+@[\w-]+\.[\w.-]+/) == nil)
-        let uuids = text.matches(of: /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/)
-        #expect(uuids.allSatisfy { $0.output == uuidPlaceholder })
-        #expect(text.firstMatch(of: /[A-Za-z0-9_]{32,}/) == nil)
-        #expect(text.firstMatch(of: planName) == nil)
-        #expect(!text.contains("% of your") && !text.contains("Tip:"))
+        return found
     }
 
     private func record(_ session: ProgramSession) async throws {
@@ -370,6 +382,7 @@ struct ProgramSessionTests {
             }
         }
         try #require(unescaped(events.compactMap { $0.output?.joined() }.joined()) == Array(bytes[..<start]))
+        try #require(privateData(in: events).isEmpty)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try encoder.encode(events)
@@ -457,7 +470,8 @@ extension ProgramSession {
 
 private let uuidPlaceholder = "00000000-0000-0000-0000-000000000000"
 
-private nonisolated(unsafe) let planName = /Claude(?: |\u{1B}\[\d+G)(Max|Pro|Team|Enterprise)/
+private nonisolated(unsafe) let planName =
+    /Claude(?: |\u{1B}(?:\[[0-?]*[ -\/]*[@-~]|[ -\/]*[0-~]))+(Max|Pro|Team|Enterprise)/
 
 private func isInstalled(_ path: String) -> Bool {
     FileManager.default.isExecutableFile(atPath: path)
