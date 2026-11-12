@@ -92,7 +92,10 @@ final class WindowSession {
         let cgEvent = try #require(scrollWheelEvent(lines: lines).cgEvent)
         let screenHeight = NSScreen.screens.first?.frame.height ?? 0
         cgEvent.location = CGPoint(x: window.frame.midX, y: screenHeight - window.frame.midY)
-        for field in [91, 92].compactMap(CGEventField.init) {
+        let fields: [CGEventField] = [
+            .mouseEventWindowUnderMousePointer, .mouseEventWindowUnderMousePointerThatCanHandleThisEvent,
+        ]
+        for field in fields {
             cgEvent.setIntegerValueField(field, value: Int64(window.windowNumber))
         }
         let event = try #require(NSEvent(cgEvent: cgEvent))

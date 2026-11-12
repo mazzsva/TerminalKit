@@ -216,6 +216,7 @@ struct ProgramSessionTests {
         let folder = URL(filePath: path)
         try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
         var configuration = TerminalSession.Configuration(
             executableURL: try #require(claudeURL),
             arguments: [

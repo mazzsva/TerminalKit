@@ -15,7 +15,7 @@ fi
 
 listed=(${${(f)"$(<$list)"}:# *})
 claude=(${(f)"$(awk '/^ +only the real Claude Code session uses it$/ { print name } /^[^ ]/ { name = $0 }' $list)"})
-if [[ $output == *'Test claudeCode() passed'* ]]; then
+if [[ $output == *'Test claudeCode() passed'* && $output == *'Test claudeCodeInWindow() passed'* ]]; then
     print 'The real Claude Code session ran'
     expected=(${listed:|claude})
 else
