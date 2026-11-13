@@ -457,7 +457,7 @@ struct TerminalSelectionTests {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
         defer { pasteboard.releaseGlobally() }
         view.copySelection(to: pasteboard)
-        #expect(pasteboard.string(forType: .string) == "world\nsecond")
+        #expect(pasteboard.string(forType: .string) == "world   \nsecond")
     }
 
     @Test func copiesAWrappedLineAsOneLine() async throws {
@@ -482,10 +482,10 @@ struct TerminalSelectionTests {
         #expect(view.selectedText == String(repeating: "a", count: columns - 1) + "中")
     }
 
-    @Test func copiesWithoutTheSpacesAtTheEndOfALine() async throws {
-        let view = try await view(running: "printf 'hello world   '")
-        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 40))
-        #expect(view.selectedText == "hello world")
+    @Test func copiesThePrintedSpacesAtTheEndOfALine() async throws {
+        let view = try await view(running: "printf 'hello   \\nab\\033[5X\\nxyz\\033[2D\\033[K\\n'")
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 3, column: 0))
+        #expect(view.selectedText == "hello   \nab     \nx\n")
     }
 
     @Test func copiesWideCharactersOnce() async throws {
