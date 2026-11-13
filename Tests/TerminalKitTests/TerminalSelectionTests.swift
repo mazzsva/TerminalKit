@@ -253,7 +253,7 @@ struct TerminalSelectionTests {
                 + "printf 'before\\n'; i=0; while [ $i -lt 70 ]; do printf %s \"$s\"; i=$((i+1)); done; printf 'yz\\nafter'"
         )
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, clickCount: clickCount))
-        #expect(view.selectedText == String(repeating: "x", count: view.session.terminal.columns * 70) + "yz")
+        #expect(view.selectedText == String(repeating: "x", count: view.session.terminal.columns * 70) + "yz\n")
     }
 
     @Test func selectsNoLineBelowTheLastLineWithATripleClick() async throws {
@@ -266,7 +266,7 @@ struct TerminalSelectionTests {
             view.selection
                 == Selection(anchor: .init(line: line, column: 0), head: .init(line: line, column: terminal.columns))
         )
-        #expect(view.selectedText == "12000")
+        #expect(view.selectedText == "12000\n")
     }
 
     @Test func selectsALineOnlyInItsScreenWithATripleClick() async throws {
@@ -278,9 +278,9 @@ struct TerminalSelectionTests {
         )
         let alternateRow = view.session.terminal.scrollback.count
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
-        #expect(view.selectedText == String(repeating: "a", count: 2 * view.session.terminal.columns + 3))
+        #expect(view.selectedText == String(repeating: "a", count: 2 * view.session.terminal.columns + 3) + "\n")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: alternateRow, column: 1, in: view, clickCount: 3))
-        #expect(view.selectedText == "bbb")
+        #expect(view.selectedText == "bbb\n")
     }
 
     @Test func copiesTheScrollbackAndTheAlternateScreenAsSeparateLines() async throws {
@@ -317,7 +317,7 @@ struct TerminalSelectionTests {
         let columns = view.session.terminal.columns
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 2, in: view, clickCount: 3))
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 3, column: 1, in: view))
-        #expect(view.selectedText == "three\nfour")
+        #expect(view.selectedText == "three\nfour\n")
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 2, in: view))
         #expect(view.selection == Selection(anchor: .init(line: 2, column: columns), head: .init(line: 1, column: 0)))
     }
@@ -346,7 +346,7 @@ struct TerminalSelectionTests {
         let view = try await view(running: "printf 'one\\ntwo\\nthree four'")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, modifierFlags: .shift))
-        #expect(view.selectedText == "one\ntwo\nthree four")
+        #expect(view.selectedText == "one\ntwo\nthree four\n")
     }
 
     @Test func extendsByCharactersWithAShiftClickAfterSelectAll() async throws {
@@ -354,7 +354,7 @@ struct TerminalSelectionTests {
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
         view.selectAll(nil)
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 4, in: view, modifierFlags: .shift))
-        #expect(view.selectedText == "two three" + String(repeating: "\n", count: view.session.terminal.rows - 1))
+        #expect(view.selectedText == "two three" + String(repeating: "\n", count: view.session.terminal.rows))
     }
 
     @Test func copiesATabAsOneCharacter() async throws {
@@ -409,11 +409,11 @@ struct TerminalSelectionTests {
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 1, in: view, clickCount: 3))
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 1, in: view, modifierFlags: .shift))
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 1, in: view, modifierFlags: .shift))
-        #expect(view.selectedText == "one\ntwo\nthree")
+        #expect(view.selectedText == "one\ntwo\nthree\n")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 1, in: view, clickCount: 3))
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .shift))
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 2, column: 1, in: view, modifierFlags: .shift))
-        #expect(view.selectedText == "one\ntwo\nthree")
+        #expect(view.selectedText == "one\ntwo\nthree\n")
     }
 
     @Test func drawsTheSelection() throws {
@@ -517,6 +517,22 @@ struct TerminalSelectionTests {
         let view = try await view(running: "seq 1 100")
         view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: 2, column: 0))
         #expect(view.selectedText == "1\n2\n")
+    }
+
+    @Test(arguments: [(0, 3, "abc"), (0, 5, "abc\n"), (1, 0, "abc\n"), (2, 0, "abc\ndef\n")])
+    func copiesTheLineBreakWhenTheSelectionCoversTheEndOfTheRow(line: Int, column: Int, text: String) async throws {
+        let view = try await view(running: "printf 'abc\\ndef\\n'")
+        view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: line, column: column))
+        #expect(view.selectedText == text)
+    }
+
+    @Test func copiesTheAccessibilityValueAfterSelectAll() async throws {
+        let view = try await view(running: "seq 1 100; printf last")
+        view.selectAll(nil)
+        #expect(view.selectedText == view.accessibilityValue() as? String)
+        #expect(
+            view.accessibilitySelectedTextRange()
+                == NSRange(location: 0, length: view.accessibilityNumberOfCharacters()))
     }
 
     @Test func copiesNothingWithoutADrag() async throws {

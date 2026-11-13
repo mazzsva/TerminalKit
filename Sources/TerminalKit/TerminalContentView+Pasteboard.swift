@@ -10,9 +10,10 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
         let graphemes = terminal.graphemes
         let rows = selectedRows(of: selection, in: terminal)
         let lastRow = rows.upperBound - 1
+        let last = max(selection.anchor, selection.head)
         let pieces =
             rows
-            .compactMap { row -> (text: String, continues: Bool)? in
+            .compactMap { row -> (text: String, breaks: Bool)? in
                 let line = line(at: row, in: terminal)
                 guard let columns = selection.columns(inLine: terminal.removedScrollbackCount + row, count: line.count)
                 else {
@@ -22,16 +23,16 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
                 let end =
                     continues
                     ? columns.upperBound
-                    : line[columns].lastIndex(where: \.isWritten).map { $0 + 1 } ?? columns.lowerBound
+                    : line[columns].lastIndex(where: \.isWritten).map { $0 + line.columnCount(at: $0) }
+                        ?? columns.lowerBound
                 let cells = line[columns.lowerBound ..< end].filter(\.isText)
-                return (cells.map(graphemes.character(of:)).joined(), continues)
+                let breaks = !continues && (terminal.removedScrollbackCount + row < last.line || last.column > end)
+                return (cells.map(graphemes.character(of:)).joined(), breaks)
             }
         guard !pieces.isEmpty else {
             return nil
         }
-        return pieces.enumerated()
-            .map { index, piece in piece.continues || index == pieces.count - 1 ? piece.text : piece.text + "\n" }
-            .joined()
+        return pieces.map { $0.breaks ? $0.text + "\n" : $0.text }.joined()
     }
 
     var hasSelectedText: Bool {
@@ -154,8 +155,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
         selection = Selection(
             anchor: Selection.Point(line: terminal.removedScrollbackCount, column: 0),
             head: Selection.Point(
-                line: terminal.removedScrollbackCount + terminal.scrollback.count + terminal.rows - 1,
-                column: terminal.columns)
+                line: terminal.removedScrollbackCount + terminal.scrollback.count + terminal.rows, column: 0)
         )
     }
 

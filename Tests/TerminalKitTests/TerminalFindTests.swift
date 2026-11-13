@@ -162,7 +162,7 @@ struct TerminalFindTests {
             view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: rows + 2, column: 20, in: view))
             view.mouseUp(with: try mouseEvent(.leftMouseUp, row: rows + 2, column: 20, in: view))
         }
-        let blankRows = selectsAll ? String(repeating: "\n", count: rows - 3) : ""
+        let blankRows = selectsAll ? String(repeating: "\n", count: rows - 2) : ""
         #expect(view.selectedText?.hasSuffix("alt one\nalt two\nhttp://example.com/b" + blankRows) == true)
         let stale = view.selection
 
@@ -173,7 +173,7 @@ struct TerminalFindTests {
         defer { pasteboard.releaseGlobally() }
         pasteboard.clearContents()
         view.copySelection(to: pasteboard)
-        let kept = normal + String(repeating: "\n", count: rows - 1)
+        let kept = normal + String(repeating: "\n", count: rows)
         let length = (view.string as NSString).length
         #expect(pasteboard.string(forType: .string) == (selectsAll ? kept : nil))
         #expect(view.accessibilitySelectedText() == (selectsAll ? kept : ""))
