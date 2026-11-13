@@ -78,9 +78,14 @@ struct TerminalAccessibilityTests {
     }
 
     @Test func keepsTheSpacesBeforeTheCursor() async throws {
-        let view = try await accessibleView(running: "printf '$ \\r\\n'; printf '$ '")
+        let view = try await accessibleView(running: "printf '$\\033[C\\r\\n'; printf '$\\033[C'")
         #expect(view.accessibilityValue() as? String == "$\n$ \n")
         #expect(view.accessibilitySelectedTextRange() == NSRange(location: 4, length: 0))
+    }
+
+    @Test func keepsThePrintedSpacesAtTheEndOfARow() async throws {
+        let view = try await accessibleView(running: "printf 'ab  \\r\\ncd  \\033[2D\\033[K'")
+        #expect(view.accessibilityValue() as? String == "ab  \ncd\n")
     }
 
     @Test func countsWideCharactersAndEmojiByTheirText() async throws {
