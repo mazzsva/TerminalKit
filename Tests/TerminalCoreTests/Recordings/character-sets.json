@@ -1,5 +1,0 @@
-[
-{"name": "decgfx", "input": "\\x1B(0_`abcdefghijklmnopqrstuvwxyz{|}~\\x1B(B\\x1B[6n\\x1B[6n", "reply": "\\x1B[1;33R\\x1B[1;33R\\x1B[1;33R", "screen": ["_◆▒␉␌␍␊°±␤␋┘┐┌└┼⎺⎻─⎼⎽├┤┴┬│≤≥π≠£·"]},
-{"name": "charset g0 0", "input": "\\x1B(0 !#$_`aqx~é\\x1B(B", "reply": "\\x1B[1;12R", "screen": [" !#$_◆▒─│·é"]},
-{"name": "nrcs ( 0", "input": "\\x1B(0!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\x5C]^_`abcdefghijklmnopqrstuvwxyz{|}~\\x1B(B", "reply": "\\x1B[3;15R", "screen": ["!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_◆▒␉␌␍␊°±␤␋┘┐┌└┼⎺⎻─⎼⎽├┤┴┬│≤≥π≠£·"]}
-]
