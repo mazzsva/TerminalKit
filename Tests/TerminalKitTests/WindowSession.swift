@@ -37,7 +37,9 @@ final class WindowSession {
     func send(_ text: String) {
         let codes: [Character: UInt16] = ["\r": 36, "\u{1B}": 53, "\u{7F}": 51, "\u{3}": 8]
         for character in text {
-            key(String(character), code: codes[character] ?? 0, flags: character == "\u{3}" ? .control : [])
+            key(
+                String(character), ignoringModifiers: character == "\u{3}" ? "c" : String(character),
+                code: codes[character] ?? 0, flags: character == "\u{3}" ? .control : [])
         }
     }
 
@@ -50,12 +52,14 @@ final class WindowSession {
         key("\r", code: 36, flags: .shift)
     }
 
-    private func key(_ characters: String, code: UInt16, flags: NSEvent.ModifierFlags) {
+    private func key(
+        _ characters: String, ignoringModifiers: String? = nil, code: UInt16, flags: NSEvent.ModifierFlags
+    ) {
         for type in [NSEvent.EventType.keyDown, .keyUp] {
             NSEvent.keyEvent(
                 with: type, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                 windowNumber: window.windowNumber, context: nil, characters: characters,
-                charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code
+                charactersIgnoringModifiers: ignoringModifiers ?? characters, isARepeat: false, keyCode: code
             )
             .map(window.sendEvent)
         }
