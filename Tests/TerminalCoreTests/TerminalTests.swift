@@ -1412,7 +1412,8 @@ struct TerminalTests {
             return Terminal.DefaultColors(foreground: color, background: color, cursor: color).isDark
         }
         #expect(isDark(0, 0, 0))
-        #expect(isDark(0x8000, 0x8000, 0x8000))
+        #expect(!isDark(0x8000, 0x8000, 0x8000))
+        #expect(isDark(0x6060, 0x6060, 0x6060))
         #expect(!isDark(0xFFFF, 0xFFFF, 0xFFFF))
         #expect(!isDark(0, 0xFFFF, 0))
         #expect(isDark(0, 0, 0xFFFF))

@@ -18,7 +18,7 @@ extension Terminal {
                 return level <= 0.04045 ? level / 12.92 : pow((level + 0.055) / 1.055, 2.4)
             }
             return 0.2126 * linear(background.red) + 0.7152 * linear(background.green)
-                + 0.0722 * linear(background.blue) < 0.5
+                + 0.0722 * linear(background.blue) < 0.179
         }
     }
 
