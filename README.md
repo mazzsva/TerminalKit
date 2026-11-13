@@ -59,11 +59,13 @@ In bracketed paste mode, `paste(_:)` sends nothing when the text contains the en
 
 Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
 
-To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, and `state` of `TerminalSession`. A login shell runs under `/usr/bin/login`, so its `state` at the end is an exit with status 0, also when the shell ends with another status or by a signal. A configuration with an executable of its own gives the real status.
+To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, `programStatus`, and `state` of `TerminalSession`. A login shell runs under `/usr/bin/login`, so its `state` at the end is an exit with status 0, also when the shell ends with another status or by a signal. A configuration with an executable of its own gives the real status.
 
 Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the session as Terminal.app, so the command changes the user's Terminal.app profile, not the host. Shift-Return makes a new line with no setup. Claude Code names that command when an Option shortcut does nothing. For those shortcuts, turn on `terminalOptionAsMetaKey(_:)`.
 
-With its default setting, Claude Code rings the bell only when the Terminal.app profile of the user has the audible bell off. To get the bell for a permission request and for a finished task in each case, start it with `claude --settings '{"preferredNotifChannel":"terminal_bell"}'`. The bell comes some seconds after the request, and one minute after the end of the task.
+With its default setting, Claude Code rings the bell only when the Terminal.app profile of the user has the audible bell off. To read that profile, it sends an Apple event to Terminal.app in the name of the host app, so macOS can ask the user to let the host control Terminal. To get the bell for a permission request and for a finished task in each case, start it with `claude --settings '{"preferredNotifChannel":"terminal_bell"}'`. The bell comes some seconds after the request, and one minute after the end of the task.
+
+`programStatus` gives the status that a program reports: idle, working, blocked, or done. Claude Code 2.1.295 or later reports it with no setup. When it waits for a permission, the state is blocked, the kind is `permission`, and the message names the request, such as the file to write. Then Claude Code puts no status glyph in front of the title. The status is nil when the program clears it or when the session ends. A program that is killed with `SIGKILL` cannot clear it, so its last status and its title stay until another program reports.
 
 For voice input in a program such as Claude Code, a host app with the hardened runtime needs the audio input entitlement and a microphone usage description, as the example app has.
 
@@ -104,4 +106,4 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
   - DECOM, DECALN, mode 47, and LNM.
 - Terminal.app does not have these either, but a host app for agent tools must know them:
   - OSC 8 marked links. A Command-click opens printed links only.
-  - OSC 9 and OSC 777, the notification requests of programs. A host gets no notification event from a program. The bell is the only signal, through `bellCount`.
+  - OSC 9 and OSC 777, the notification requests of programs. A host gets no notification event from a program. The signals are the bell, through `bellCount`, and the status that a program reports, through `programStatus`.
