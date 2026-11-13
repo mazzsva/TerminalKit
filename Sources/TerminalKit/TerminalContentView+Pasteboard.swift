@@ -26,7 +26,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
                     : line[columns].lastIndex(where: \.isWritten).map { $0 + line.columnCount(at: $0) }
                         ?? columns.lowerBound
                 let cells = line[columns.lowerBound ..< end].filter(\.isText)
-                let breaks = !continues && (terminal.removedScrollbackCount + row < last.line || last.column > end)
+                let breaks = !line.isWrapped && (terminal.removedScrollbackCount + row < last.line || last.column > end)
                 return (cells.map(graphemes.character(of:)).joined(), breaks)
             }
         guard !pieces.isEmpty else {
