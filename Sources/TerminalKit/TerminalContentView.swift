@@ -435,9 +435,7 @@ final class TerminalContentView: NSView {
         }
         let sendsBytes = if case .bytes = input { true } else { false }
         guard !modifiers.contains(.command) || sendsBytes else {
-            if markedText.isEmpty, !session.liveTerminal.isAlternateScreenActive, modifiers == .command,
-                event.charactersIgnoringModifiers == "k"
-            {
+            if markedText.isEmpty, modifiers == .command, event.charactersIgnoringModifiers == "k" {
                 session.clearToStart()
             } else {
                 super.keyDown(with: event)
