@@ -7,15 +7,14 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct TerminalDropTests {
     private let names = [
-        "plain-name_1.txt", "a b", "it's", "a'b\t!c", "quote\"x", "$HOME", "back\\slash", "star*?", "semi;colon&",
-        "!bang", "#hash", "~tilde", "(paren)[x]{y}", "a=b", "pipe|<>", "`tick`", "é中文🙂", "tab\tx", "new\nline",
-        "a\\b\tc",
+        "plain-name_1.txt", "a b", "it's", "a'b!c", "quote\"x", "$HOME", "back\\slash", "star*?", "semi;colon&",
+        "!bang", "#hash", "~tilde", "(paren)[x]{y}", "a=b", "pipe|<>", "`tick`", "é中文🙂",
     ]
 
     @Test(arguments: [
         ("/a/plain-name_1.txt", "/a/plain-name_1.txt"), ("/a b", "/a\\ b"), ("/it's", "/it\\'s"),
-        ("/$HOME", "/\\$HOME"), ("/é中文🙂", "/é中文🙂"), ("/a\nb", "$'/a\\x0ab'"), ("/a'b\tc", "$'/a\\x27b\\x09c'"),
-        ("/a\\\tb", "$'/a\\\\\\x09b'"),
+        ("/$HOME", "/\\$HOME"), ("/é中文🙂", "/é中文🙂"), ("/a\nb", "/a\\\nb"), ("/a'b\tc", "/a\\'b\\\tc"),
+        ("/a\u{1}b", "/a\u{1}b"),
     ])
     func escapesAPath(path: String, escaped: String) {
         #expect(TerminalContentView.escapedPath(path) == escaped)

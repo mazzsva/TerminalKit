@@ -24,27 +24,15 @@ extension TerminalContentView {
     }
 
     static func escapedPath(_ path: String) -> String {
-        let scalars = path.unicodeScalars
-        guard scalars.contains(where: { $0.properties.generalCategory == .control }) else {
-            return String(
-                String.UnicodeScalarView(
-                    scalars.flatMap { scalar -> [Unicode.Scalar] in
-                        !scalar.isASCII || scalar.properties.isAlphabetic || scalar.properties.numericType != nil
-                            || "/._-+,@%:".unicodeScalars.contains(scalar) ? [scalar] : ["\\", scalar]
-                    }
-                )
+        String(
+            String.UnicodeScalarView(
+                path.unicodeScalars.flatMap { scalar -> [Unicode.Scalar] in
+                    !scalar.isASCII || scalar.properties.isAlphabetic || scalar.properties.numericType != nil
+                        || "/._-+,@%:".unicodeScalars.contains(scalar)
+                        || scalar.properties.generalCategory == .control && !scalar.properties.isWhitespace
+                        ? [scalar] : ["\\", scalar]
+                }
             )
-        }
-        let quoted = scalars.map { scalar in
-            switch scalar {
-            case "\\":
-                "\\\\"
-            case _ where scalar == "'" || scalar.properties.generalCategory == .control:
-                String(scalar).utf8.map { String(format: "\\x%02x", $0) }.joined()
-            default:
-                String(scalar)
-            }
-        }
-        return "$'" + quoted.joined() + "'"
+        )
     }
 }
