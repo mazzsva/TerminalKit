@@ -14,12 +14,12 @@ struct ProgramSessionTests {
         "CSI 38;2m", "CSI 39m", "CSI 48;2m", "CSI 49m", "CSI 94m", "CSI ?1h", "CSI ?1l", "CSI ?7h", "CSI ?25h",
         "CSI ?25l", "CSI ?1000l", "CSI ?1002l", "CSI ?1003l", "CSI ?1004h", "CSI ?1004l", "CSI ?1006l", "CSI ?1049h",
         "CSI ?1049l", "CSI ?2004h", "CSI ?2004l", "CSI ?2026h", "CSI ?2026l", "OSC 0", "OSC 2", "OSC 7", "OSC 10;?",
-        "OSC 11;?", "CSI 22;1t", "CSI 22;2t", "CSI 23;1t", "CSI 23;2t", "CSI ?4m",
+        "OSC 11;?", "OSC 7501", "CSI 22;1t", "CSI 22;2t", "CSI 23;1t", "CSI 23;2t", "CSI ?4m",
     ]
 
     static let ignored: Set<String> = [
         "ESC \\", "CSI 0%m", "CSI 29m", "CSI ?$p", "CSI ?12h", "CSI ?12l",
-        "CSI ?1034h", "C0 0F", "CSI >q", "CSI ?u", "CSI ?1016l", "CSI ?2031h", "CSI ?2031l", "OSC 7501",
+        "CSI ?1034h", "C0 0F", "CSI >q", "CSI ?u", "CSI ?1016l", "CSI ?2031h", "CSI ?2031l",
     ]
 
     static let ignoredThatTerminalActsOn: Set<String> = ["C0 0F"]
@@ -198,7 +198,7 @@ struct ProgramSessionTests {
     @Test(.enabled(if: isClaudeSessionRequested))
     func claudeCode() async throws {
         let session = try await run { session in
-            try await runClaudeCode(session, in: "/tmp/TerminalKitClaudeSession")
+            try await runClaudeCode(session, in: "/tmp/TerminalKitClaudeSession", checksStatus: true)
             try #require(await session.controlFunctions.isSuperset(of: ["CSI ?2026h", "CSI ?2026l"]))
         }
         if ProcessInfo.processInfo.environment["TERMINALKIT_CLAUDE_SESSION"] == "record" {
@@ -211,10 +211,10 @@ struct ProgramSessionTests {
     func claudeCodeInWindow() async throws {
         let session = WindowSession()
         defer { session.close() }
-        try await runClaudeCode(session, in: "/tmp/TerminalKitClaudeWindowSession")
+        try await runClaudeCode(session, in: "/tmp/TerminalKitClaudeWindowSession", checksStatus: false)
     }
 
-    private func runClaudeCode(_ session: some ClaudeSession, in path: String) async throws {
+    private func runClaudeCode(_ session: some ClaudeSession, in path: String, checksStatus: Bool) async throws {
         let folder = URL(filePath: path)
         try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -244,6 +244,7 @@ struct ProgramSessionTests {
         try await session.submit("Reply with the single word pineapple and nothing else.")
         try await session.wait(timeout: .seconds(60)) {
             $0.isReady && $0.lines.contains { $0.lowercased() == "⏺ pineapple" }
+                && (!checksStatus || $0.programStatus?.state == .done)
         }
 
         try await session.submit("Run in Bash: echo tk-$((6*7))")
@@ -256,10 +257,12 @@ struct ProgramSessionTests {
         try await session.wait(timeout: .seconds(60)) {
             $0.lines.contains { $0.contains("Do you want to create note.txt?") }
                 && $0.lines.contains { $0.trimmingCharacters(in: .whitespaces) == "❯ 1. Yes" }
+                && (!checksStatus || $0.programStatus?.state == .blocked && $0.programStatus?.kind == "permission")
         }
         await session.send("\r")
         try await session.wait(timeout: .seconds(60)) {
             $0.isReady && $0.lines.contains { $0.hasPrefix("⏺ Write(note.txt)") }
+                && (!checksStatus || $0.programStatus?.state == .done)
         }
         try #require(
             try String(contentsOf: folder.appending(path: "note.txt"), encoding: .utf8)
@@ -304,6 +307,7 @@ struct ProgramSessionTests {
         let terminal = try #require(try await session.exitedTerminal())
         try #require(terminal.ruleRows.count <= 2)
         try #require(terminal.lines.contains("Resume this session with:"))
+        try #require(terminal.programStatus == nil)
     }
 
     @Test func claudeCodeRecording() throws {
@@ -342,6 +346,10 @@ struct ProgramSessionTests {
 
     private func privateData(in events: [ProgramSession.Event]) -> [String] {
         let output = String(decoding: unescaped(events.compactMap { $0.output?.joined() }.joined()), as: UTF8.self)
+            .replacing(statusMessage) { match in
+                let message = Data(base64Encoded: String(match.output.2)).map { String(decoding: $0, as: UTF8.self) }
+                return match.output.1 + (message ?? String(match.output.2))
+            }
         let raw = ([output] + events.compactMap { $0.screen?.joined(separator: "\n") }).joined(separator: "\n")
         let text = raw + "\n" + raw.replacing(/\u{1B}(?:\[[0-?]*[ -\/]*[@-~]|[ -\/]*[0-~])/, with: " ")
         let words = NSFullUserName().split { !$0.isLetter }.map(String.init).filter { $0.count >= 3 }
@@ -361,13 +369,11 @@ struct ProgramSessionTests {
 
     private func record(_ session: ProgramSession) async throws {
         let output = await session.output
-        var text = try #require(String(validating: output, as: UTF8.self))
-        for (word, placeholder) in [
-            (NSHomeDirectory(), "/home/user/"), (NSFullUserName(), "Person "), (NSUserName(), "user"),
-        ]
-        where !word.isEmpty {
-            text = text.replacing(
-                word, with: String(repeating: placeholder, count: word.utf8.count).prefix(word.utf8.count))
+        var text = replacingNames(in: try #require(String(validating: output, as: UTF8.self)))
+        text = text.replacing(statusMessage) { match in
+            let message = Data(base64Encoded: String(match.output.2)).flatMap { String(data: $0, encoding: .utf8) }
+            return match.output.1
+                + (message.map { Data(replacingNames(in: $0).utf8).base64EncodedString() } ?? String(match.output.2))
         }
         text = text.replacing(/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/) { _ in
             uuidPlaceholder
@@ -404,6 +410,18 @@ struct ProgramSessionTests {
         try encoder.encode(events)
             .write(
                 to: URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Recordings/claude-code.json"))
+    }
+
+    private func replacingNames(in text: String) -> String {
+        var text = text
+        for (word, placeholder) in [
+            (NSHomeDirectory(), "/home/user/"), (NSFullUserName(), "Person "), (NSUserName(), "user"),
+        ]
+        where !word.isEmpty {
+            text = text.replacing(
+                word, with: String(repeating: placeholder, count: word.utf8.count).prefix(word.utf8.count))
+        }
+        return text
     }
 
     private func recordingURL() throws -> URL {
@@ -534,6 +552,8 @@ extension Terminal {
 }
 
 private let uuidPlaceholder = "00000000-0000-0000-0000-000000000000"
+
+private nonisolated(unsafe) let statusMessage = /(\u{1B}\]7501;[^\u{7}\u{1B}]*msg=)([A-Za-z0-9+\/]+=*)/
 
 private nonisolated(unsafe) let planName =
     /Claude(?: |\u{1B}(?:\[[0-?]*[ -\/]*[@-~]|[ -\/]*[0-~]))+(Max|Pro|Team|Enterprise)/

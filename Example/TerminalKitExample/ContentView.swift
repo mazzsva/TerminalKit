@@ -9,9 +9,14 @@ struct ContentView: View {
     var body: some View {
         TerminalView(session: session)
             .navigationTitle(session.title.isEmpty ? "Terminal" : session.title)
-            .navigationSubtitle(session.currentDirectoryURL?.path(percentEncoded: false) ?? "")
+            .navigationSubtitle(subtitle)
             .onChange(of: session.bellCount) {
                 NSApp.requestUserAttention(.informationalRequest)
+            }
+            .onChange(of: session.programStatus?.state) { _, state in
+                if state == .blocked || state == .done {
+                    NSApp.requestUserAttention(.informationalRequest)
+                }
             }
             .onChange(of: session.state) {
                 if case .exited = session.state {
@@ -24,6 +29,21 @@ struct ContentView: View {
             .onDisappear {
                 session.terminate()
             }
+    }
+
+    private var subtitle: Text {
+        switch session.programStatus?.state {
+        case .idle:
+            Text("Idle")
+        case .working:
+            Text("Working")
+        case .blocked:
+            Text("Blocked")
+        case .done:
+            Text("Done")
+        case nil:
+            Text(verbatim: session.currentDirectoryURL?.path(percentEncoded: false) ?? "")
+        }
     }
 }
 
