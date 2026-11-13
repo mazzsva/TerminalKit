@@ -176,9 +176,7 @@ actor ProgramSession {
 
     func pressShiftReturn() throws {
         let event = try keyDown("\r", modifierFlags: .shift)
-        let input =
-            event.otherKeyInput(level: terminal.modifyOtherKeys, usesOptionAsMetaKey: false).map(TerminalKeyInput.bytes)
-            ?? event.terminalKeyInput(TerminalKeyModes())
+        let input = event.terminalKeyInput(TerminalKeyModes())
         if case .bytes(let bytes) = input {
             pseudoTerminal?.write(bytes)
         }
