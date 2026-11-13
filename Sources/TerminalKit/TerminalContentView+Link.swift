@@ -10,6 +10,7 @@ extension TerminalContentView {
 
         var url: URL
         var spans: [Span]
+        var toolTip: String?
     }
 
     enum LinkAction: Equatable {
@@ -136,9 +137,7 @@ extension TerminalContentView {
     }
 
     private func markedLink(_ link: UInt16, atRow row: Int, in terminal: Terminal) -> Link? {
-        guard let url = terminal.links.uri(of: link).flatMap(URL.init(string:)),
-            let scheme = url.scheme?.lowercased(), Self.schemes.contains(scheme)
-        else {
+        guard let url = terminal.links.uri(of: link).flatMap(URL.init(string:)) else {
             return nil
         }
         let spans = { (row: Int) in
@@ -165,7 +164,7 @@ extension TerminalContentView {
             result += found
             below += 1
         }
-        return Link(url: url, spans: result)
+        return Link(url: url, spans: result, toolTip: url.absoluteString)
     }
 
     static func detectedLinks(in text: String) -> [Range<Int>] {
