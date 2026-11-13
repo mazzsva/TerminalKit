@@ -1,11 +1,7 @@
 import AppKit
 import Testing
 
-@testable import TerminalCore
 @testable import TerminalKit
-
-private let printedLink = "printf 'https://example.com'"
-private let markedLink = "printf '\\033]8;;https://example.com\\033\\\\example\\033]8;;\\007'"
 
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
@@ -102,102 +98,8 @@ struct TerminalLinkTests {
         #expect(view.link(atRow: 9, column: 0) == nil)
     }
 
-    @Test func findsAMarkedLink() async throws {
-        let view = try await linkView(
-            running: "printf 'x \\033]8;;https://example.com/a\\033\\\\ab\\033]8;;\\033\\\\ c'")
-        let link = try #require(view.link(atRow: 0, column: 3))
-        #expect(link.url == URL(string: "https://example.com/a"))
-        #expect(link.spans == [.init(row: 0, columns: 2 ..< 4)])
-        #expect(view.link(atRow: 0, column: 4) == nil)
-        #expect(view.link(atRow: 0, column: 0) == nil)
-    }
-
-    @Test func prefersTheMarkedLinkToThePrintedLink() async throws {
-        let view = try await linkView(
-            running: "printf '\\033]8;;https://b.com/\\007https://a.com\\033]8;;\\007 https://c.com'")
-        let link = view.link(atRow: 0, column: 3)
-        #expect(link?.url == URL(string: "https://b.com/"))
-        #expect(link?.spans == [.init(row: 0, columns: 0 ..< 10), .init(row: 1, columns: 0 ..< 3)])
-        #expect(view.link(atRow: 1, column: 6)?.url == URL(string: "https://c.com"))
-    }
-
-    @Test func opensAnAddressThatClaudeCodeWraps() async throws {
-        let open = "\\033]8;id=57yy2o;https://example.com/long\\007"
-        let session = TerminalSession(
-            running: "printf '  \(open)https://\\033]8;;\\007\\r\\n  \(open)example.com/long\\033]8;;\\007'")
-        session.resize(columns: 20, rows: 4)
-        let view = TerminalContentView(session: session)
-        var actions: [TerminalContentView.LinkAction] = []
-        view.performLinkAction = { actions.append($0) }
-        let window = NSWindow(contentView: view)
-        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-        try session.start()
-        await session.waitForExit()
-        let url = try #require(URL(string: "https://example.com/long"))
-        for row in 0 ..< 2 {
-            let link = view.link(atRow: row, column: 5)
-            #expect(link?.url == url)
-            #expect(link?.spans == [.init(row: 0, columns: 2 ..< 10), .init(row: 1, columns: 2 ..< 18)])
-        }
-        #expect(view.link(atRow: 1, column: 1) == nil)
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 3, in: view, modifierFlags: .command))
-        #expect(actions == [.open(url)])
-        #expect(window.contentView === view)
-    }
-
-    @Test func opensAMarkedFileLink() async throws {
-        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let note = folder.appending(path: "note.txt")
-        try Data("text".utf8).write(to: note)
-        let view = try await linkView(
-            running: "printf '\\033]8;id=a;\(note.absoluteString)\\007note.txt\\033]8;;\\007'")
-        var actions: [TerminalContentView.LinkAction] = []
-        view.performLinkAction = { actions.append($0) }
-        let window = NSWindow(contentView: view)
-        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 4, in: view, modifierFlags: .command))
-        #expect(actions == [.open(note)])
-        #expect(window.contentView === view)
-    }
-
-    @Test(arguments: ["zoommtg://join", "javascript:alert(1)", "file://example.com/etc/hosts"])
-    func opensNoUnsafeMarkedLink(uri: String) async throws {
-        let view = try await linkView(running: "printf '\\033]8;;\(uri)\\033\\\\join\\033]8;;\\033\\\\'")
-        var actions: [TerminalContentView.LinkAction] = []
-        view.performLinkAction = { actions.append($0) }
-        let window = NSWindow(contentView: view)
-        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-        #expect(view.session.terminal.screen[0][1].link != 0)
-        #expect(view.link(atRow: 0, column: 1)?.toolTip == uri)
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, modifierFlags: .command))
-        #expect(actions.isEmpty)
-        #expect(window.contentView === view)
-    }
-
-    @Test func opensAKeptMarkedLinkAfterTheLinkTableIsFull() async throws {
-        let link = "\\033]8;;https://%s.example/\\033\\\\%s\\033]8;;\\033\\\\"
-        let session = TerminalSession(
-            running: """
-                printf '\\033[?2026h\(link)\\r\\n\\r\\n\\r\\n\\r\\n' kept kept
-                i=0; while [ $i -lt 200 ]; do printf '\(link)\\033[2K\\r' $i x; i=$((i+1)); done
-                printf '\(link)\\033[?2026l' last last
-                """)
-        session.resize(columns: 20, rows: 4)
-        session.liveTerminal.links = Terminal.Links(capacity: 80)
-        let view = TerminalContentView(session: session)
-        try session.start()
-        await session.waitForExit()
-        #expect(session.terminal.links.count < 80)
-        #expect(session.terminal.scrollback.count == 1)
-        #expect(view.link(atRow: 0, column: 1)?.url == URL(string: "https://kept.example/"))
-        #expect(view.link(atRow: 4, column: 1)?.url == URL(string: "https://last.example/"))
-    }
-
-    @Test(arguments: [printedLink, markedLink])
-    func opensALinkWithCommandClick(script: String) async throws {
-        let view = try await linkView(running: script)
+    @Test func opensALinkWithCommandClick() async throws {
+        let view = try await linkView(running: "printf 'https://example.com'")
         var actions: [TerminalContentView.LinkAction] = []
         view.performLinkAction = { actions.append($0) }
         let window = NSWindow(contentView: view)
@@ -245,9 +147,8 @@ struct TerminalLinkTests {
         #expect(window.contentView === view)
     }
 
-    @Test(arguments: [printedLink, markedLink])
-    func underlinesTheHoveredLink(script: String) async throws {
-        let view = try await linkView(running: script)
+    @Test func underlinesTheHoveredLink() async throws {
+        let view = try await linkView(running: "printf 'https://example.com'")
         let window = NSWindow(contentView: view)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
         let location = view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil)
@@ -354,110 +255,21 @@ struct TerminalLinkTests {
         #expect(window.contentView === view)
     }
 
-    @Test func showsTheTargetOfTheHoveredMarkedLink() async throws {
-        let view = try await linkView(
-            running: "printf '\\033]8;;https://b.com/\\033\\\\a.com\\033]8;;\\033\\\\\\nhttps://c.com'")
-        let window = NSWindow(contentView: view)
-        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-        let marked = view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil)
-        view.updateHoveredLink(at: marked, modifierFlags: .command)
-        #expect(view.toolTip == "https://b.com/")
-        view.updateHoveredLink(
-            at: view.convert(view.rect(row: 1, columns: 2 ..< 3).center, to: nil), modifierFlags: .command)
-        #expect(view.hoveredLink?.url == URL(string: "https://c.com"))
-        #expect(view.toolTip == nil)
-        view.updateHoveredLink(at: marked, modifierFlags: .command)
-        #expect(view.toolTip == "https://b.com/")
-        view.mouseExited(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view))
-        #expect(view.toolTip == nil)
-        #expect(window.contentView === view)
-    }
-
-    @Test func keepsTheTargetUntilNewOutputChangesIt() async throws {
-        let session = TerminalSession(
-            running:
-                "printf '\\033]8;;https://b.com/\\033\\\\a.com\\033]8;;\\033\\\\'; read x; printf '\\033[3;1Hz'; read x; printf '\\033[Hdone'"
-        )
-        session.resize(columns: 10, rows: 4)
-        let view = TerminalContentView(session: session)
+    @Test func clearsTheTargetAfterCommandIsReleasedInAnotherView() async throws {
+        let view = try await linkView(running: "printf 'https://b.com'")
         let window = MouseWindow(contentView: view)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-        view.currentModifierFlags = { .command }
-        try session.start()
-        await session.waitForText("a.com")
-        window.mouseLocation = view.convert(view.rect(row: 0, columns: 2 ..< 3).center, to: nil)
+        window.mouseLocation = view.convert(view.rect(row: 0, columns: 7 ..< 8).center, to: nil)
         view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
-        #expect(view.toolTip == "https://b.com/")
-        session.send(Array("\r".utf8))
-        await session.waitForText("z")
-        view.display()
-        #expect(view.toolTip == "https://b.com/")
-        session.send(Array("\r".utf8))
-        await session.waitForText("done")
-        NSCursor.pointingHand.set()
-        view.display()
-        #expect(NSCursor.current == .iBeam)
-        #expect(view.hoveredLink == nil)
-        #expect(view.toolTip == nil)
-        #expect(window.contentView === view)
-    }
-
-    @Test func updatesTheTargetAfterAScroll() async throws {
-        let session = TerminalSession(
-            running:
-                "for i in $(seq 1 30); do printf '\\033]8;;https://%s.com/\\033\\\\link\\033]8;;\\033\\\\\\n' $i; done"
-        )
-        let scrollView = TerminalScrollView(session: session)
-        let window = MouseWindow(contentView: scrollView)
-        scrollView.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-        scrollView.layoutSubtreeIfNeeded()
-        try session.start()
-        await session.waitForExit()
-        scrollView.layoutSubtreeIfNeeded()
-        let view = scrollView.terminalView
-        view.currentModifierFlags = { .command }
-        let row = Int((view.visibleRect.midY - TerminalContentView.topPadding) / view.cellSize.height)
-        window.mouseLocation = view.convert(view.rect(row: row, columns: 1 ..< 2).center, to: nil)
-        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
-        #expect(view.toolTip == "https://\(row + 1).com/")
-        view.scroll(CGPoint(x: 0, y: view.visibleRect.minY - 5 * view.cellSize.height))
-        #expect(view.toolTip == "https://\(row - 4).com/")
-        #expect(window.contentView === scrollView)
-    }
-
-    @Test func updatesTheTargetAfterAFontChange() async throws {
-        let (view, window) = try await twoMarkedLinks()
-        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
-        #expect(view.toolTip == "https://b.com/")
-        view.font = .monospacedSystemFont(ofSize: 2 * view.font.pointSize, weight: .regular)
-        #expect(view.toolTip == "https://a.com/")
-        #expect(window.contentView === view)
-    }
-
-    @Test func showsNoTargetAfterAFontChangeWithoutAHover() async throws {
-        let (view, window) = try await twoMarkedLinks()
-        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: [])
-        view.font = .monospacedSystemFont(ofSize: 2 * view.font.pointSize, weight: .regular)
-        #expect(view.hoveredLink == nil)
-        #expect(view.toolTip == nil)
-        #expect(window.contentView === view)
-    }
-
-    @Test func clearsTheTargetAfterCommandIsReleasedInAnotherView() async throws {
-        let (view, window) = try await twoMarkedLinks()
-        view.currentModifierFlags = { [] }
-        view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
-        #expect(view.toolTip == "https://b.com/")
+        #expect(view.hoveredLink != nil)
         view.font = .monospacedSystemFont(ofSize: 2 * view.font.pointSize, weight: .regular)
         #expect(NSCursor.current == .iBeam)
         #expect(view.hoveredLink == nil)
-        #expect(view.toolTip == nil)
         #expect(window.contentView === view)
     }
 
     @Test func clearsTheTargetWhenCommandIsReleasedWhileAnotherViewIsFocused() async throws {
-        let focusedView = try await linkView(
-            running: "printf '\\033]8;;https://b.com/\\033\\\\ab\\033]8;;\\033\\\\'")
+        let focusedView = try await linkView(running: "printf 'https://b.com'")
         let view = TerminalContentView(session: focusedView.session)
         let window = MouseWindow(contentView: NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 100)))
         window.contentView?.addSubview(focusedView)
@@ -467,11 +279,10 @@ struct TerminalLinkTests {
         window.makeFirstResponder(focusedView)
         window.mouseLocation = view.convert(view.rect(row: 0, columns: 1 ..< 2).center, to: nil)
         view.updateHoveredLink(at: window.mouseLocation, modifierFlags: .command)
-        #expect(view.toolTip == "https://b.com/")
+        #expect(view.hoveredLink != nil)
         NSApplication.shared.sendEvent(try flagsChanged([]))
         #expect(NSCursor.current == .iBeam)
         #expect(view.hoveredLink == nil)
-        #expect(view.toolTip == nil)
         #expect(window.firstResponder === focusedView)
     }
 
@@ -501,9 +312,8 @@ struct TerminalLinkTests {
         #expect(view.hoveredLink == nil)
     }
 
-    @Test(arguments: [printedLink, markedLink])
-    func showsThePointingHandOverALinkWithCommand(script: String) async throws {
-        let view = try await linkView(running: script)
+    @Test func showsThePointingHandOverALinkWithCommand() async throws {
+        let view = try await linkView(running: "printf 'https://a.com'")
         let window = NSWindow(contentView: view)
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
         view.mouseMoved(with: try mouseEvent(.mouseMoved, row: 0, column: 2, in: view, modifierFlags: .command))
@@ -615,19 +425,6 @@ private func twoLinks() async throws -> (TerminalContentView, MouseWindow) {
     try session.start()
     await session.waitForExit()
     window.mouseLocation = view.convert(view.rect(row: 0, columns: 16 ..< 17).center, to: nil)
-    return (view, window)
-}
-
-@MainActor
-private func twoMarkedLinks() async throws -> (TerminalContentView, MouseWindow) {
-    let view = try await linkView(
-        running:
-            "printf '\\033]8;;https://a.com/\\033\\\\a.com\\033]8;;https://b.com/\\033\\\\b.com\\033]8;;\\033\\\\'"
-    )
-    let window = MouseWindow(contentView: view)
-    view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
-    view.currentModifierFlags = { .command }
-    window.mouseLocation = view.convert(view.rect(row: 0, columns: 7 ..< 8).center, to: nil)
     return (view, window)
 }
 

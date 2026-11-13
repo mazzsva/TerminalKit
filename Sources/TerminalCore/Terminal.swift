@@ -49,7 +49,6 @@ package struct Terminal: Sendable {
     package private(set) var usesReverseVideo = false
     package private(set) var title = ""
     package internal(set) var graphemes = Graphemes()
-    package internal(set) var links = Links()
     package private(set) var bellCount = 0
     package internal(set) var currentDirectory: URL?
     package internal(set) var programStatus: ProgramStatus?
@@ -77,7 +76,6 @@ package struct Terminal: Sendable {
         snapshot.removedScrollbackCount = removedScrollbackCount
         snapshot.restoredNormalScreenCount = restoredNormalScreenCount
         snapshot.graphemes = graphemes
-        snapshot.links = links
         return snapshot
     }
 
@@ -91,7 +89,6 @@ package struct Terminal: Sendable {
     private var isLastCharacterDropped = false
     private var isAfterPrint = false
     private var style = Style()
-    private var link: UInt16 = 0
     private var usesLineDrawing = false
     private var lastCharacter: Unicode.Scalar? = " "
     private var savedCursor = SavedCursor()
@@ -467,10 +464,10 @@ package struct Terminal: Sendable {
 
     private mutating func place(_ scalar: Unicode.Scalar, width: Int = 1) {
         guard scalar != " " else {
-            place(.writtenSpace(style: style, link: link))
+            place(.writtenSpace(style: style))
             return
         }
-        place(Cell(scalar: scalar, style: style, width: columns > 1 ? UInt8(width) : 1, link: link))
+        place(Cell(scalar: scalar, style: style, width: columns > 1 ? UInt8(width) : 1))
     }
 
     private mutating func place(_ cell: Cell) {
@@ -505,7 +502,7 @@ package struct Terminal: Sendable {
         }
         screen[cursor.row][cursor.column] = cell
         if width == 2 {
-            screen[cursor.row][cursor.column + 1] = Cell(style: cell.style, width: 0, link: cell.link)
+            screen[cursor.row][cursor.column + 1] = Cell(style: cell.style, width: 0)
         }
         if cursor.column + width == columns {
             cursor.column = columns - 1
@@ -575,8 +572,7 @@ package struct Terminal: Sendable {
         }
         clearWideCharacter(at: column + 1)
         screen[cursor.row][column].width = 2
-        screen[cursor.row][column + 1] = Cell(
-            style: screen[cursor.row][column].style, width: 0, link: screen[cursor.row][column].link)
+        screen[cursor.row][column + 1] = Cell(style: screen[cursor.row][column].style, width: 0)
         if column + 2 == columns {
             isWrapPending = usesAutowrap
             isTextRunClipped = !usesAutowrap
@@ -587,33 +583,6 @@ package struct Terminal: Sendable {
 
     package func character(of cell: Cell) -> String {
         graphemes.character(of: cell)
-    }
-
-    private mutating func setLink(_ value: Substring) {
-        guard let (key, uri) = Links.key(from: value) else {
-            return
-        }
-        guard !uri.isEmpty else {
-            link = 0
-            return
-        }
-        if links.needsCompaction(forKey: key) {
-            compactLinks()
-        }
-        link = links.link(forKey: key, uri: uri)
-    }
-
-    private mutating func compactLinks() {
-        var used = Array(repeating: false, count: links.count)
-        scrollback.markLinks(into: &used)
-        Links.markLinks(in: screen, into: &used)
-        Links.markLinks(in: synchronizedSnapshot.first?.screen ?? [], into: &used)
-        let newIndices = links.compact(keeping: used)
-        scrollback.remapLinks(with: newIndices)
-        Links.remapLinks(in: &screen, with: newIndices)
-        if !synchronizedSnapshot.isEmpty {
-            Links.remapLinks(in: &synchronizedSnapshot[0].screen, with: newIndices)
-        }
     }
 
     private mutating func lineFeed() {
@@ -770,8 +739,6 @@ package struct Terminal: Sendable {
             title = String(text)
         case (7, let text?):
             setCurrentDirectory(text)
-        case (8, let text?):
-            setLink(text)
         case (4, let text?):
             changeIndexedColors(text)
         case (10 ... 12, let text?):
@@ -796,7 +763,6 @@ package struct Terminal: Sendable {
         terminal.changedColors = changedColors
         terminal.changedColors.indexed = [:]
         terminal.graphemes = graphemes
-        terminal.links = links
         terminal.scrollback = scrollback
         scrollback = Scrollback(columns: columns)
         terminal.unwrapLine(before: 0)
@@ -939,7 +905,6 @@ package struct Terminal: Sendable {
             var snapshot = self
             snapshot.scrollback = Scrollback(columns: columns)
             snapshot.graphemes = Graphemes()
-            snapshot.links = Links()
             synchronizedSnapshot = [snapshot]
             synchronizedOutputCount += 1
         case (2026, false):
