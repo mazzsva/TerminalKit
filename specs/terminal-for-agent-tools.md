@@ -56,7 +56,7 @@ Each one needs a test.
 - Restore a removed feature from the Git history, with its tests. Do not write it again
 - No dependencies, macOS 27, Swift 6 strict concurrency, and no change to the user's shell startup files
 - A real session runs with an empty home folder and a fixed project
-- A Terminal.app recording stays only while it protects code that stays. The recordings that remain are a safety net during the removal of code, and a later decision keeps or removes them
+- A Terminal.app recording stays only while it finds a change of the emulator that no other test finds. After the removal of code, a mutation test of 200 single changes decided it: the 6 recording files that found such a change stay, and the 12 that found none are gone
 - Each pull request is small, uses the repository template, and merges only after CI passes
 
 ## Check
