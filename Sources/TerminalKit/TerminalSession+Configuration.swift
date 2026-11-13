@@ -92,16 +92,7 @@ extension TerminalSession.Configuration {
             languageRegion: Locale.current.region)
     ) -> [String: String] {
         var environment = environment
-        for name in [
-            "TERM_SESSION_ID", "TMUX", "TMUX_PANE", "STY", "LC_TERMINAL",
-            "LC_TERMINAL_VERSION", "ITERM_SESSION_ID", "ITERM_PROFILE", "KITTY_WINDOW_ID", "KITTY_PID", "COLORFGBG",
-            "COLUMNS", "LINES", "TERMINFO", "CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION", "CURSOR_TRACE_ID",
-            "TERMINAL_EMULATOR", "ALACRITTY_LOG", "ALACRITTY_WINDOW_ID", "WEZTERM_PANE", "WT_SESSION", "VTE_VERSION",
-            "KONSOLE_VERSION", "GNOME_TERMINAL_SERVICE", "XTERM_VERSION", "TERMINATOR_UUID", "TILIX_ID", "ZED_TERM",
-            "ZELLIJ", "CLAUDE_CODE_SSE_PORT", "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY",
-        ] {
-            environment[name] = nil
-        }
+        environment["TERM_SESSION_ID"] = nil
         environment["TERM"] = "xterm-256color"
         environment["COLORTERM"] = "truecolor"
         environment["TERM_PROGRAM"] = "Apple_Terminal"
