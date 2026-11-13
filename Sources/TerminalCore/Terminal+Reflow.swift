@@ -35,16 +35,6 @@ extension Terminal {
                 }
                 cursorOffset = offset
             }
-            if columns == 1 {
-                let kept = cursorOffset.map { cells[..<min($0, cells.count)].count { $0.width > 0 } }
-                cursorOffset = kept
-                cells = cells.filter { $0.width > 0 }
-                    .map { cell in
-                        var cell = cell
-                        cell.width = 1
-                        return cell
-                    }
-            }
             let firstRow = result.count
             var rowStarts = [0]
             var used = 0
@@ -63,7 +53,7 @@ extension Terminal {
                 used += Int(cell.width)
             }
             let lastStart = rowStarts[rowStarts.count - 1]
-            let keepsEmptyRow = start < end && textCount == 0 && used == columns
+            let keepsEmptyRow = textCount == 0 && used == columns
             var lastLine = Line(cells[lastStart...], isWrapped: keepsEmptyRow || lines[end].isWrapped)
             if let fill = lines[end].fill, used < columns {
                 lastLine.append(fill)

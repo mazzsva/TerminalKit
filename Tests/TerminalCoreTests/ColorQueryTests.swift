@@ -17,7 +17,7 @@ struct ColorQueryTests {
     }
 
     @Test func answersNothingWithoutColors() {
-        var terminal = Terminal(columns: 1, rows: 1)
+        var terminal = Terminal(columns: 2, rows: 1)
         #expect(terminal.receive("\u{1B}]10;?\u{7}") == "")
     }
 
@@ -33,6 +33,16 @@ struct ColorQueryTests {
         let changes = terminal.changedColors
         #expect(changes.cursor == Terminal.RGB(red: 0x3000, green: 0x4000, blue: 0x5000))
         #expect(changes.indexed == [2: Terminal.RGB(red: 0x5000, green: 0x6000, blue: 0x7000)])
+    }
+
+    @Test func changesTheFirstAndTheLastIndexedColor() {
+        var terminal = coloredTerminal()
+        terminal.receive("\u{1B}]4;0;#102030;255;#405060\u{7}")
+        #expect(
+            terminal.changedColors.indexed == [
+                0: Terminal.RGB(red: 0x1000, green: 0x2000, blue: 0x3000),
+                255: Terminal.RGB(red: 0x4000, green: 0x5000, blue: 0x6000),
+            ])
     }
 
     @Test func clearsOnlyTheIndexedColorsOnAReset() {
@@ -68,7 +78,7 @@ struct ColorQueryTests {
 }
 
 private func coloredTerminal() -> Terminal {
-    var terminal = Terminal(columns: 1, rows: 1)
+    var terminal = Terminal(columns: 2, rows: 1)
     terminal.defaultColors = Terminal.DefaultColors(
         foreground: Terminal.RGB(red: 0x0001, green: 0xABCD, blue: 0x1234),
         background: Terminal.RGB(red: 0xFFFF, green: 0xFEFE, blue: 0x0000),

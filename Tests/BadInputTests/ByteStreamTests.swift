@@ -115,7 +115,7 @@ struct ByteStreams {
     }
 
     mutating func size() -> (columns: Int, rows: Int) {
-        (int(pick([1 ... 4, 5 ... 80, 1 ... 200])), int(pick([1 ... 4, 5 ... 24, 1 ... 60])))
+        (int(pick([2 ... 4, 5 ... 80, 2 ... 200])), int(pick([1 ... 4, 5 ... 24, 1 ... 60])))
     }
 
     mutating func next() -> (resize: (columns: Int, rows: Int)?, bytes: [UInt8]) {

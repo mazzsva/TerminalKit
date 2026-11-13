@@ -16,6 +16,14 @@ struct ScrollbackLimitTests {
         #expect(terminal.scrollback.map { text(of: $0, in: terminal) } == (101_001 ... 201_000).map(String.init))
     }
 
+    @Test func keepsTheLimitAfterOneLineMore() {
+        var terminal = Terminal(columns: 8, rows: 1)
+        terminal.receive((1 ... Terminal.Scrollback.maximumCount + 1).map { "\($0)\r\n" }.joined())
+        #expect(terminal.scrollback.count == Terminal.Scrollback.maximumCount)
+        #expect(terminal.removedScrollbackCount == 1)
+        #expect(text(of: terminal.scrollback[0], in: terminal) == "2")
+    }
+
     @Test func keepsTheLimitAfterAResize() throws {
         var terminal = Terminal(columns: 8, rows: 1)
         for start in stride(from: 1, through: 110_001, by: 1_000) {
@@ -32,8 +40,8 @@ struct ScrollbackLimitTests {
     }
 
     @Test func keepsTheLimitForOneLongLine() {
-        var terminal = Terminal(columns: 1, rows: 1)
-        terminal.receive(String(repeating: "a", count: Terminal.Scrollback.maximumCount + 2))
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive(String(repeating: "a", count: 2 * Terminal.Scrollback.maximumCount + 4))
         #expect(terminal.scrollback.count <= Terminal.Scrollback.maximumCount)
         #expect(terminal.removedScrollbackCount + terminal.scrollback.count == Terminal.Scrollback.maximumCount + 1)
     }

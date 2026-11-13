@@ -135,19 +135,19 @@ struct EmojiWidthTests {
         #expect(terminal.screen[1].allSatisfy { $0 == Terminal.Cell() })
     }
 
+    @Test func dropsTheTextAfterAClusterThatWidensToTheLastColumnWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?7lab" + Self.heart + "x")
+        #expect(terminal.screen[0].map(\.width) == [1, 1, 2, 0])
+        #expect(terminal.character(of: terminal.screen[0][2]) == Self.heart)
+    }
+
     @Test func insertsTheSecondCellOfAClusterInInsertMode() {
         var terminal = Terminal(columns: 6, rows: 1)
         terminal.receive("abc\u{1B}[1G\u{1B}[4h" + Self.heart)
         #expect(terminal.screen[0].prefix(5).map(\.width) == [2, 0, 1, 1, 1])
         #expect(terminal.screen[0].dropFirst(2).prefix(3).map(terminal.character(of:)) == ["a", "b", "c"])
         #expect(terminal.cursor.column == 2)
-    }
-
-    @Test func placesAFlagInAOneColumnScreen() {
-        var terminal = Terminal(columns: 1, rows: 1)
-        terminal.receive("\u{1F1FA}\u{1F1F8}")
-        #expect(terminal.screen[0].map(\.width) == [1])
-        #expect(terminal.character(of: terminal.screen[0][0]) == "\u{1F1FA}\u{1F1F8}")
     }
 
     @Test(arguments: [

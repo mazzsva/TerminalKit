@@ -270,9 +270,6 @@ extension Terminal {
                 return 1
             }
             let isSimple = paragraphs[index].isSimple
-            if !isSimple, columns == 1 {
-                return Terminal.laidOut(storedLines[range], columns: columns).count
-            }
             let (rows, used) =
                 isSimple
                 ? Widths.simpleRowCount(textCount: textCount, columns: columns)
@@ -284,11 +281,6 @@ extension Terminal {
             storedRows > 1 && paragraphs[index].lastRowTextCount == 0 && used == columns
         }
 
-        fileprivate func isCheap(_ index: Int) -> Bool {
-            index >= storedRelaidCount || columns > 1 || paragraphs[index].isSimple
-                || (storedRange(of: index).count == 1 && paragraphs[index].textCount <= columns)
-        }
-
         fileprivate func row(_ row: Int, of index: Int) -> Line {
             let range = storedRange(of: index)
             guard index < storedRelaidCount else {
@@ -298,19 +290,13 @@ extension Terminal {
             if range.count == 1, paragraph.textCount <= columns {
                 return Terminal.relaidRow(storedLines[range.lowerBound], columns: columns)
             }
-            guard paragraph.isSimple || columns > 1 else {
-                return Terminal.laidOut(storedLines[range], columns: columns)[row]
-            }
             let widths = paragraph.isSimple ? nil : paragraph.widths ?? Widths(storedLines[range])
             let last = storedLines[range.upperBound - 1]
             var rows = rowCount(of: index)
-            var keepsEmptyRow = false
             if row == rows - 1 {
-                let used: Int
-                (rows, used) =
-                    widths?.rowCount(columns: columns)
-                    ?? Widths.simpleRowCount(textCount: paragraph.textCount, columns: columns)
-                keepsEmptyRow = self.keepsEmptyRow(index, storedRows: range.count, used: used, columns: columns)
+                rows =
+                    widths?.rowCount(columns: columns).rows
+                    ?? Widths.simpleRowCount(textCount: paragraph.textCount, columns: columns).rows
             }
             guard row < rows else {
                 return Terminal.trimmed(Line([], isWrapped: last.isWrapped))
@@ -325,7 +311,7 @@ extension Terminal {
                 line.append(contentsOf: repeatElement(.padding, count: Swift.max(columns - bounds.used, 0)))
                 return line
             }
-            line.isWrapped = keepsEmptyRow || last.isWrapped
+            line.isWrapped = last.isWrapped
             if let fill = last.fill, bounds.used < columns {
                 line.append(fill)
             }
@@ -366,10 +352,6 @@ extension Terminal {
                 storedRow += 1
             }
             return line
-        }
-
-        fileprivate func rows(of index: Int) -> [Line] {
-            Terminal.laidOut(storedLines[storedRange(of: index)], columns: columns)
         }
 
         fileprivate func rowCount(of index: Int) -> Int {
@@ -541,7 +523,7 @@ extension Terminal {
                 var start = 0
                 for run in runs[(mark?.run ?? 0)...] {
                     let (count, newUsed) = run.breaks(columns: columns, used: used)
-                    if row > 0, breaks < row, breaks + count >= row {
+                    if breaks < row, breaks + count >= row {
                         start =
                             offset + run.breakPoint(row - breaks - 1, columns: columns, used: used).unit
                             * Int(run.cells)
@@ -562,7 +544,6 @@ extension Terminal {
             private let scrollback: Scrollback
             private var paragraph: Int
             private var row = 0
-            private var rows: [Line]?
 
             fileprivate init(scrollback: Scrollback) {
                 self.scrollback = scrollback
@@ -573,19 +554,11 @@ extension Terminal {
                 guard paragraph < scrollback.paragraphCount else {
                     return nil
                 }
-                let line: Line
-                if scrollback.isCheap(paragraph) {
-                    line = scrollback.row(row, of: paragraph)
-                } else {
-                    let rows = rows ?? scrollback.rows(of: paragraph)
-                    self.rows = rows
-                    line = rows[row]
-                }
+                let line = scrollback.row(row, of: paragraph)
                 row += 1
                 if row == scrollback.rowCount(of: paragraph) {
                     paragraph += 1
                     row = 0
-                    rows = nil
                 }
                 return line
             }
@@ -603,9 +576,5 @@ extension Terminal {
     static func relaidRow(_ line: Line, columns: Int) -> Line {
         let kept = Swift.max(min((line.lastIndex { !$0.isBlank } ?? -1) + 1, columns), line.textCount)
         return trimmed(kept == line.count ? line : Line(line.prefix(kept), isWrapped: line.isWrapped))
-    }
-
-    static func laidOut(_ lines: ArraySlice<Line>, columns: Int) -> [Line] {
-        reflow(Array(lines), columns: columns, cursor: nil).lines.map(trimmed)
     }
 }

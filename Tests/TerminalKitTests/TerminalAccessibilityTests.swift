@@ -184,7 +184,7 @@ struct TerminalAccessibilityTests {
                 break
             }
             if step % 3 == 0 {
-                session.resize(columns: [1, 2, 6, 9].randomElement(using: &generator) ?? 6, rows: 2)
+                session.resize(columns: [2, 3, 6, 9].randomElement(using: &generator) ?? 6, rows: 2)
             }
             let fresh = TerminalContentView.AccessibilityText(session.terminal, revision: 0)
             #expect(view.accessibilityValue() as? String == fresh.string)

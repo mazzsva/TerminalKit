@@ -103,7 +103,7 @@ package struct Terminal: Sendable {
     private var synchronizedSnapshot: [Terminal] = []
 
     package init(columns: Int, rows: Int) {
-        precondition(columns > 0 && rows > 0)
+        precondition(columns > 1 && rows > 0)
         self.columns = columns
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
@@ -116,7 +116,7 @@ package struct Terminal: Sendable {
     }
 
     mutating func resize(columns: Int, rows: Int, restoredRows: Int) {
-        precondition(columns > 0 && rows > 0)
+        precondition(columns > 1 && rows > 0)
         endSynchronizedOutput()
         isTextRunClipped = false
         isLastCharacterDropped = false
@@ -153,9 +153,7 @@ package struct Terminal: Sendable {
     ) -> (screen: [Line], cursor: Position) {
         let restored = scrollback.removeLast(coveringRows: restoredRows, columns: columns)
         removedScrollbackCount += scrollback.relayOut(columns: columns)
-        let storedCursor = cursor.flatMap {
-            $0.row < usedRows ? Position(row: restored.count + $0.row, column: $0.column) : nil
-        }
+        let storedCursor = cursor.map { Position(row: restored.count + $0.row, column: $0.column) }
         var (lines, target) = Self.reflow(restored + screen.prefix(usedRows), columns: columns, cursor: storedCursor)
         var column = target?.column ?? 0
         if let cursor, usedRows == self.rows, (lines.last?.textCount ?? 0) >= columns {
@@ -430,7 +428,7 @@ package struct Terminal: Sendable {
 
     private static func isWideEmoji(_ character: String) -> Bool {
         let scalars = Array(character.unicodeScalars)
-        guard scalars.count > 1, scalars[0].properties.isEmoji else {
+        guard scalars[0].properties.isEmoji else {
             return false
         }
         if isRegionalIndicator(scalars[0]) {
@@ -466,7 +464,7 @@ package struct Terminal: Sendable {
             place(.writtenSpace(style: style))
             return
         }
-        place(Cell(scalar: scalar, style: style, width: columns > 1 ? UInt8(width) : 1))
+        place(Cell(scalar: scalar, style: style, width: UInt8(width)))
     }
 
     private mutating func place(_ cell: Cell) {
@@ -517,7 +515,7 @@ package struct Terminal: Sendable {
         switch screen[cursor.row][column].width {
         case 0 where column > 0:
             screen[cursor.row][column - 1] = writtenBlank
-        case 2 where column + 1 < screen[cursor.row].count:
+        case 2:
             screen[cursor.row][column + 1] = writtenBlank
         default:
             break
@@ -553,9 +551,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func widen(_ column: Int) {
-        guard columns > 1 else {
-            return
-        }
         guard !isWrapPending else {
             var cell = screen[cursor.row][column]
             cell.width = 2

@@ -4,8 +4,8 @@ extension Terminal {
     private static let launchHostName = currentHostName
 
     private static var currentHostName: String {
-        var name = [CChar](repeating: 0, count: Int(MAXHOSTNAMELEN) + 1)
-        guard gethostname(&name, Int(MAXHOSTNAMELEN)) == 0 else {
+        var name = [CChar](repeating: 0, count: Int(MAXHOSTNAMELEN))
+        guard gethostname(&name, name.count) == 0 else {
             return ""
         }
         return String(decoding: name.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self).lowercased()

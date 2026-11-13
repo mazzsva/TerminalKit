@@ -18,14 +18,14 @@ struct SynchronizedOutputTests {
     }
 
     @Test(arguments: [
-        ("S", "\u{1B}[5;1Hg", ["a", "c", "d", "e", "g", "f"]),
-        ("T", "\u{1B}[2;1Hg", ["a", "g", "b", "c", "d", "f"]),
+        ("S", "\u{1B}[5;1Hg", ["a ", "c ", "d ", "e ", "g ", "f "]),
+        ("T", "\u{1B}[2;1Hg", ["a ", "g ", "b ", "c ", "d ", "f "]),
     ])
     func drawsTheScrollFrameOfClaudeCode(command: String, text: String, expected: [String]) {
-        var terminal = Terminal(columns: 1, rows: 6)
+        var terminal = Terminal(columns: 2, rows: 6)
         terminal.receive("\u{1B}[?1049ha\r\nb\r\nc\r\nd\r\ne\r\nf")
         terminal.receive("\u{1B}[?2026h\u{1B}[2;5r\u{1B}[1\(command)\u{1B}[r\u{1B}[H\(text)")
-        #expect(lines(terminal.displayed) == ["a", "b", "c", "d", "e", "f"])
+        #expect(lines(terminal.displayed) == ["a ", "b ", "c ", "d ", "e ", "f "])
 
         terminal.receive("\u{1B}[?2026l")
         #expect(lines(terminal.displayed) == expected)

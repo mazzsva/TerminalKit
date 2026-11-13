@@ -132,7 +132,7 @@ struct StyleTests {
 }
 
 private func style(_ parameters: String) -> Terminal.Style {
-    var terminal = Terminal(columns: 1, rows: 1)
+    var terminal = Terminal(columns: 2, rows: 1)
     terminal.receive("\u{1B}[\(parameters)mA")
     return terminal.screen[0][0].style
 }
