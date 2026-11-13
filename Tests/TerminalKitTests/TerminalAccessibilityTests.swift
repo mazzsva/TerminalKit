@@ -77,10 +77,10 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityValue() as? String == "abc中\n")
     }
 
-    @Test func keepsTheSpacesBeforeTheCursor() async throws {
+    @Test func leavesOutTheCellsBeforeTheCursorThatNoProgramWrote() async throws {
         let view = try await accessibleView(running: "printf '$\\033[C\\r\\n'; printf '$\\033[C'")
-        #expect(view.accessibilityValue() as? String == "$\n$ \n")
-        #expect(view.accessibilitySelectedTextRange() == NSRange(location: 4, length: 0))
+        #expect(view.accessibilityValue() as? String == "$\n$\n")
+        #expect(view.accessibilitySelectedTextRange() == NSRange(location: 3, length: 0))
     }
 
     @Test func keepsThePrintedSpacesAtTheEndOfARow() async throws {

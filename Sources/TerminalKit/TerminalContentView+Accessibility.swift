@@ -43,17 +43,11 @@ extension TerminalContentView {
                     {
                         return reusable.scrollback[cached]
                     }
-                    return Self.row(line, continues: continues, cursorColumn: nil, graphemes: graphemes)
+                    return Self.row(line, continues: continues, graphemes: graphemes)
                 }
-            let cursorRow = terminal.cursor.row
             let screen = terminal.screen.indices.map { row in
                 let line = terminal.screen[row]
-                return Self.row(
-                    line,
-                    continues: line.isWrapped && row < terminal.rows - 1,
-                    cursorColumn: row == cursorRow ? terminal.cursor.column : nil,
-                    graphemes: graphemes
-                )
+                return Self.row(line, continues: line.isWrapped && row < terminal.rows - 1, graphemes: graphemes)
             }
             let allRows = scrollback + screen
             var string = ""
@@ -87,13 +81,9 @@ extension TerminalContentView {
         private static func row(
             _ line: Terminal.Line,
             continues: Bool,
-            cursorColumn: Int?,
             graphemes: Terminal.Graphemes
         ) -> Row {
-            var end = textEnd(of: line, continues: continues)
-            if let cursorColumn {
-                end = max(end, min(cursorColumn, line.count))
-            }
+            let end = textEnd(of: line, continues: continues)
             var text = ""
             var length = 0
             for cell in line[..<end] where isText(cell) {
