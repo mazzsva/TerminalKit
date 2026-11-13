@@ -177,8 +177,13 @@ struct TerminalPasteTests {
         #expect(try await pastedLines([item]).contains("</tmp/My\\ Shot.png >"))
     }
 
-    @Test func pastesACopiedFileWithoutAName() async throws {
-        #expect(try await pastedLines([URL(filePath: "/tmp/My Shot.png") as NSURL]).contains("</tmp/My\\ Shot.png >"))
+    @Test func turnsOffPasteForAFileWithoutText() {
+        let view = TerminalContentView(session: TerminalSession(running: "exit"))
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        pasteboard.writeObjects([URL(filePath: "/tmp/My Shot.png") as NSURL])
+        #expect(!view.canPaste(from: pasteboard))
     }
 }
 

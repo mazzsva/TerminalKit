@@ -101,7 +101,7 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
     }
 
     func canPaste(from pasteboard: NSPasteboard) -> Bool {
-        pasteboard.availableType(from: [.fileURL, .string]) != nil
+        pasteboard.availableType(from: [.string]) != nil
     }
 
     func paste(text: String) {
