@@ -69,7 +69,7 @@ With its default setting, Claude Code rings the bell only when the Terminal.app 
 
 For voice input in a program such as Claude Code, a host app with the hardened runtime needs the audio input entitlement and a microphone usage description, as the example app has.
 
-A Command-click opens marked links too. A program marks a link with OSC 8, as Claude Code does for web addresses and file names. Claude Code marks no links in a terminal with the name `Apple_Terminal`, so TerminalKit sets `FORCE_HYPERLINK=1` in the environment, unless the host sets it. A host that does not want marked links sets it to `0`.
+A Command-click opens marked links too. With Command held over a marked link, a tooltip shows its target. A program marks a link with OSC 8, as Claude Code does for web addresses and file names. Claude Code marks no links in a terminal with the name `Apple_Terminal`, so TerminalKit sets `FORCE_HYPERLINK=1` in the environment, unless the host sets it. A host that does not want marked links sets it to `0`.
 
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
