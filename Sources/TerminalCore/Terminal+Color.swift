@@ -11,6 +11,15 @@ extension Terminal {
             self.background = background
             self.cursor = cursor
         }
+
+        package var isDark: Bool {
+            func linear(_ value: UInt16) -> Double {
+                let level = Double(value) / 65535
+                return level <= 0.04045 ? level / 12.92 : pow((level + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * linear(background.red) + 0.7152 * linear(background.green)
+                + 0.0722 * linear(background.blue) < 0.179
+        }
     }
 
     package struct ChangedColors: Equatable, Sendable {

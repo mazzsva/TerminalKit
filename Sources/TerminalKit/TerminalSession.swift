@@ -253,13 +253,24 @@ public final class TerminalSession {
         outputActivity = nil
     }
 
+    func updateColors() {
+        guard let view = sizingView, view.reportedColors != liveTerminal.defaultColors else {
+            return
+        }
+        let previous = liveTerminal.defaultColors
+        liveTerminal.defaultColors = view.reportedColors
+        if liveTerminal.usesColorSchemeReporting, let previous, let colors = view.reportedColors,
+            previous.isDark != colors.isDark
+        {
+            pseudoTerminal?.write(Array("\u{1B}[?997;\(colors.isDark ? 1 : 2)n".utf8))
+        }
+    }
+
     func receive(_ bytes: [UInt8]) {
         if bytes.count >= PseudoTerminal.Output.capacity {
             beginOutputActivity()
         }
-        if let view = sizingView, view.reportedColors != liveTerminal.defaultColors {
-            liveTerminal.defaultColors = view.reportedColors
-        }
+        updateColors()
         let replies = liveTerminal.receive(bytes)
         title = liveTerminal.title
         if bellCount != liveTerminal.bellCount {

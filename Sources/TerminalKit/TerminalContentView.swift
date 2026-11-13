@@ -290,6 +290,7 @@ final class TerminalContentView: NSView {
             }
             reportedColors = Terminal.DefaultColors(foreground: foreground, background: background, cursor: cursor)
         }
+        session.updateColors()
     }
 
     override func viewWillMove(toWindow newWindow: NSWindow?) {
