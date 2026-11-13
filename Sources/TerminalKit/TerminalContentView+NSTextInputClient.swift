@@ -7,7 +7,7 @@ extension TerminalContentView: NSTextInputClient {
             if hasMarkedText() || characters != keyDownEvent?.characters {
                 nil
             } else if let event = keyDownEvent {
-                switch modifiedInput(event).map(TerminalKeyInput.bytes) ?? keyInput(event) {
+                switch keyInput(event) {
                 case .bytes(let bytes): bytes
                 case .nothing, .scroll: []
                 case .text: nil

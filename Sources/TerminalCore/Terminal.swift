@@ -55,7 +55,6 @@ package struct Terminal: Sendable {
     package var defaultColors: DefaultColors?
     package internal(set) var changedColors = ChangedColors()
     package private(set) var usesSGRMouseEncoding = false
-    package private(set) var modifyOtherKeys = 0
     package private(set) var synchronizedOutputCount = 0
     package private(set) var restoredNormalScreenCount = 0
 
@@ -308,14 +307,6 @@ package struct Terminal: Sendable {
                 replies += "\u{1B}[>1;95;0c".utf8
             }
             return
-        }
-        if sequence.privateMarker == ">", sequence.final == "m" && [nil, 4].contains(sequence.parameters.first) {
-            let level = sequence.parameter(at: 1, default: 0)
-            modifyOtherKeys = level <= 2 ? level : 0
-            return
-        }
-        if sequence.privateMarker == "?", sequence.final == "m", sequence.parameters.first == 4 {
-            replies += "\u{1B}[>4;\(modifyOtherKeys)m".utf8
         }
         guard sequence.privateMarker == nil else {
             return
@@ -789,7 +780,6 @@ package struct Terminal: Sendable {
         usesLineDrawing = false
         lastCharacter = " "
         savedCursor = SavedCursor()
-        modifyOtherKeys = 0
     }
 
     private mutating func moveToNextTabStop() {

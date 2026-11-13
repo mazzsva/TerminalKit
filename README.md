@@ -79,7 +79,7 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 
 ## Engineering decisions
 
-**A fixed list of programs.** The measure of done is the list of programs above, not parity with Terminal.app. The emulator acts on a control function when a listed program sends it, or when the macOS terminfo entry of `xterm-256color` holds it, and the known limits name each exception that Terminal.app does not share, or that a host app must know. Shift-Return makes a new line in Claude Code with no setup, through xterm's modifyOtherKeys.
+**A fixed list of programs.** The measure of done is the list of programs above, not parity with Terminal.app. The emulator acts on a control function when a listed program sends it, or when the macOS terminfo entry of `xterm-256color` holds it, and the known limits name each exception that Terminal.app does not share, or that a host app must know. Shift-Return sends the same bytes as in Terminal.app, and makes a new line in Claude Code with no setup.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 7,000 lines of Swift and C on POSIX and AppKit APIs.
 

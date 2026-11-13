@@ -186,7 +186,7 @@ struct ByteStreams {
             sequence += "?\(modes.joined(separator: ";"))\(chance(0.6) ? "h" : "l")"
         case 2:
             sequence += pick([
-                "6n", "5n", "?6n", "c", "0c", ">c", ">0c", ">4;\(int(0 ... 3))m", ">4n", "?4m", "\(int(0 ... 7)) q",
+                "6n", "5n", "?6n", "c", "0c", ">c", ">0c", ">4n", "\(int(0 ... 7)) q",
                 "!p", "22;\(int(0 ... 3))t", "23;\(int(0 ... 3))t", "\(int(0 ... 3))J", "3J",
             ])
         case 3:

@@ -428,8 +428,7 @@ final class TerminalContentView: NSView {
             isNumLockOn.toggle()
             return
         }
-        let modifiedInput = markedText.isEmpty ? modifiedInput(event) : nil
-        let input = modifiedInput.map(TerminalKeyInput.bytes) ?? (markedText.isEmpty ? keyInput(event) : .text)
+        let input = markedText.isEmpty ? keyInput(event) : .text
         if case .scroll = input {
             scrollView(for: event.specialKey)
             return
@@ -472,10 +471,6 @@ final class TerminalContentView: NSView {
         }
         keyDown(with: event)
         return true
-    }
-
-    func modifiedInput(_ event: NSEvent) -> [UInt8]? {
-        event.otherKeyInput(level: session.liveTerminal.modifyOtherKeys, usesOptionAsMetaKey: usesOptionAsMetaKey)
     }
 
     func keyInput(_ event: NSEvent) -> TerminalKeyInput {
@@ -523,8 +518,7 @@ final class TerminalContentView: NSView {
         guard let event = keyDownEvent else {
             return
         }
-        let modifiedInput = markedText.isEmpty ? modifiedInput(event) : nil
-        if case .bytes(let bytes) = modifiedInput.map(TerminalKeyInput.bytes) ?? keyInput(event) {
+        if case .bytes(let bytes) = keyInput(event) {
             insertedText = ""
             session.send(bytes)
             keyDownEvent = nil
