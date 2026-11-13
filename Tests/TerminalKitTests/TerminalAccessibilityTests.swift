@@ -31,13 +31,15 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityLine(for: 5) == 2)
     }
 
-    @Test func joinsAWrappedRowIntoOneLine() async throws {
+    @Test func givesEachRowOfAWrappedLineItsOwnLine() async throws {
         let view = try await accessibleView(running: "printf 'abcdefg'", columns: 4)
         #expect(view.accessibilityValue() as? String == "abcdefg\n")
-        #expect(view.accessibilityRange(forLine: 0) == NSRange(location: 0, length: 8))
-        #expect(view.accessibilityLine(for: 5) == 0)
-        #expect(view.accessibilityLine(for: 8) == 1)
-        #expect(view.accessibilityInsertionPointLineNumber() == 0)
+        #expect(view.accessibilityRange(forLine: 0) == NSRange(location: 0, length: 4))
+        #expect(view.accessibilityRange(forLine: 1) == NSRange(location: 4, length: 4))
+        #expect(view.accessibilityLine(for: 3) == 0)
+        #expect(view.accessibilityLine(for: 5) == 1)
+        #expect(view.accessibilityLine(for: 8) == 2)
+        #expect(view.accessibilityInsertionPointLineNumber() == 1)
         #expect(view.accessibilitySelectedTextRange() == NSRange(location: 7, length: 0))
     }
 
@@ -51,7 +53,7 @@ struct TerminalAccessibilityTests {
     @Test func endsTheScrollbackLineAtTheAlternateScreen() async throws {
         let view = try await accessibleView(running: "printf 'abcdefghijKLMNOP\\nx\\ny\\033[?1049h\\033[Hvim'")
         #expect(view.accessibilityValue() as? String == "abcdefghijKLMNOP\nx\ny\nvim\n\n")
-        #expect(view.accessibilityRange(forLine: 2) == NSRange(location: 19, length: 2))
+        #expect(view.accessibilityRange(forLine: 3) == NSRange(location: 19, length: 2))
     }
 
     @Test func rebuildsTheLastScrollbackRowForTheAlternateScreen() {
@@ -194,7 +196,6 @@ struct TerminalAccessibilityTests {
             let fresh = TerminalContentView.AccessibilityText(session.terminal, revision: 0)
             #expect(view.accessibilityValue() as? String == fresh.string)
             #expect(view.accessibilityText.rows == fresh.rows)
-            #expect(view.accessibilityText.lines == fresh.lines)
         }
         session.send([4])
         await session.waitForExit()
