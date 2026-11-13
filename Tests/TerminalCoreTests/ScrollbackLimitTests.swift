@@ -40,8 +40,8 @@ struct ScrollbackLimitTests {
     }
 
     @Test func keepsTheLimitForOneLongLine() {
-        var terminal = Terminal(columns: 1, rows: 1)
-        terminal.receive(String(repeating: "a", count: Terminal.Scrollback.maximumCount + 2))
+        var terminal = Terminal(columns: 2, rows: 1)
+        terminal.receive(String(repeating: "a", count: 2 * Terminal.Scrollback.maximumCount + 4))
         #expect(terminal.scrollback.count <= Terminal.Scrollback.maximumCount)
         #expect(terminal.removedScrollbackCount + terminal.scrollback.count == Terminal.Scrollback.maximumCount + 1)
     }

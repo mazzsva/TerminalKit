@@ -17,7 +17,7 @@ struct ColorQueryTests {
     }
 
     @Test func answersNothingWithoutColors() {
-        var terminal = Terminal(columns: 1, rows: 1)
+        var terminal = Terminal(columns: 2, rows: 1)
         #expect(terminal.receive("\u{1B}]10;?\u{7}") == "")
     }
 
@@ -78,7 +78,7 @@ struct ColorQueryTests {
 }
 
 private func coloredTerminal() -> Terminal {
-    var terminal = Terminal(columns: 1, rows: 1)
+    var terminal = Terminal(columns: 2, rows: 1)
     terminal.defaultColors = Terminal.DefaultColors(
         foreground: Terminal.RGB(red: 0x0001, green: 0xABCD, blue: 0x1234),
         background: Terminal.RGB(red: 0xFFFF, green: 0xFEFE, blue: 0x0000),

@@ -150,13 +150,6 @@ struct EmojiWidthTests {
         #expect(terminal.cursor.column == 2)
     }
 
-    @Test func placesAFlagInAOneColumnScreen() {
-        var terminal = Terminal(columns: 1, rows: 1)
-        terminal.receive("\u{1F1FA}\u{1F1F8}")
-        #expect(terminal.screen[0].map(\.width) == [1])
-        #expect(terminal.character(of: terminal.screen[0][0]) == "\u{1F1FA}\u{1F1F8}")
-    }
-
     @Test(arguments: [
         "\u{1B}[1G\u{1B}[@", "\u{1B}[1G\u{1B}[P", "\u{1B}[3G\u{1B}[1K", "\u{1B}[3Gy", "\u{1B}[2Gy", "\u{1B}[2X",
     ])

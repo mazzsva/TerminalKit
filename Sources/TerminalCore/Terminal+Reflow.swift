@@ -35,16 +35,6 @@ extension Terminal {
                 }
                 cursorOffset = offset
             }
-            if columns == 1 {
-                let kept = cursorOffset.map { cells[..<min($0, cells.count)].count { $0.width > 0 } }
-                cursorOffset = kept
-                cells = cells.filter { $0.width > 0 }
-                    .map { cell in
-                        var cell = cell
-                        cell.width = 1
-                        return cell
-                    }
-            }
             let firstRow = result.count
             var rowStarts = [0]
             var used = 0

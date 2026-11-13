@@ -103,7 +103,7 @@ package struct Terminal: Sendable {
     private var synchronizedSnapshot: [Terminal] = []
 
     package init(columns: Int, rows: Int) {
-        precondition(columns > 0 && rows > 0)
+        precondition(columns > 1 && rows > 0)
         self.columns = columns
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
@@ -116,7 +116,7 @@ package struct Terminal: Sendable {
     }
 
     mutating func resize(columns: Int, rows: Int, restoredRows: Int) {
-        precondition(columns > 0 && rows > 0)
+        precondition(columns > 1 && rows > 0)
         endSynchronizedOutput()
         isTextRunClipped = false
         isLastCharacterDropped = false
@@ -464,7 +464,7 @@ package struct Terminal: Sendable {
             place(.writtenSpace(style: style))
             return
         }
-        place(Cell(scalar: scalar, style: style, width: columns > 1 ? UInt8(width) : 1))
+        place(Cell(scalar: scalar, style: style, width: UInt8(width)))
     }
 
     private mutating func place(_ cell: Cell) {
@@ -551,9 +551,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func widen(_ column: Int) {
-        guard columns > 1 else {
-            return
-        }
         guard !isWrapPending else {
             var cell = screen[cursor.row][column]
             cell.width = 2
