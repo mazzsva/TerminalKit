@@ -45,6 +45,7 @@ package struct Terminal: Sendable {
     package private(set) var isCursorVisible = true
     package private(set) var cursorShape = CursorShape.block
     package private(set) var usesFocusReporting = false
+    package private(set) var usesColorSchemeReporting = false
     package private(set) var usesReverseVideo = false
     package private(set) var title = ""
     package internal(set) var graphemes = Graphemes()
@@ -890,6 +891,8 @@ package struct Terminal: Sendable {
             usesSGRMouseEncoding = isEnabled
         case (2004, _):
             usesBracketedPaste = isEnabled
+        case (2031, _):
+            usesColorSchemeReporting = isEnabled
         case (1049, true):
             saveCursor()
             enterAlternateScreen()
