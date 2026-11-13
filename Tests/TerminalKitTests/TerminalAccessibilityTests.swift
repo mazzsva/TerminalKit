@@ -15,25 +15,25 @@ struct TerminalAccessibilityTests {
 
     @Test func exposesTheScreenAsText() async throws {
         let view = try await accessibleView(running: "printf 'ab\\r\\ncd'")
-        #expect(view.accessibilityValue() as? String == "ab\ncd\n")
-        #expect(view.accessibilityNumberOfCharacters() == 6)
+        #expect(view.accessibilityValue() as? String == "ab\ncd\n\n")
+        #expect(view.accessibilityNumberOfCharacters() == 7)
         #expect(view.accessibilityInsertionPointLineNumber() == 1)
         #expect(view.accessibilitySelectedTextRange() == NSRange(location: 5, length: 0))
     }
 
     @Test func includesTheScrollback() async throws {
         let view = try await accessibleView(running: "printf '1\\r\\n2\\r\\n3\\r\\n4'")
-        #expect(view.accessibilityValue() as? String == "1\n2\n3\n4")
+        #expect(view.accessibilityValue() as? String == "1\n2\n3\n4\n")
         #expect(view.accessibilityInsertionPointLineNumber() == 3)
         #expect(view.accessibilityRange(forLine: 2) == NSRange(location: 4, length: 2))
-        #expect(view.accessibilityRange(forLine: 3) == NSRange(location: 6, length: 1))
+        #expect(view.accessibilityRange(forLine: 3) == NSRange(location: 6, length: 2))
         #expect(view.accessibilityRange(forLine: 4).location == NSNotFound)
         #expect(view.accessibilityLine(for: 5) == 2)
     }
 
     @Test func givesEachRowOfAWrappedLineItsOwnLine() async throws {
         let view = try await accessibleView(running: "printf 'abcdefg'", columns: 4)
-        #expect(view.accessibilityValue() as? String == "abcdefg\n")
+        #expect(view.accessibilityValue() as? String == "abcdefg\n\n")
         #expect(view.accessibilityRange(forLine: 0) == NSRange(location: 0, length: 4))
         #expect(view.accessibilityRange(forLine: 1) == NSRange(location: 4, length: 4))
         #expect(view.accessibilityLine(for: 3) == 0)
@@ -52,7 +52,7 @@ struct TerminalAccessibilityTests {
 
     @Test func endsTheScrollbackLineAtTheAlternateScreen() async throws {
         let view = try await accessibleView(running: "printf 'abcdefghijKLMNOP\\nx\\ny\\033[?1049h\\033[Hvim'")
-        #expect(view.accessibilityValue() as? String == "abcdefghijKLMNOP\nx\ny\nvim\n\n")
+        #expect(view.accessibilityValue() as? String == "abcdefghijKLMNOP\nx\ny\nvim\n\n\n")
         #expect(view.accessibilityRange(forLine: 3) == NSRange(location: 19, length: 2))
     }
 
@@ -62,7 +62,7 @@ struct TerminalAccessibilityTests {
         let before = TerminalContentView.AccessibilityText(terminal, revision: 0)
         _ = terminal.receive(Array("\u{1B}[?1049h\u{1B}[Hvim".utf8))
         let after = TerminalContentView.AccessibilityText(terminal, revision: 1, reusing: before)
-        #expect(after.string == "abcdefghij0123456789KLM\nx\ny\nvim\n\n")
+        #expect(after.string == "abcdefghij0123456789KLM\nx\ny\nvim\n\n\n")
     }
 
     @Test func rebuildsTheScrollbackRowsAfterTheAlternateScreen() {
@@ -71,28 +71,28 @@ struct TerminalAccessibilityTests {
         let before = TerminalContentView.AccessibilityText(terminal, revision: 0)
         _ = terminal.receive(Array("\u{1B}[?1049l\u{1B}[Hc\r\nd\r\ne".utf8))
         let after = TerminalContentView.AccessibilityText(terminal, revision: 1, reusing: before)
-        #expect(after.string == "c\nd\ne")
+        #expect(after.string == "c\nd\ne\n")
     }
 
     @Test func leavesOutThePaddingOfAWideCharacterThatWraps() async throws {
         let view = try await accessibleView(running: "printf 'abc中'", columns: 4)
-        #expect(view.accessibilityValue() as? String == "abc中\n")
+        #expect(view.accessibilityValue() as? String == "abc中\n\n")
     }
 
     @Test func leavesOutTheCellsBeforeTheCursorThatNoProgramWrote() async throws {
         let view = try await accessibleView(running: "printf '$\\033[C\\r\\n'; printf '$\\033[C'")
-        #expect(view.accessibilityValue() as? String == "$\n$\n")
+        #expect(view.accessibilityValue() as? String == "$\n$\n\n")
         #expect(view.accessibilitySelectedTextRange() == NSRange(location: 3, length: 0))
     }
 
     @Test func keepsThePrintedSpacesAtTheEndOfARow() async throws {
         let view = try await accessibleView(running: "printf 'ab  \\r\\ncd  \\033[2D\\033[K'")
-        #expect(view.accessibilityValue() as? String == "ab  \ncd\n")
+        #expect(view.accessibilityValue() as? String == "ab  \ncd\n\n")
     }
 
     @Test func countsWideCharactersAndEmojiByTheirText() async throws {
         let view = try await accessibleView(running: "printf 'a中🙂b'")
-        #expect(view.accessibilityValue() as? String == "a中🙂b\n\n")
+        #expect(view.accessibilityValue() as? String == "a中🙂b\n\n\n")
         #expect(view.accessibilitySelectedTextRange() == NSRange(location: 5, length: 0))
         #expect(view.accessibilityRange(for: 1) == NSRange(location: 1, length: 1))
         #expect(view.accessibilityRange(for: 3) == NSRange(location: 2, length: 2))
@@ -103,7 +103,7 @@ struct TerminalAccessibilityTests {
 
     @Test func countsAnEmojiSequenceAsOneCharacter() async throws {
         let view = try await accessibleView(running: "printf 'a\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}b'")
-        #expect(view.accessibilityValue() as? String == "a\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}b\n\n")
+        #expect(view.accessibilityValue() as? String == "a\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}b\n\n\n")
         #expect(view.accessibilitySelectedTextRange() == NSRange(location: 10, length: 0))
         #expect(view.accessibilityRange(for: 5) == NSRange(location: 1, length: 8))
         #expect(view.accessibilityRange(for: 9) == NSRange(location: 9, length: 1))
@@ -120,8 +120,8 @@ struct TerminalAccessibilityTests {
 
     @Test func clampsTheRequestedRanges() async throws {
         let view = try await accessibleView(running: "printf 'ab'")
-        #expect(view.accessibilityString(for: NSRange(location: 1, length: 99)) == "b\n\n")
-        #expect(view.accessibilityString(for: NSRange(location: 5, length: 1)) == nil)
+        #expect(view.accessibilityString(for: NSRange(location: 1, length: 99)) == "b\n\n\n")
+        #expect(view.accessibilityString(for: NSRange(location: 6, length: 1)) == nil)
         #expect(view.accessibilityString(for: NSRange(location: NSNotFound, length: 0)) == nil)
         #expect(view.accessibilityAttributedString(for: NSRange(location: 0, length: 2))?.string == "ab")
         #expect(view.accessibilityLine(for: -3) == 0)
@@ -134,7 +134,7 @@ struct TerminalAccessibilityTests {
         #expect(terminal.removedScrollbackCount > 0)
         let text = try #require(view.accessibilityValue() as? String)
         #expect(text.hasPrefix("\(terminal.removedScrollbackCount + 1)\n"))
-        #expect(text.hasSuffix("12000\n"))
+        #expect(text.hasSuffix("12000\n\n"))
 
         view.selection = TerminalContentView.Selection(
             anchor: .init(line: 0, column: 0), head: .init(line: terminal.removedScrollbackCount + 1, column: 1))
@@ -165,11 +165,11 @@ struct TerminalAccessibilityTests {
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("a")
-        #expect(view.accessibilityValue() as? String == "a")
+        #expect(view.accessibilityValue() as? String == "a\n")
 
         session.send(Array("\r".utf8))
         await session.waitForExit()
-        #expect(view.accessibilityValue() as? String == "a\nb")
+        #expect(view.accessibilityValue() as? String == "a\nb\n")
     }
 
     @Test func reusesTheScrollbackOnlyWhileItStaysTheSame() async throws {
@@ -278,10 +278,10 @@ struct TerminalAccessibilityTests {
         try session.start()
         await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
-        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 6, length: 3))
+        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 6, length: 4))
 
         view.scroll(.zero)
-        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 0, length: 3))
+        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 0, length: 4))
     }
 
     @Test func throttlesTheChangeNotifications() async throws {

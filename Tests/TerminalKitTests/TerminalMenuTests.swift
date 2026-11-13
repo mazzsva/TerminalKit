@@ -16,7 +16,7 @@ struct TerminalMenuTests {
         let lines = try #require(view.selectedText).split(separator: "\n", omittingEmptySubsequences: false)
         #expect(lines.prefix(3) == ["1", "2", "3"])
         #expect(lines.contains("30"))
-        #expect(lines.last == "last")
+        #expect(lines.suffix(2) == ["last", ""])
     }
 
     @Test func showsTheEditMenu() async throws {
@@ -84,7 +84,7 @@ struct TerminalMenuTests {
             anchor: .init(line: 0, column: 20), head: .init(line: 0, column: 30))
         #expect(view.validRequestor(forSendType: .string, returnType: nil) as? TerminalContentView === view)
         #expect(view.writeSelection(to: pasteboard, types: [.string]))
-        #expect(pasteboard.string(forType: .string) == "")
+        #expect(pasteboard.string(forType: .string) == "\n")
         view.keyDown(with: try keyDown("x"))
         #expect(await session.linesAfterExit().contains("78"))
     }

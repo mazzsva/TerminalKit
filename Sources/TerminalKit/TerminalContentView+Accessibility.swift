@@ -12,6 +12,7 @@ extension TerminalContentView {
         let revision: Int
         let string: String
         let rows: [NSRange]
+        let length: Int
         private let resizeCount: Int
         private let restoredNormalScreenCount: Int
         private let firstLine: Int
@@ -52,17 +53,18 @@ extension TerminalContentView {
             var rows: [NSRange] = []
             var length = 0
             rows.reserveCapacity(allRows.count)
-            for (index, row) in allRows.enumerated() {
+            for row in allRows {
                 string += row.text
                 rows.append(NSRange(location: length, length: row.length))
                 length += row.length
-                if !row.isWrapped, index < allRows.count - 1 {
+                if !row.isWrapped {
                     string += "\n"
                     length += 1
                 }
             }
             self.string = string
             self.rows = rows
+            self.length = length
         }
 
         private static func row(
@@ -79,10 +81,6 @@ extension TerminalContentView {
                 length += character.utf16.count
             }
             return Row(text: text, length: length, isWrapped: continues)
-        }
-
-        var length: Int {
-            rows.last?.upperBound ?? 0
         }
 
         func row(containing index: Int) -> Int {
@@ -161,7 +159,8 @@ extension TerminalContentView {
         let firstRow = row(at: visibleRect.minY + Self.topPadding, in: text)
         let lastRow = row(at: visibleRect.maxY - Self.bottomPadding - 1, in: text)
         return NSRange(
-            location: text.rows[firstRow].location, length: text.rows[lastRow].upperBound - text.rows[firstRow].location
+            location: text.rows[firstRow].location,
+            length: NSMaxRange(accessibilityRange(forLine: lastRow)) - text.rows[firstRow].location
         )
     }
 
@@ -198,7 +197,7 @@ extension TerminalContentView {
         guard text.rows.indices.contains(line) else {
             return NSRange(location: NSNotFound, length: 0)
         }
-        let end = line + 1 < text.rows.count ? text.rows[line + 1].location : text.rows[line].upperBound
+        let end = line + 1 < text.rows.count ? text.rows[line + 1].location : text.length
         return NSRange(location: text.rows[line].location, length: end - text.rows[line].location)
     }
 
