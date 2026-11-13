@@ -10,6 +10,7 @@ extension TerminalContentView {
 
         var url: URL
         var spans: [Span]
+        var toolTip: String?
     }
 
     enum LinkAction: Equatable {
@@ -102,6 +103,9 @@ extension TerminalContentView {
         guard let (cells, index) = cells(atRow: row, column: column, in: terminal) else {
             return nil
         }
+        if case let link = cells[index].cell.link, link > 0 {
+            return markedLink(link, atRow: row, in: terminal)
+        }
         var text = String.UnicodeScalarView()
         var starts: [Int] = []
         var count = 0
@@ -130,6 +134,37 @@ extension TerminalContentView {
             }
             .sorted { $0.row < $1.row }
         return Link(url: url, spans: spans)
+    }
+
+    private func markedLink(_ link: UInt16, atRow row: Int, in terminal: Terminal) -> Link? {
+        guard let url = terminal.links.uri(of: link).flatMap(URL.init(string:)) else {
+            return nil
+        }
+        let spans = { (row: Int) in
+            let line = self.line(at: row, in: terminal)
+            return line.indices.filter { line[$0].link == link }
+                .reduce(into: [Link.Span]()) { spans, column in
+                    if spans.last?.columns.upperBound == column {
+                        spans[spans.count - 1].columns = spans[spans.count - 1].columns.lowerBound ..< column + 1
+                    } else {
+                        spans.append(Link.Span(row: row, columns: column ..< column + 1))
+                    }
+                }
+        }
+        var result = spans(row)
+        var above = row - 1
+        while above >= max(row - 64, 0), case let found = spans(above), !found.isEmpty {
+            result = found + result
+            above -= 1
+        }
+        var below = row + 1
+        while below < min(row + 65, terminal.scrollback.count + terminal.rows), case let found = spans(below),
+            !found.isEmpty
+        {
+            result += found
+            below += 1
+        }
+        return Link(url: url, spans: result, toolTip: url.absoluteString)
     }
 
     static func detectedLinks(in text: String) -> [Range<Int>] {

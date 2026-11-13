@@ -8,16 +8,18 @@ extension Terminal {
 
         package var style = Style()
         package var width: UInt8 = 1
+        package var link: UInt16 = 0
         fileprivate var content: UInt32 = 0x20
 
-        package init(scalar: Unicode.Scalar = " ", style: Style = Style(), width: UInt8 = 1) {
+        package init(scalar: Unicode.Scalar = " ", style: Style = Style(), width: UInt8 = 1, link: UInt16 = 0) {
             self.style = style
             self.width = width
+            self.link = link
             content = scalar.value
         }
 
-        package static func writtenSpace(style: Style = Style()) -> Cell {
-            var cell = Cell(style: style)
+        package static func writtenSpace(style: Style = Style(), link: UInt16 = 0) -> Cell {
+            var cell = Cell(style: style, link: link)
             cell.content = writtenSpaceContent
             return cell
         }

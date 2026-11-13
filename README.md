@@ -69,6 +69,8 @@ With its default setting, Claude Code rings the bell only when the Terminal.app 
 
 For voice input in a program such as Claude Code, a host app with the hardened runtime needs the audio input entitlement and a microphone usage description, as the example app has.
 
+A Command-click opens marked links too. With Command held over a marked link, a tooltip shows its target. A program marks a link with OSC 8, as Claude Code does for web addresses and file names. Claude Code marks no links in a terminal with the name `Apple_Terminal`, so TerminalKit sets `FORCE_HYPERLINK=1` in the environment, unless the host sets it. A host that does not want marked links sets it to `0`.
+
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
 A held letter key with accents, such as E, shows the accent menu of macOS and does not repeat, as in a text view. For a key that repeats as in Terminal, register `ApplePressAndHoldEnabled` as `false` in the `UserDefaults` of the host app, as the example app does.
@@ -85,13 +87,13 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 
 **A value-type emulator.** The full terminal state is one Swift struct. Tests feed it bytes and compare values.
 
-**Safe links.** A Command-click opens printed web, mail, FTP, and file links. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
+**Safe links.** A Command-click opens web, mail, FTP, and file links, both the links that a program prints and the links that it marks with OSC 8. A file link to an app, an executable, or a Finder alias, even through a symbolic link, shows it in the Finder and never launches it.
 
 **The right size from the first frame.** When the host calls `start()` after it makes the view, as in the example, the process waits until the view has its size, so a full-screen program never draws its first frame at the wrong width and then redraws.
 
 **Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts.
 
-**Never touches the shell.** There are no shell integration scripts and no changes to startup files. The user's own shell starts through `/usr/bin/login`. Programs see `TERM_PROGRAM=Apple_Terminal`, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file. The library also sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1`, so Claude Code uses synchronized output.
+**Never touches the shell.** There are no shell integration scripts and no changes to startup files. The user's own shell starts through `/usr/bin/login`. Programs see `TERM_PROGRAM=Apple_Terminal`, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file. The library also sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1`, so Claude Code uses synchronized output, and `FORCE_HYPERLINK=1`, so Claude Code marks its links.
 
 ## Known limits
 
@@ -105,5 +107,4 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
   - The window reports `CSI 11t`, `CSI 13t`, `CSI 14t`, and `CSI 18t`, and DECREQTPARM (`CSI x`).
   - DECOM, DECALN, mode 47, and LNM.
 - Terminal.app does not have these either, but a host app for agent tools must know them:
-  - OSC 8 marked links. A Command-click opens printed links only.
   - OSC 9 and OSC 777, the notification requests of programs. A host gets no notification event from a program. The signals are the bell, through `bellCount`, and the status that a program reports, through `programStatus`.

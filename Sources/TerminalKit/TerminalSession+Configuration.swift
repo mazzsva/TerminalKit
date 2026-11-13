@@ -112,6 +112,7 @@ extension TerminalSession.Configuration {
                 FileManager.default.fileExists(atPath: "/usr/share/locale/" + name) ? name : "en_US.UTF-8"
         }
         environment["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] = environment["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] ?? "1"
+        environment["FORCE_HYPERLINK"] = environment["FORCE_HYPERLINK"] ?? "1"
         return environment
     }
 

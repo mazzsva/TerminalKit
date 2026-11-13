@@ -148,6 +148,14 @@ extension Terminal {
             return removeOldest()
         }
 
+        func markLinks(into used: inout [Bool]) {
+            Links.markLinks(in: storedLines, into: &used)
+        }
+
+        mutating func remapLinks(with newIndices: [UInt16]) {
+            Links.remapLinks(in: &storedLines, with: newIndices)
+        }
+
         mutating func unwrapLastRow() {
             if !storedLines.isEmpty {
                 storedLines[storedLines.count - 1].isWrapped = false
