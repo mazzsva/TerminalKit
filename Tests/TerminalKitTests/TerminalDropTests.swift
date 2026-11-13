@@ -14,7 +14,7 @@ struct TerminalDropTests {
     @Test(arguments: [
         ("/a/plain-name_1.txt", "/a/plain-name_1.txt"), ("/a b", "/a\\ b"), ("/it's", "/it\\'s"),
         ("/$HOME", "/\\$HOME"), ("/é中文🙂", "/é中文🙂"), ("/a\nb", "/a\\\nb"), ("/a'b\tc", "/a\\'b\\\tc"),
-        ("/a\u{1}b", "/a\u{1}b"),
+        ("/a\u{1}b", "/a\u{1}b"), ("/plain-file_1+2,@%:.txt", "/plain-file_1+2\\,@\\%\\:.txt"),
     ])
     func escapesAPath(path: String, escaped: String) {
         #expect(TerminalContentView.escapedPath(path) == escaped)

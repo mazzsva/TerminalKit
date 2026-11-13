@@ -28,7 +28,7 @@ extension TerminalContentView {
             String.UnicodeScalarView(
                 path.unicodeScalars.flatMap { scalar -> [Unicode.Scalar] in
                     !scalar.isASCII || scalar.properties.isAlphabetic || scalar.properties.numericType != nil
-                        || "/._-+,@%:".unicodeScalars.contains(scalar)
+                        || "/._-+@".unicodeScalars.contains(scalar)
                         || scalar.properties.generalCategory == .control && !scalar.properties.isWhitespace
                         ? [scalar] : ["\\", scalar]
                 }
