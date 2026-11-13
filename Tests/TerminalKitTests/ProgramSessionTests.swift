@@ -14,12 +14,12 @@ struct ProgramSessionTests {
         "CSI 38;2m", "CSI 39m", "CSI 48;2m", "CSI 49m", "CSI 94m", "CSI ?1h", "CSI ?1l", "CSI ?7h", "CSI ?25h",
         "CSI ?25l", "CSI ?1000l", "CSI ?1002l", "CSI ?1003l", "CSI ?1004h", "CSI ?1004l", "CSI ?1006l", "CSI ?1049h",
         "CSI ?1049l", "CSI ?2004h", "CSI ?2004l", "CSI ?2026h", "CSI ?2026l", "OSC 0", "OSC 2", "OSC 7", "OSC 10;?",
-        "OSC 11;?", "CSI 22;1t", "CSI 22;2t", "CSI 23;1t", "CSI 23;2t", "CSI ?4m",
+        "OSC 11;?", "OSC 7501", "CSI 22;1t", "CSI 22;2t", "CSI 23;1t", "CSI 23;2t", "CSI ?4m",
     ]
 
     static let ignored: Set<String> = [
         "ESC \\", "CSI 0%m", "CSI 29m", "CSI ?$p", "CSI ?12h", "CSI ?12l",
-        "CSI ?1034h", "C0 0F", "CSI >q", "CSI ?u", "CSI ?1016l", "CSI ?2031h", "CSI ?2031l", "OSC 7501",
+        "CSI ?1034h", "C0 0F", "CSI >q", "CSI ?u", "CSI ?1016l", "CSI ?2031h", "CSI ?2031l",
     ]
 
     static let ignoredThatTerminalActsOn: Set<String> = ["C0 0F"]

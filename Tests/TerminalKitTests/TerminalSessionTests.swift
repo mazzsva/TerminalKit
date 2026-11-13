@@ -245,6 +245,30 @@ struct TerminalSessionTests {
         #expect(session.currentDirectoryURL == URL(filePath: "/tmp/a b"))
     }
 
+    @Test func showsTheStatusOfTheProgramUntilTheProcessEnds() async throws {
+        let report = "printf '\\033]7501;state=blocked:app=a:kind=permission:msg=b2s=\\007'"
+        let session = TerminalSession(running: "\(report); read line; \(report); echo more; read line")
+        #expect(session.programStatus == nil)
+        try session.start()
+        let blocked = TerminalSession.ProgramStatus(
+            state: .blocked, application: "a", kind: "permission", message: "ok")
+        for await status in Observations({ session.programStatus }) where status == blocked {
+            break
+        }
+        let changes = Mutex(0)
+        withObservationTracking {
+            _ = session.programStatus
+        } onChange: {
+            changes.withLock { $0 += 1 }
+        }
+        session.send(Array("\r".utf8))
+        await session.waitForText("more")
+        #expect(changes.withLock { $0 } == 0)
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+        #expect(session.programStatus == nil)
+    }
+
     @Test func keepsTheTitleForOtherOutput() async throws {
         let session = TerminalSession(running: "printf '\\033]0;Title\\007'; read line; echo more")
         try session.start()

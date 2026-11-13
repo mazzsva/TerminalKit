@@ -16,11 +16,26 @@ public final class TerminalSession {
         case uncaughtSignal(Int32)
     }
 
+    public struct ProgramStatus: Hashable, Sendable {
+        public enum State: Hashable, Sendable {
+            case idle
+            case working
+            case done
+            case blocked
+        }
+
+        public let state: State
+        public let application: String?
+        public let kind: String?
+        public let message: String?
+    }
+
     private let configuration: Configuration
     public private(set) var state = State.idle
     public private(set) var title = ""
     public private(set) var bellCount = 0
     public private(set) var currentDirectoryURL: URL?
+    public private(set) var programStatus: ProgramStatus?
 
     var liveTerminal = Terminal(columns: 80, rows: 24) {
         didSet {
@@ -200,6 +215,7 @@ public final class TerminalSession {
         guard let termination = pseudoTerminal?.termination else {
             return
         }
+        programStatus = nil
         state = .exited(Termination(termination))
         pseudoTerminal = nil
         if liveTerminal.isSynchronizingOutput {
@@ -252,6 +268,10 @@ public final class TerminalSession {
         if currentDirectoryURL != liveTerminal.currentDirectory {
             currentDirectoryURL = liveTerminal.currentDirectory
         }
+        let status = liveTerminal.programStatus.map(ProgramStatus.init)
+        if programStatus != status {
+            programStatus = status
+        }
         if !replies.isEmpty {
             pseudoTerminal?.write(replies, isReply: true)
         }
@@ -288,5 +308,23 @@ extension TerminalSession.Termination {
         case .uncaughtSignal(let signal):
             self = .uncaughtSignal(signal)
         }
+    }
+}
+
+extension TerminalSession.ProgramStatus {
+    fileprivate init(_ status: Terminal.ProgramStatus) {
+        switch status.state {
+        case .idle:
+            state = .idle
+        case .working:
+            state = .working
+        case .done:
+            state = .done
+        case .blocked:
+            state = .blocked
+        }
+        application = status.application
+        kind = status.kind
+        message = status.message
     }
 }

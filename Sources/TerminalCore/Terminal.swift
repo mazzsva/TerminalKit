@@ -50,6 +50,7 @@ package struct Terminal: Sendable {
     package internal(set) var graphemes = Graphemes()
     package private(set) var bellCount = 0
     package internal(set) var currentDirectory: URL?
+    package internal(set) var programStatus: ProgramStatus?
     package private(set) var mouseTracking = MouseTracking.off
     package var defaultColors: DefaultColors?
     package internal(set) var changedColors = ChangedColors()
@@ -743,6 +744,8 @@ package struct Terminal: Sendable {
             changeDynamicColors(text, from: number)
         case (112, _):
             changedColors.cursor = nil
+        case (7501, let text?):
+            reportProgramStatus(text)
         default:
             break
         }
@@ -752,6 +755,7 @@ package struct Terminal: Sendable {
         exitAlternateScreen()
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
+        terminal.programStatus = programStatus
         terminal.bellCount = bellCount
         terminal.synchronizedOutputCount = synchronizedOutputCount
         terminal.defaultColors = defaultColors
