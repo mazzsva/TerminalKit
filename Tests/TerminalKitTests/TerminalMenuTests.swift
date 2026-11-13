@@ -39,7 +39,7 @@ struct TerminalMenuTests {
         #expect(!view.validateMenuItem(menu.items[0]))
         view.selectAll(nil)
         #expect(view.validateMenuItem(menu.items[0]))
-        #expect(view.selectedText == "text")
+        #expect(view.selectedText?.hasPrefix("text\n") == true)
     }
 
     @Test func offersTheSelectionToServices() async throws {

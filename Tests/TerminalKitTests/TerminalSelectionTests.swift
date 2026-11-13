@@ -354,13 +354,13 @@ struct TerminalSelectionTests {
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
         view.selectAll(nil)
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 4, in: view, modifierFlags: .shift))
-        #expect(view.selectedText == "two three")
+        #expect(view.selectedText == "two three" + String(repeating: "\n", count: view.session.terminal.rows - 1))
     }
 
     @Test func copiesATabAsOneCharacter() async throws {
         let view = try await view(running: "printf 'a\\tb'")
         view.selectAll(nil)
-        #expect(view.selectedText == "a\tb")
+        #expect(view.selectedText?.hasPrefix("a\tb\n") == true)
     }
 
     @Test func extendsByCharactersWithAShiftClickAfterFind() async throws {

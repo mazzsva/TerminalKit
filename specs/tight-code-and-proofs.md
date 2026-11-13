@@ -73,6 +73,7 @@ Each one needs a test.
 - The removal of 33 inherited environment variables, such as `TMUX`, `COLUMNS`, `CLAUDECODE`, and `SSH_TTY`: with its code removed, no requirement and no script step failed. Gone (#396).
 - The swallow of DCS, SOS, PM, and APC strings: with its code removed, no requirement and no script step failed. vim probes for it and completes its script. Gone (#397).
 - The title stack (`CSI 22 t` and `CSI 23 t`): with its code removed, only tests of the title stack failed, one of them the check of the title in the vim test. Gone (#398).
+- The stop of Select All at the last row that holds text (Terminal.app selects to the end of the last row of the screen): with its code removed, only tests whose expected copy held the stop failed. Gone (#409).
 - The trim of printed spaces in a copy and in the text for VoiceOver (each dropped the spaces that a program printed at the end of a row, and Terminal.app keeps them): with its code removed, only tests of the trim failed. Gone (#401 for the copy, and #403 for the text for VoiceOver).
 - The spaces in the text for VoiceOver for the cells up to the cursor that no program wrote (Terminal.app gives none): with its code removed, only the test of these spaces failed. Gone (#408).
 - The lines for VoiceOver of a wrapped line (one line for each logical line, where Terminal.app gives one line for each row): with its code removed, only tests of the line rule failed. Gone (#406).

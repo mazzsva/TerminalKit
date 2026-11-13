@@ -162,7 +162,8 @@ struct TerminalFindTests {
             view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: rows + 2, column: 20, in: view))
             view.mouseUp(with: try mouseEvent(.leftMouseUp, row: rows + 2, column: 20, in: view))
         }
-        #expect(view.selectedText?.hasSuffix("alt one\nalt two\nhttp://example.com/b") == true)
+        let blankRows = selectsAll ? String(repeating: "\n", count: rows - 3) : ""
+        #expect(view.selectedText?.hasSuffix("alt one\nalt two\nhttp://example.com/b" + blankRows) == true)
         let stale = view.selection
 
         _ = session.liveTerminal.receive(Array("\u{1B}[?1049l".utf8))
