@@ -135,6 +135,13 @@ struct EmojiWidthTests {
         #expect(terminal.screen[1].allSatisfy { $0 == Terminal.Cell() })
     }
 
+    @Test func dropsTheTextAfterAClusterThatWidensToTheLastColumnWithoutAutowrap() {
+        var terminal = Terminal(columns: 4, rows: 1)
+        terminal.receive("\u{1B}[?7lab" + Self.heart + "x")
+        #expect(terminal.screen[0].map(\.width) == [1, 1, 2, 0])
+        #expect(terminal.character(of: terminal.screen[0][2]) == Self.heart)
+    }
+
     @Test func insertsTheSecondCellOfAClusterInInsertMode() {
         var terminal = Terminal(columns: 6, rows: 1)
         terminal.receive("abc\u{1B}[1G\u{1B}[4h" + Self.heart)

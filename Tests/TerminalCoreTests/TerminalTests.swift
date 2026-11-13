@@ -883,6 +883,25 @@ struct TerminalTests {
         #expect(terminal.cursor == Terminal.Position(row: 3, column: 2))
     }
 
+    @Test func movesTheCursorForAFullLastRowAfterAResizeAddedARow() {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("x\r\ny\r\nab\r\ncdef")
+        terminal.resize(columns: 4, rows: 3)
+        terminal.receive("\u{1B}[3;1Hghij\u{1B}[1;1H")
+        terminal.resize(columns: 4, rows: 4)
+        #expect(scrollback(terminal) == ["x"])
+        #expect(lines(terminal) == ["y   ", "ab  ", "cdef", "ghij"])
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 1))
+    }
+
+    @Test func removesTheErasedCellsOfALineLongerThanTheAlternateScreen() {
+        var terminal = Terminal(columns: 6, rows: 1)
+        terminal.receive("\u{1B}[?1049habcdef")
+        terminal.resize(columns: 5, rows: 1)
+        terminal.receive("\u{1B}[3G\u{1B}[K")
+        #expect(lines(terminal) == ["abf  "])
+    }
+
     @Test(arguments: [(3, "\u{1B}[?1049h")])
     func resizesTheAlternateScreenAfterTheRowsChange(rows: Int, sequence: String) {
         var terminal = Terminal(columns: 4, rows: rows)

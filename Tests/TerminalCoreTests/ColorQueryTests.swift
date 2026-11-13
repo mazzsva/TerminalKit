@@ -35,6 +35,16 @@ struct ColorQueryTests {
         #expect(changes.indexed == [2: Terminal.RGB(red: 0x5000, green: 0x6000, blue: 0x7000)])
     }
 
+    @Test func changesTheFirstAndTheLastIndexedColor() {
+        var terminal = coloredTerminal()
+        terminal.receive("\u{1B}]4;0;#102030;255;#405060\u{7}")
+        #expect(
+            terminal.changedColors.indexed == [
+                0: Terminal.RGB(red: 0x1000, green: 0x2000, blue: 0x3000),
+                255: Terminal.RGB(red: 0x4000, green: 0x5000, blue: 0x6000),
+            ])
+    }
+
     @Test func clearsOnlyTheIndexedColorsOnAReset() {
         for reset in ["\u{1B}c", "\u{1B}[!p"] {
             var terminal = coloredTerminal()
