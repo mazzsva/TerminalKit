@@ -278,10 +278,10 @@ struct TerminalAccessibilityTests {
         try session.start()
         await session.waitForExit()
         scrollView.layoutSubtreeIfNeeded()
-        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 6, length: 3))
+        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 6, length: 4))
 
         view.scroll(.zero)
-        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 0, length: 3))
+        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 0, length: 4))
     }
 
     @Test func throttlesTheChangeNotifications() async throws {
