@@ -130,7 +130,7 @@ extension TerminalContentView {
             guard !continues else {
                 return line.count
             }
-            return (line.lastIndex { !$0.isSpace }).map { $0 + 1 } ?? 0
+            return line.lastIndex(where: \.isWritten).map { $0 + 1 } ?? 0
         }
     }
 
