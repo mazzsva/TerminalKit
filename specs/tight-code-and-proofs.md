@@ -75,6 +75,7 @@ Each one needs a test.
 - The title stack (`CSI 22 t` and `CSI 23 t`): with its code removed, only tests of the title stack failed, one of them the check of the title in the vim test. Gone (#398).
 - The trim of printed spaces in a copy and in the text for VoiceOver (each dropped the spaces that a program printed at the end of a row, and Terminal.app keeps them): with its code removed, only tests of the trim failed. Gone (#401 for the copy, and #403 for the text for VoiceOver).
 - The lines for VoiceOver of a wrapped line (one line for each logical line, where Terminal.app gives one line for each row): with its code removed, only tests of the line rule failed. Gone (#406).
+- The quoting of a pasted or dropped path that holds a control character (`$'...'` with `\xNN` escapes, where Terminal.app puts a backslash before a tab or a line break and sends other control characters as they are): with its code removed, only tests of the quoting failed. Gone (#407).
 - Synchronized output (mode 2026, with `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1`): with its code removed, the view drew frames that the program did not complete, so requirement 6 of the first spec failed. Each step of the real Claude Code session in the window passed without it. Stays.
 
 ## Deviations
