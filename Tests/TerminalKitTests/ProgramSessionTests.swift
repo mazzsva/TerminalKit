@@ -14,13 +14,12 @@ struct ProgramSessionTests {
         "CSI 49m", "CSI 94m", "CSI ?1h", "CSI ?1l", "CSI ?7h", "CSI ?25h", "CSI ?25l", "CSI ?1000l", "CSI ?1002l",
         "CSI ?1003l", "CSI ?1004h", "CSI ?1004l", "CSI ?1006l", "CSI ?1049h", "CSI ?1049l", "CSI ?2004h",
         "CSI ?2004l", "CSI ?2026h", "CSI ?2026l", "OSC 0", "OSC 2", "OSC 7", "OSC 10;?", "OSC 11;?", "OSC 7501",
-        "CSI 22;1t", "CSI 22;2t", "CSI 23;1t", "CSI 23;2t",
     ]
 
     static let ignored: Set<String> = [
         "ESC \\", "CSI 0%m", "CSI 29m", "CSI ?$p", "CSI ?12h", "CSI ?12l", "CSI ?1034h", "C0 0F", "CSI >q",
         "CSI ?u", "CSI ?1016l", "CSI ?2031h", "CSI ?2031l", "CSI >4m", "CSI >4;0m", "CSI >4;2m", "CSI ?4m",
-        "ESC P",
+        "ESC P", "CSI 22;1t", "CSI 22;2t", "CSI 23;1t", "CSI 23;2t",
     ]
 
     static let ignoredThatTerminalActsOn: Set<String> = ["C0 0F"]
@@ -63,12 +62,9 @@ struct ProgramSessionTests {
     @Test(.enabled(if: isInstalled("/usr/bin/vim")))
     func vim() async throws {
         try await run { session in
-            try await session.start([
-                "/bin/sh", "-c", "printf '\\033]2;before vim\\007'; exec /usr/bin/vim --cmd 'set title' notes.txt",
-            ])
+            try await session.start(["/usr/bin/vim", "notes.txt"])
             try await session.wait {
                 $0.lines[23].hasPrefix("\"notes.txt\" [New]") && $0.cursor == Terminal.Position(row: 0, column: 0)
-                    && $0.terminal.title.contains("notes.txt")
             }
             await session.send("ifirst line\rsecond line\u{1B}")
             try await session.wait {
@@ -83,7 +79,6 @@ struct ProgramSessionTests {
             await session.send(":wq\r")
             #expect(try await session.exit() == .exit(0))
             await expectNormalScreen(session)
-            #expect(await session.terminal.title == "before vim")
             #expect(
                 try String(contentsOf: session.url("work/notes.txt"), encoding: .utf8)
                     == "first line end\nsecond line\n")

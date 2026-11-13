@@ -31,7 +31,6 @@ package struct Terminal: Sendable {
 
     private static let maximumBytesPerCell = 1_024
     private static let maximumRepeatCount = 1_000_000
-    private static let maximumTitleStackDepth = 10
 
     package private(set) var columns: Int
     package private(set) var rows: Int
@@ -97,7 +96,6 @@ package struct Terminal: Sendable {
     var replies: [UInt8] = []
     private var normalSavedCursor: SavedCursor?
     private var alternateSavedCursor: SavedCursor?
-    private var titleStack: [String] = []
     private var repeatsLeft = 0
     private var synchronizedSnapshot: [Terminal] = []
 
@@ -374,13 +372,6 @@ package struct Terminal: Sendable {
             reportStatus(sequence.parameter(at: 0, default: 0))
         case "r":
             setScrollRegion(top: count - 1, bottom: min(sequence.parameter(at: 1, default: rows), rows))
-        case "t" where count == 22 && sequence.parameter(at: 1, default: 0) <= 2:
-            let saved = sequence.parameter(at: 1, default: 0) == 1 ? titleStack.last ?? title : title
-            titleStack = Array((titleStack + [saved]).suffix(Self.maximumTitleStackDepth))
-        case "t" where count == 23 && sequence.parameter(at: 1, default: 0) <= 2:
-            if let saved = titleStack.popLast(), sequence.parameter(at: 1, default: 0) != 1 {
-                title = saved
-            }
         default:
             break
         }
