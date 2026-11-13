@@ -43,6 +43,7 @@
         },
       ],
       "build-settings": {
+        "CODE_SIGN_ENTITLEMENTS": "TerminalKitExample/TerminalKitExample.entitlements",
         "CODE_SIGN_IDENTITY": "-",
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "1",
@@ -51,6 +52,7 @@
         "ENABLE_PREVIEWS": "YES",
         "GCC_TREAT_WARNINGS_AS_ERRORS": "YES",
         "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_KEY_NSMicrophoneUsageDescription": "A program in the terminal asks for the microphone.",
         "LD_RUNPATH_SEARCH_PATHS": "@executable_path/../Frameworks",
         "MACOSX_DEPLOYMENT_TARGET": "27.0",
         "MARKETING_VERSION": "1.0",

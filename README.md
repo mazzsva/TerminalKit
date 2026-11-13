@@ -65,6 +65,8 @@ Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the s
 
 With its default setting, Claude Code rings the bell only when the Terminal.app profile of the user has the audible bell off. To get the bell for a permission request and for a finished task in each case, start it with `claude --settings '{"preferredNotifChannel":"terminal_bell"}'`. The bell comes some seconds after the request, and one minute after the end of the task.
 
+For voice input in a program such as Claude Code, a host app with the hardened runtime needs the audio input entitlement and a microphone usage description, as the example app has.
+
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
 A held letter key with accents, such as E, shows the accent menu of macOS and does not repeat, as in a text view. For a key that repeats as in Terminal, register `ApplePressAndHoldEnabled` as `false` in the `UserDefaults` of the host app, as the example app does.
