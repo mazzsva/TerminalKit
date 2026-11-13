@@ -14,8 +14,8 @@ struct ProgramSessionTests {
         "CSI 38;2m", "CSI 39m", "CSI 48;2m", "CSI 49m", "CSI 94m", "CSI ?1h", "CSI ?1l", "CSI ?7h", "CSI ?25h",
         "CSI ?25l", "CSI ?1000l", "CSI ?1002l", "CSI ?1003l", "CSI ?1004h", "CSI ?1004l", "CSI ?1006l", "CSI ?1049h",
         "CSI ?1049l", "CSI ?2004h", "CSI ?2004l", "CSI ?2026h", "CSI ?2026l", "CSI ?2031h", "CSI ?2031l", "OSC 0",
-        "OSC 2", "OSC 7", "OSC 10;?",
-        "OSC 11;?", "OSC 7501", "CSI 22;1t", "CSI 22;2t", "CSI 23;1t", "CSI 23;2t", "CSI ?4m",
+        "OSC 2", "OSC 7", "OSC 8", "OSC 10;?", "OSC 11;?", "OSC 7501", "CSI 22;1t", "CSI 22;2t", "CSI 23;1t",
+        "CSI 23;2t", "CSI ?4m",
     ]
 
     static let ignored: Set<String> = [
@@ -268,6 +268,12 @@ struct ProgramSessionTests {
         try #require(
             try String(contentsOf: folder.appending(path: "note.txt"), encoding: .utf8)
                 .trimmingCharacters(in: .newlines) == "tk-file")
+        if let session = session as? WindowSession {
+            let (uris, actions) = try await session.commandClick(on: "note.txt", inLineWithPrefix: "⏺ Write(note.txt)")
+            let url = try #require(uris.count == 1 ? uris.first.flatMap { $0 }.flatMap(URL.init(string:)) : nil)
+            try #require(url.resolvingSymlinksInPath() == folder.appending(path: "note.txt").resolvingSymlinksInPath())
+            try #require(actions == [.open(url)])
+        }
 
         await session.send("/")
         try await session.wait { $0.input == ["❯ /"] && $0.menuRows.count >= 5 }
@@ -335,6 +341,9 @@ struct ProgramSessionTests {
             }
         }
         #expect(events.count { $0.screen != nil } > 10)
+        #expect(
+            (Array(whole.scrollback) + whole.screen).joined()
+                .contains { whole.links.uri(of: $0.link) == "file:///private/tmp/TerminalKitClaudeSession/note.txt" })
         let unknown = ProgramSession.controlFunctions(in: output).subtracting(Self.handled).subtracting(Self.ignored)
         #expect(unknown.isEmpty, "Not in a list: \(unknown.sorted())")
     }

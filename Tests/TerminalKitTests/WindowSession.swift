@@ -83,6 +83,29 @@ final class WindowSession {
             ))
     }
 
+    func commandClick(
+        on text: String, inLineWithPrefix prefix: String
+    ) throws -> (uris: Set<String?>, actions: [TerminalContentView.LinkAction]) {
+        let view = try #require(view)
+        let terminal = terminal
+        let row = try #require(ProgramSession.lines(of: terminal).firstIndex { $0.hasPrefix(prefix) })
+        let cells = terminal.screen[row].indices.filter { terminal.screen[row][$0].width > 0 }
+        let characters = cells.map { terminal.character(of: terminal.screen[row][$0]) }
+        let start = try #require(
+            characters.indices.first { characters[$0...].prefix(text.count).joined() == text })
+        let columns = cells[start ..< start + text.count]
+        let uris = Set(columns.map { terminal.links.uri(of: terminal.screen[row][$0].link) })
+        var actions: [TerminalContentView.LinkAction] = []
+        view.performLinkAction = { actions.append($0) }
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = try mouseEvent(
+                type, row: terminal.scrollback.count + row, column: CGFloat(columns.first ?? 0) + 0.5, in: view,
+                modifierFlags: .command)
+            type == .leftMouseDown ? view.mouseDown(with: event) : view.mouseUp(with: event)
+        }
+        return (uris, actions)
+    }
+
     func scrollsBack(to line: @Sendable (String) -> Bool) async throws -> Bool {
         let isShown = try await scroll(lines: 10) { $0.contains(where: line) }
         let isAtBottom = try await scroll(lines: -10) { _ in
