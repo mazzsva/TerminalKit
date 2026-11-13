@@ -20,6 +20,7 @@ struct ProgramSessionTests {
     static let ignored: Set<String> = [
         "ESC \\", "CSI 0%m", "CSI 29m", "CSI ?$p", "CSI ?12h", "CSI ?12l", "CSI ?1034h", "C0 0F", "CSI >q",
         "CSI ?u", "CSI ?1016l", "CSI ?2031h", "CSI ?2031l", "CSI >4m", "CSI >4;0m", "CSI >4;2m", "CSI ?4m",
+        "ESC P",
     ]
 
     static let ignoredThatTerminalActsOn: Set<String> = ["C0 0F"]

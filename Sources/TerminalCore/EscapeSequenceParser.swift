@@ -32,7 +32,6 @@ struct EscapeSequenceParser: Sendable {
         case operatingSystemCommandNumber
         case operatingSystemCommand
         case operatingSystemCommandEscape
-        case ignoredString
     }
 
     private static let maximumIntermediates = 2
@@ -66,7 +65,7 @@ struct EscapeSequenceParser: Sendable {
             return nil
         case "\u{7}" where isInOperatingSystemCommand:
             return finishString()
-        case "\u{0}" ... "\u{1F}" where isInOperatingSystemCommand || state == .ignoredString, "\u{7F}":
+        case "\u{0}" ... "\u{1F}" where isInOperatingSystemCommand, "\u{7F}":
             return nil
         case "\u{0}" ... "\u{1F}":
             return .execute(scalar)
@@ -92,7 +91,7 @@ struct EscapeSequenceParser: Sendable {
         case .operatingSystemCommand:
             collectString(scalar)
             return nil
-        case .operatingSystemCommandEscape, .ignoredString:
+        case .operatingSystemCommandEscape:
             return nil
         }
     }
@@ -110,8 +109,6 @@ struct EscapeSequenceParser: Sendable {
             state = .controlSequence
         case "]":
             state = .operatingSystemCommandNumber
-        case "P", "X", "^", "_":
-            state = .ignoredString
         case "0" ... "~":
             state = .ground
             return .escape(intermediates: intermediates, final: scalar)

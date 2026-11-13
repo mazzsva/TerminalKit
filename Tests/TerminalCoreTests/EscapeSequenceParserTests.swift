@@ -143,12 +143,6 @@ struct EscapeSequenceParserTests {
     func ignoresAnOperatingSystemCommandWithAnotherNumber(number: String) {
         #expect(parse("\u{1B}]\(number);A\u{7}B") == [.print("B")])
     }
-
-    @Test(arguments: ["P", "X", "^", "_"])
-    func ignoresStrings(introducer: String) {
-        #expect(
-            parse("\u{1B}\(introducer)1$q\n\u{7}\u{1B}\\A") == [.escape(intermediates: "", final: "\\"), .print("A")])
-    }
 }
 
 private func parse(_ text: String) -> [EscapeSequenceParser.Action] {
