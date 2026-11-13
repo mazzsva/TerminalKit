@@ -40,7 +40,6 @@ extension PseudoTerminal {
         private struct State {
             var bytes: [UInt8] = []
             var isSuspended = false
-            var isCancelled = false
         }
 
         private let source: any DispatchSourceRead
@@ -58,7 +57,7 @@ extension PseudoTerminal {
                     wakeUp.yield()
                 }
                 state.bytes += bytes
-                if state.bytes.count >= Output.capacity, !state.isSuspended, !state.isCancelled {
+                if state.bytes.count >= Output.capacity, !state.isSuspended {
                     state.isSuspended = true
                     source.suspend()
                 }
@@ -67,7 +66,7 @@ extension PseudoTerminal {
 
         func take() -> [UInt8] {
             state.withLock { state in
-                if state.isSuspended, !state.isCancelled {
+                if state.isSuspended {
                     state.isSuspended = false
                     source.resume()
                 }
@@ -79,10 +78,6 @@ extension PseudoTerminal {
 
         func cancel() {
             state.withLock { state in
-                guard !state.isCancelled else {
-                    return
-                }
-                state.isCancelled = true
                 if state.isSuspended {
                     state.isSuspended = false
                     source.resume()

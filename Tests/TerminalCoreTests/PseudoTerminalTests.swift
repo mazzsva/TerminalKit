@@ -52,6 +52,29 @@ struct PseudoTerminalTests {
         #expect(kill(processIdentifier, SIGKILL) == 0)
     }
 
+    @Test func keepsAJobThatOutlivesTheExitedProcess() async throws {
+        let output = try await output("trap '' HUP; /bin/sleep 600 & echo $!")
+        let job = try #require(pid_t(output.trimmingCharacters(in: .whitespacesAndNewlines)))
+        defer { kill(job, SIGKILL) }
+        let later = try PseudoTerminal(
+            executableURL: URL(filePath: "/bin/sh"),
+            arguments: ["-c", "trap '' HUP; echo ready; exec /bin/sleep 600"],
+            environment: [:],
+            columns: 80,
+            rows: 24
+        )
+        var iterator = later.output.makeAsyncIterator()
+        var text = ""
+        while !text.contains("ready"), let bytes = await iterator.next() {
+            text += String(decoding: bytes, as: UTF8.self)
+        }
+        later.hangUp()
+        while kill(later.processIdentifier, 0) == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(kill(job, 0) == 0)
+    }
+
     @Test func readsAllOutputBeforeTheExit() async throws {
         #expect(try await output("head -c 200000 /dev/zero | tr '\\0' a").count == 200_000)
     }
@@ -105,6 +128,22 @@ struct PseudoTerminalTests {
         #expect(!FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
         for await _ in pseudoTerminal.output {}
         #expect(FileManager.default.fileExists(atPath: marker.path(percentEncoded: false)))
+    }
+
+    @Test func readsNoMoreThanTheCapacityAheadOfTheReader() async throws {
+        let pseudoTerminal = try PseudoTerminal(
+            executableURL: URL(filePath: "/bin/sh"),
+            arguments: ["-c", "stty -opost; exec head -c 4000000 /dev/zero"],
+            environment: [:],
+            columns: 80,
+            rows: 24
+        )
+        var sizes: [Int] = []
+        for await bytes in pseudoTerminal.output {
+            sizes.append(bytes.count)
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(sizes.allSatisfy { $0 <= PseudoTerminal.Output.capacity })
     }
 
     @Test func sendsALargeInputInOrder() async throws {
