@@ -2,7 +2,7 @@
 
 Native macOS terminal view for SwiftUI, built on AppKit.
 
-TerminalKit is a terminal view for Mac apps in which a login shell and agent tools such as Claude Code work as well as in the best Mac terminals. Terminal.app stays the model only for what a person does in the view: selection, copy, paste, drag and drop, scroll, Find, VoiceOver, and the default look.
+TerminalKit is a terminal view for Mac apps. In it, the zsh login shell, vim, less, man, top, nano, git, and Claude Code work at least as well as in Terminal.app, and the host app also gets the status that a program reports. Terminal.app is also the model for what a person does in the view: selection, copy, paste, drag and drop, scroll, Find, VoiceOver, and the default look.
 
 ## Core technologies
 
