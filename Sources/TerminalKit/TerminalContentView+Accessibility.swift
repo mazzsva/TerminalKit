@@ -12,8 +12,6 @@ extension TerminalContentView {
         let revision: Int
         let string: String
         let rows: [NSRange]
-        let lines: [NSRange]
-        let lineOfRow: [Int]
         private let resizeCount: Int
         private let restoredNormalScreenCount: Int
         private let firstLine: Int
@@ -58,30 +56,19 @@ extension TerminalContentView {
             let allRows = scrollback + screen
             var string = ""
             var rows: [NSRange] = []
-            var lines: [NSRange] = []
-            var lineOfRow: [Int] = []
             var length = 0
-            var lineStart = 0
             rows.reserveCapacity(allRows.count)
-            lineOfRow.reserveCapacity(allRows.count)
             for (index, row) in allRows.enumerated() {
                 string += row.text
                 rows.append(NSRange(location: length, length: row.length))
                 length += row.length
-                lineOfRow.append(lines.count)
-                if !row.isWrapped {
-                    if index < allRows.count - 1 {
-                        string += "\n"
-                        length += 1
-                    }
-                    lines.append(NSRange(location: lineStart, length: length - lineStart))
-                    lineStart = length
+                if !row.isWrapped, index < allRows.count - 1 {
+                    string += "\n"
+                    length += 1
                 }
             }
             self.string = string
             self.rows = rows
-            self.lines = lines
-            self.lineOfRow = lineOfRow
         }
 
         private static func row(
@@ -208,18 +195,21 @@ extension TerminalContentView {
     }
 
     override func accessibilityInsertionPointLineNumber() -> Int {
-        let text = accessibilityText
-        return text.lineOfRow[session.terminal.scrollback.count + session.terminal.cursor.row]
+        session.terminal.scrollback.count + session.terminal.cursor.row
     }
 
     override func accessibilityLine(for index: Int) -> Int {
         let text = accessibilityText
-        return text.lineOfRow[text.row(containing: min(max(index, 0), text.length))]
+        return text.row(containing: min(max(index, 0), text.length))
     }
 
     override func accessibilityRange(forLine line: Int) -> NSRange {
         let text = accessibilityText
-        return text.lines.indices.contains(line) ? text.lines[line] : NSRange(location: NSNotFound, length: 0)
+        guard text.rows.indices.contains(line) else {
+            return NSRange(location: NSNotFound, length: 0)
+        }
+        let end = line + 1 < text.rows.count ? text.rows[line + 1].location : text.rows[line].upperBound
+        return NSRange(location: text.rows[line].location, length: end - text.rows[line].location)
     }
 
     override func accessibilityString(for range: NSRange) -> String? {
