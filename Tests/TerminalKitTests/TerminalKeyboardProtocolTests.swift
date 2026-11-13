@@ -49,14 +49,15 @@ struct TerminalKeyboardProtocolTests {
         #expect(await session.linesAfterExit().contains { $0.hasSuffix(" c2  b4  78") })
     }
 
-    @Test func keepsTheAlternateScreenWithCommandK() async throws {
+    @Test func clearsToStartOnTheAlternateScreenWithCommandK() async throws {
         let session = TerminalSession(
-            running: "printf 'a\\n\\033[?1049hb\\nc'; stty raw -echo; echo ready; head -c 1 >/dev/null")
+            running: "printf 'a\\n\\033[?1049hb\\nc'; stty raw -echo; printf ready; head -c 1 >/dev/null")
         let view = TerminalContentView(session: session)
         try session.start()
         await session.waitForText("ready")
         view.keyDown(with: try keyDown("k", modifierFlags: .command))
-        #expect(session.lines.prefix(2) == ["b", "cready"])
+        #expect(session.lines.prefix(2) == ["cready", ""])
+        #expect(session.terminal.scrollback.isEmpty)
         session.send("x")
         await session.waitForExit()
     }
