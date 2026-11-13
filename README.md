@@ -30,7 +30,7 @@ TerminalKit is a terminal view for Mac apps. In it, the zsh login shell, vim, le
 Add the package with Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/mazzsva/TerminalKit", from: "2.0.0")
+.package(url: "https://github.com/mazzsva/TerminalKit", from: "2.1.0")
 ```
 
 Then show a terminal that runs Claude Code:
