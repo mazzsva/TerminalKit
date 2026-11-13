@@ -57,7 +57,7 @@ Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent befor
 
 In bracketed paste mode, `paste(_:)` sends nothing when the text contains the end marker `ESC [201~`, also when a combining mark follows it.
 
-Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`. When the host changes the palette between dark and light, TerminalKit tells a program that asked for it, so Claude Code with its automatic theme follows.
+Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
 
 To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, `programStatus`, and `state` of `TerminalSession`. A login shell runs under `/usr/bin/login`, so its `state` at the end is an exit with status 0, also when the shell ends with another status or by a signal. A configuration with an executable of its own gives the real status.
 
