@@ -18,6 +18,7 @@ TerminalKit aimed at an exact replica of Terminal.app. That aim has no end, and 
 - Of the features that #239 to #248 and #312 removed, only the title stack comes back, because vim uses it. Another one comes back only when a listed program uses it with the terminal name below.
 - TerminalKit keeps the terminal name `Apple_Terminal`. In a measurement, Claude Code sent the same control sequences with each honest name, and this name makes the shell report the current directory.
 - The host app gets the signals that an app needs to follow a session: title, bell, notification, current directory, and process exit (assumed)
+- The host app also gets the status that a program reports with the Program Status Protocol (OSC 7501), because Claude Code reports with it when it works, waits for a permission, or is done, and its bell comes late or not at all. TerminalKit answers the query of that protocol, though Terminal.app does not.
 - The owner tags 2.0.0 when each requirement passes. After that, only a measured defect becomes work (assumed)
 
 ## Requirements
@@ -28,7 +29,7 @@ TerminalKit aimed at an exact replica of Terminal.app. That aim has no end, and 
 5. TerminalKit acts on each control sequence and answers each query that a listed program sends during its script. A test lists each one that TerminalKit ignores on purpose, and the README names each of those that Terminal.app acts on.
 6. While a program redraws the full screen of 200 columns by 60 rows on each key, the view never draws a frame that the program did not complete.
 7. A Command-click opens a link that a program marks or prints, with the safe link rules that exist now.
-8. The host app can read the title and the current directory, and gets an event for the bell, for a notification that a program requests, and for the exit of the process.
+8. The host app can read the title, the current directory, and the status that a program reports, and gets an event for the bell, for a notification that a program requests, and for the exit of the process.
 9. In a release build, the output of a 100 MB text file takes no longer than in Terminal.app, and one resize step with 100,000 saved lines takes less than 100 ms.
 10. A run of 1,000,000 byte streams, random and made from the sequence grammar, causes no crash and no hang.
 11. What a person does in the view stays as it is now: each current test of selection, copy, paste, drag and drop, scroll, Find, and VoiceOver passes.
