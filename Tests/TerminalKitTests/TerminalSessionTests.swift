@@ -76,7 +76,7 @@ struct TerminalSessionTests {
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
                 "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "488", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1",
-                "FORCE_HYPERLINK": "1", "PATH": "/bin",
+                "PATH": "/bin",
             ])
     }
 
@@ -89,7 +89,6 @@ struct TerminalSessionTests {
         #expect(environment["TERM_PROGRAM"] == "Apple_Terminal")
         #expect(environment["TERM_PROGRAM_VERSION"] == "488")
         #expect(environment["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] == inherited["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] ?? "1")
-        #expect(environment["FORCE_HYPERLINK"] == inherited["FORCE_HYPERLINK"] ?? "1")
         #expect(environment["TERM_SESSION_ID"] == nil)
     }
 
@@ -122,11 +121,6 @@ struct TerminalSessionTests {
         let environment = TerminalSession.Configuration.terminalEnvironment(
             inheriting: ["CLAUDE_CODE_FORCE_SYNC_OUTPUT": "0"])
         #expect(environment["CLAUDE_CODE_FORCE_SYNC_OUTPUT"] == "0")
-    }
-
-    @Test func keepsTheLinkSettingOfTheHost() {
-        let environment = TerminalSession.Configuration.terminalEnvironment(inheriting: ["FORCE_HYPERLINK": "0"])
-        #expect(environment["FORCE_HYPERLINK"] == "0")
     }
 
     @Test func keepsTheLanguageOfTheUser() {
@@ -171,7 +165,7 @@ struct TerminalSessionTests {
             environment == [
                 "TERM": "xterm-256color", "COLORTERM": "truecolor", "LANG": "en_US.UTF-8",
                 "TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "488", "CLAUDE_CODE_FORCE_SYNC_OUTPUT": "1",
-                "FORCE_HYPERLINK": "1", "SSH_AUTH_SOCK": "/tmp/agent", "GIT_ASKPASS": "/tmp/askpass",
+                "SSH_AUTH_SOCK": "/tmp/agent", "GIT_ASKPASS": "/tmp/askpass",
                 "VSCODE_GIT_IPC_HANDLE": "/tmp/vscode-git.sock",
             ])
     }
