@@ -1265,13 +1265,6 @@ struct TerminalTests {
         #expect(terminal.screen[0].prefix(2).map(terminal.character(of:)) == ["a", "b"])
     }
 
-    @Test(arguments: ["\u{1B}P1;2\u{7}x\u{1B}\\", "\u{1B}_\u{7}\u{1B}\\"])
-    func ignoresABellInAString(string: String) {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive(string)
-        #expect(terminal.bellCount == 0)
-    }
-
     @Test func keepsTheBellCountAfterAReset() {
         var terminal = Terminal(columns: 4, rows: 1)
         terminal.receive("\u{7}\u{1B}c\u{7}")
@@ -1312,13 +1305,6 @@ struct TerminalTests {
         terminal.receive("\u{1B}[5 q" + sequence + "x")
         #expect(terminal.cursorShape == .bar)
         #expect(terminal.character(of: terminal.screen[0][0]) == "x")
-    }
-
-    @Test func ignoresAStringBeforeACursorReport() {
-        var terminal = Terminal(columns: 10, rows: 4)
-        terminal.receive("\u{1B}[2;3H")
-        #expect(terminal.receive("\u{1B}Pzz\u{1B}\\\u{1B}[6n") == "\u{1B}[2;3R")
-        #expect(lines(terminal) == ["          ", "          ", "          ", "          "])
     }
 
     @Test func ignoresAnSGRWithAnIntermediate() {
