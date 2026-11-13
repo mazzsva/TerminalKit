@@ -159,7 +159,8 @@ extension TerminalContentView {
         let firstRow = row(at: visibleRect.minY + Self.topPadding, in: text)
         let lastRow = row(at: visibleRect.maxY - Self.bottomPadding - 1, in: text)
         return NSRange(
-            location: text.rows[firstRow].location, length: text.rows[lastRow].upperBound - text.rows[firstRow].location
+            location: text.rows[firstRow].location,
+            length: NSMaxRange(accessibilityRange(forLine: lastRow)) - text.rows[firstRow].location
         )
     }
 
