@@ -304,13 +304,10 @@ extension Terminal {
             let widths = paragraph.isSimple ? nil : paragraph.widths ?? Widths(storedLines[range])
             let last = storedLines[range.upperBound - 1]
             var rows = rowCount(of: index)
-            var keepsEmptyRow = false
             if row == rows - 1 {
-                let used: Int
-                (rows, used) =
-                    widths?.rowCount(columns: columns)
-                    ?? Widths.simpleRowCount(textCount: paragraph.textCount, columns: columns)
-                keepsEmptyRow = self.keepsEmptyRow(index, storedRows: range.count, used: used, columns: columns)
+                rows =
+                    widths?.rowCount(columns: columns).rows
+                    ?? Widths.simpleRowCount(textCount: paragraph.textCount, columns: columns).rows
             }
             guard row < rows else {
                 return Terminal.trimmed(Line([], isWrapped: last.isWrapped))
@@ -325,7 +322,7 @@ extension Terminal {
                 line.append(contentsOf: repeatElement(.padding, count: Swift.max(columns - bounds.used, 0)))
                 return line
             }
-            line.isWrapped = keepsEmptyRow || last.isWrapped
+            line.isWrapped = last.isWrapped
             if let fill = last.fill, bounds.used < columns {
                 line.append(fill)
             }
@@ -541,7 +538,7 @@ extension Terminal {
                 var start = 0
                 for run in runs[(mark?.run ?? 0)...] {
                     let (count, newUsed) = run.breaks(columns: columns, used: used)
-                    if row > 0, breaks < row, breaks + count >= row {
+                    if breaks < row, breaks + count >= row {
                         start =
                             offset + run.breakPoint(row - breaks - 1, columns: columns, used: used).unit
                             * Int(run.cells)

@@ -153,9 +153,7 @@ package struct Terminal: Sendable {
     ) -> (screen: [Line], cursor: Position) {
         let restored = scrollback.removeLast(coveringRows: restoredRows, columns: columns)
         removedScrollbackCount += scrollback.relayOut(columns: columns)
-        let storedCursor = cursor.flatMap {
-            $0.row < usedRows ? Position(row: restored.count + $0.row, column: $0.column) : nil
-        }
+        let storedCursor = cursor.map { Position(row: restored.count + $0.row, column: $0.column) }
         var (lines, target) = Self.reflow(restored + screen.prefix(usedRows), columns: columns, cursor: storedCursor)
         var column = target?.column ?? 0
         if let cursor, usedRows == self.rows, (lines.last?.textCount ?? 0) >= columns {
@@ -430,7 +428,7 @@ package struct Terminal: Sendable {
 
     private static func isWideEmoji(_ character: String) -> Bool {
         let scalars = Array(character.unicodeScalars)
-        guard scalars.count > 1, scalars[0].properties.isEmoji else {
+        guard scalars[0].properties.isEmoji else {
             return false
         }
         if isRegionalIndicator(scalars[0]) {
@@ -517,7 +515,7 @@ package struct Terminal: Sendable {
         switch screen[cursor.row][column].width {
         case 0 where column > 0:
             screen[cursor.row][column - 1] = writtenBlank
-        case 2 where column + 1 < screen[cursor.row].count:
+        case 2:
             screen[cursor.row][column + 1] = writtenBlank
         default:
             break

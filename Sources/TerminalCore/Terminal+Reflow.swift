@@ -63,7 +63,7 @@ extension Terminal {
                 used += Int(cell.width)
             }
             let lastStart = rowStarts[rowStarts.count - 1]
-            let keepsEmptyRow = start < end && textCount == 0 && used == columns
+            let keepsEmptyRow = textCount == 0 && used == columns
             var lastLine = Line(cells[lastStart...], isWrapped: keepsEmptyRow || lines[end].isWrapped)
             if let fill = lines[end].fill, used < columns {
                 lastLine.append(fill)
