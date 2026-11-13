@@ -67,13 +67,11 @@ With its default setting, Claude Code rings the bell only when the Terminal.app 
 
 `programStatus` gives the status that a program reports: idle, working, blocked, or done. Claude Code 2.1.295 or later reports it with no setup. When it waits for a permission, the state is blocked, the kind is `permission`, and the message names the request, such as the file to write. Then Claude Code puts no status glyph in front of the title. The status is nil when the program clears it or when the session ends. A program that is killed with `SIGKILL` cannot clear it, so its last status and its title stay until another program reports.
 
-For voice input in a program such as Claude Code, a host app with the hardened runtime needs the audio input entitlement and a microphone usage description, as the example app has.
-
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
 A held letter key with accents, such as E, shows the accent menu of macOS and does not repeat, as in a text view. For a key that repeats as in Terminal, register `ApplePressAndHoldEnabled` as `false` in the `UserDefaults` of the host app, as the example app does.
 
-macOS gives microphone access to the host app, not to the program in the terminal. To use Claude Code voice dictation, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement.
+macOS gives microphone access to the host app, not to the program in the terminal. For voice input in a program such as Claude Code, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement, as the example app has. Voice input was not tested.
 
 The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalView` with the user's login shell. Build it with the `TerminalKitExample` scheme.
 
