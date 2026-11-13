@@ -271,9 +271,11 @@ package struct Terminal: Sendable {
     }
 
     package mutating func clearToStart() {
-        keepInScrollback(screen.prefix(cursor.row))
-        scrollUp(cursor.row, in: 0 ..< rows)
-        cursor.row = 0
+        let top = screen[..<cursor.row].lastIndex { !$0.isWrapped }.map { $0 + 1 } ?? 0
+        keepInScrollback(screen.prefix(top))
+        scrollUp(top, in: 0 ..< rows)
+        cursor.row -= top
+        screen.replaceSubrange(cursor.row + 1 ..< rows, with: blankLines(rows - cursor.row - 1))
         eraseInDisplay(3)
     }
 

@@ -290,7 +290,29 @@ struct TerminalTests {
         terminal.clearToStart()
         #expect(terminal.scrollback.isEmpty)
         #expect(terminal.removedScrollbackCount == 2)
-        #expect(lines(terminal) == ["c ", "d ", "  "])
+        #expect(lines(terminal) == ["c ", "  ", "  "])
+    }
+
+    @Test func movesTheWholeWrappedLineToTheTopWhenClearingToStart() {
+        var terminal = Terminal(columns: 4, rows: 4)
+        terminal.receive("x\r\nabcdef\r\nz\u{1B}[3;3H")
+        terminal.clearToStart()
+        #expect(terminal.scrollback.isEmpty)
+        #expect(terminal.cursor == Terminal.Position(row: 1, column: 2))
+        #expect(lines(terminal) == ["abcd", "ef  ", "    ", "    "])
+        terminal.receive("X")
+        #expect(lines(terminal) == ["abcd", "efX ", "    ", "    "])
+    }
+
+    @Test func clearsToStartOnTheAlternateScreen() {
+        var terminal = Terminal(columns: 4, rows: 3)
+        terminal.receive("n1\r\nn2\r\nn3\r\nn4\u{1B}[?1049h\u{1B}[Ha1\r\na2\r\na3\u{1B}[2;3H")
+        terminal.clearToStart()
+        #expect(terminal.scrollback.isEmpty)
+        #expect(lines(terminal) == ["a2  ", "    ", "    "])
+        terminal.receive("\u{1B}[?1049l")
+        #expect(terminal.scrollback.isEmpty)
+        #expect(lines(terminal) == ["    ", "    ", "    "])
     }
 
     @Test func movesTheCursorLineToTheTopWhenClearingToStart() {
