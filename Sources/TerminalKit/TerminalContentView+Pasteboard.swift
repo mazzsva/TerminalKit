@@ -150,14 +150,12 @@ extension TerminalContentView: NSMenuItemValidation, NSServicesMenuRequestor, NS
 
     @objc override func selectAll(_ sender: Any?) {
         let terminal = session.terminal
-        let isWritten = { (line: Terminal.Line) in !line.allSatisfy(\.isBlank) }
-        let lastRow =
-            terminal.screen.lastIndex(where: isWritten).map { terminal.scrollback.count + $0 }
-            ?? terminal.scrollback.lastIndex(where: isWritten) ?? 0
         selectionClickCount = 1
         selection = Selection(
             anchor: Selection.Point(line: terminal.removedScrollbackCount, column: 0),
-            head: Selection.Point(line: terminal.removedScrollbackCount + lastRow, column: terminal.columns)
+            head: Selection.Point(
+                line: terminal.removedScrollbackCount + terminal.scrollback.count + terminal.rows - 1,
+                column: terminal.columns)
         )
     }
 
