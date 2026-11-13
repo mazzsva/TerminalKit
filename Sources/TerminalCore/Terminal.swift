@@ -275,7 +275,8 @@ package struct Terminal: Sendable {
         keepInScrollback(screen.prefix(top))
         scrollUp(top, in: 0 ..< rows)
         cursor.row -= top
-        screen.replaceSubrange(cursor.row + 1 ..< rows, with: blankLines(rows - cursor.row - 1))
+        let bottom = screen[cursor.row...].firstIndex { !$0.isWrapped } ?? rows - 1
+        screen.replaceSubrange(bottom + 1 ..< rows, with: blankLines(rows - bottom - 1))
         eraseInDisplay(3)
     }
 

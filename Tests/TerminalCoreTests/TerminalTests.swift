@@ -304,6 +304,14 @@ struct TerminalTests {
         #expect(lines(terminal) == ["abcd", "efX ", "    ", "    "])
     }
 
+    @Test func keepsTheRestOfTheCursorLineWhenClearingToStart() {
+        var terminal = Terminal(columns: 4, rows: 5)
+        terminal.receive("x\r\nabcdefghij\r\nz\u{1B}[2;2H")
+        terminal.clearToStart()
+        #expect(terminal.cursor == Terminal.Position(row: 0, column: 1))
+        #expect(lines(terminal) == ["abcd", "efgh", "ij  ", "    ", "    "])
+    }
+
     @Test func clearsToStartOnTheAlternateScreen() {
         var terminal = Terminal(columns: 4, rows: 3)
         terminal.receive("n1\r\nn2\r\nn3\r\nn4\u{1B}[?1049h\u{1B}[Ha1\r\na2\r\na3\u{1B}[2;3H")
