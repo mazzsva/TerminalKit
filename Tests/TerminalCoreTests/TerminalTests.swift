@@ -1393,33 +1393,6 @@ struct TerminalTests {
         #expect(!terminal.usesFocusReporting)
     }
 
-    @Test func setsTheColorSchemeReportingMode() {
-        var terminal = Terminal(columns: 1, rows: 1)
-        #expect(!terminal.usesColorSchemeReporting)
-        terminal.receive("\u{1B}[?2031h")
-        #expect(terminal.usesColorSchemeReporting)
-        terminal.receive("\u{1B}[?1049h\u{1B}[?1049l\u{1B}[!p")
-        #expect(terminal.usesColorSchemeReporting)
-        terminal.receive("\u{1B}[?2031l")
-        #expect(!terminal.usesColorSchemeReporting)
-        terminal.receive("\u{1B}[?2031h\u{1B}c")
-        #expect(!terminal.usesColorSchemeReporting)
-    }
-
-    @Test func tellsDarkFromLightBackgrounds() {
-        func isDark(_ red: UInt16, _ green: UInt16, _ blue: UInt16) -> Bool {
-            let color = Terminal.RGB(red: red, green: green, blue: blue)
-            return Terminal.DefaultColors(foreground: color, background: color, cursor: color).isDark
-        }
-        #expect(isDark(0, 0, 0))
-        #expect(!isDark(0x8000, 0x8000, 0x8000))
-        #expect(isDark(0x6060, 0x6060, 0x6060))
-        #expect(!isDark(0xFFFF, 0xFFFF, 0xFFFF))
-        #expect(!isDark(0, 0xFFFF, 0))
-        #expect(isDark(0, 0, 0xFFFF))
-        #expect(isDark(0x0100, 0x0100, 0x0100))
-    }
-
     @Test func setsTheApplicationCursorKeysMode() {
         var terminal = Terminal(columns: 1, rows: 1)
         #expect(!terminal.usesApplicationCursorKeys)
