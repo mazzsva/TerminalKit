@@ -34,6 +34,13 @@ struct TerminalBidiTests {
         #expect(view.selectedText == "א")
     }
 
+    @Test func selectsTheRightToLeftTextFromTheLeftEdgeOfItsFirstCell() async throws {
+        let view = try await view(running: "printf '\\327\\220\\327\\221 cd'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0.2, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 1.8, in: view))
+        #expect(view.selectedText == "אב")
+    }
+
     @Test func selectsTheRightToLeftWordUnderADoubleClick() async throws {
         let view = try await view(running: "printf '\\327\\220\\327\\221 \\327\\222\\327\\223'")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0.5, in: view, clickCount: 2))

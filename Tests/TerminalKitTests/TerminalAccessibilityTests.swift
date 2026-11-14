@@ -126,6 +126,8 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityAttributedString(for: NSRange(location: 0, length: 2))?.string == "ab")
         #expect(view.accessibilityLine(for: -3) == 0)
         #expect(view.accessibilityLine(for: 99) == 2)
+        #expect(view.accessibilityRange(for: 0) == NSRange(location: 0, length: 1))
+        #expect(view.accessibilityRange(for: 99) == NSRange(location: NSNotFound, length: 0))
     }
 
     @Test func followsTheErasedScrollback() async throws {

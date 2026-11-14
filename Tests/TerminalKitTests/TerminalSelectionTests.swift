@@ -205,6 +205,12 @@ struct TerminalSelectionTests {
         #expect(view.selection == Selection(anchor: .init(line: 0, column: 7), head: .init(line: 0, column: 7)))
     }
 
+    @Test func selectsAWordInTheFirstColumn() async throws {
+        let view = try await view(running: "printf 'a bc'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0.5, in: view, clickCount: 2))
+        #expect(view.selectedText == "a")
+    }
+
     @Test func selectsAWordAcrossASoftWrap() async throws {
         let view = try await view(
             running:
@@ -528,6 +534,7 @@ struct TerminalSelectionTests {
 
     @Test(arguments: [
         ("abc中", 0, 4, "abc"), ("abcdefghij", 1, 4, "abcdefgh"), ("abcdefghij", 2, 4, "abcdefghij\n"),
+        ("a\\033[2Cbc", 0, 2, "a"),
     ])
     func copiesNoLineBreakInsideAWrappedLine(text: String, line: Int, column: Int, copy: String) async throws {
         let session = TerminalSession(running: "printf '\(text)'")
