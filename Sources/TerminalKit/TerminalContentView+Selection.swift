@@ -150,7 +150,7 @@ extension TerminalContentView {
         let rows = rows(ofLineAt: point.line - terminal.removedScrollbackCount, limit: .max, in: terminal)
         return Selection(
             anchor: Selection.Point(line: terminal.removedScrollbackCount + rows.lowerBound, column: 0),
-            head: Selection.Point(line: terminal.removedScrollbackCount + rows.upperBound, column: terminal.columns)
+            head: Selection.Point(line: terminal.removedScrollbackCount + rows.upperBound + 1, column: 0)
         )
     }
 
