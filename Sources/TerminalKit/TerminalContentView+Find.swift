@@ -83,7 +83,7 @@ extension TerminalContentView: NSTextFinderClient {
         return (start.row ... end.row)
             .flatMap { row in
                 let lowerBound = row == start.row ? start.column : 0
-                let upperBound = row == end.row ? end.column : max(line(at: row).count, lowerBound + 1)
+                let upperBound = row == end.row ? end.column : line(at: row).count
                 return rects(
                     row: row, columns: lowerBound ..< max(upperBound, lowerBound + 1), order: visualOrder(ofRow: row))
             }

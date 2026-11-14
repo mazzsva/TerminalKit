@@ -19,6 +19,14 @@ struct TerminalFindTests {
             ])
     }
 
+    @Test func framesAnEmptyRowInsideAMatch() async throws {
+        let scrollView = try await findView(running: "printf 'a\\n\\nb\\n'; seq 1 20")
+        let view = scrollView.terminalView
+        #expect(view.line(at: 1).isEmpty)
+        let rects = try #require(view.rects(forCharacterRange: NSRange(location: 0, length: 4))).map(\.rectValue)
+        #expect(rects == (0 ..< 3).map { view.rect(row: $0, columns: 0 ..< 1) })
+    }
+
     @Test func mapsWideAndCombinedCharacters() async throws {
         let scrollView = try await findView(running: "printf 'a中e\\314\\201🙂x'")
         let view = scrollView.terminalView
