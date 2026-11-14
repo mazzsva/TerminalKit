@@ -572,8 +572,7 @@ final class TerminalContentView: NSView {
                     let visual = order?.columns[column] ?? column
                     pixels[visual] = fill
                 }
-                let drawsText = selected != nil || hasInk
-                if drawsText {
+                if hasInk {
                     runs.append((line, row, columns, style, foreground, order, joined))
                 }
             }
