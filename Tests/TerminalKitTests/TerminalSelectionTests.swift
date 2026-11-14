@@ -534,6 +534,7 @@ struct TerminalSelectionTests {
 
     @Test(arguments: [
         ("abc中", 0, 4, "abc"), ("abcdefghij", 1, 4, "abcdefgh"), ("abcdefghij", 2, 4, "abcdefghij\n"),
+        ("a\\033[2Cbc", 0, 2, "a"),
     ])
     func copiesNoLineBreakInsideAWrappedLine(text: String, line: Int, column: Int, copy: String) async throws {
         let session = TerminalSession(running: "printf '\(text)'")
