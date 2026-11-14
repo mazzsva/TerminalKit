@@ -6,7 +6,6 @@ extension TerminalContentView {
         autoscrollTask?.cancel()
         autoscrollTask = nil
         guard !isOpeningLink else {
-            isOpeningLink = false
             return
         }
         if releasesButton(0) {

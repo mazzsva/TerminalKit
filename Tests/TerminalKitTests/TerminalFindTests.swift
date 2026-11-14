@@ -89,6 +89,8 @@ struct TerminalFindTests {
 
     @Test func scrollsTheFoundRowToTheMiddleOnARowEdge() async throws {
         let scrollView = try await findView(running: "seq 1 29; echo needle; seq 31 100")
+        let restoreFindPasteboard = savedFindPasteboard()
+        defer { restoreFindPasteboard() }
         let view = scrollView.terminalView
         let window = KeyWindow(contentView: scrollView)
         window.makeFirstResponder(view)
@@ -150,6 +152,8 @@ struct TerminalFindTests {
 
     @Test(arguments: [true, false])
     func readsASelectionOfTheAlternateScreenAfterTheExit(selectsAll: Bool) throws {
+        let restoreFindPasteboard = savedFindPasteboard()
+        defer { restoreFindPasteboard() }
         let session = TerminalSession(running: "true")
         let scrollView = TerminalScrollView(session: session)
         scrollView.scrollerStyle = .overlay
@@ -320,6 +324,8 @@ struct TerminalFindTests {
 
     @Test func takesTheFindPanelActionFromTheTerminalAndTheFindBar() async throws {
         let scrollView = try await findView(running: "printf 'text one text two'")
+        let restoreFindPasteboard = savedFindPasteboard()
+        defer { restoreFindPasteboard() }
         let view = scrollView.terminalView
         let window = KeyWindow(contentView: scrollView)
         window.makeFirstResponder(view)
@@ -453,6 +459,18 @@ private func target(of action: Selector, in window: NSWindow) -> NSResponder? {
 @MainActor
 private func searchField(in view: NSView) -> NSSearchField? {
     view as? NSSearchField ?? view.subviews.lazy.compactMap(searchField).first
+}
+
+@MainActor
+private func savedFindPasteboard() -> () -> Void {
+    let pasteboard = NSPasteboard(name: .find)
+    let search = pasteboard.string(forType: .string)
+    return {
+        pasteboard.clearContents()
+        if let search {
+            pasteboard.setString(search, forType: .string)
+        }
+    }
 }
 
 @MainActor
