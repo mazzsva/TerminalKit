@@ -46,8 +46,8 @@ final class GlyphCache {
     private var entries: [Key: Entry] = [:]
     private var asciiEntries = [Entry?](repeating: nil, count: 4 * 128)
 
-    func entry(for character: String, font: NSFont, index: Int, isMirrored: Bool = false) -> Entry {
-        if character.utf8.count == 1, let ascii = character.utf8.first, ascii < 128, !isMirrored {
+    func entry(for character: String, font: NSFont, index: Int, isMirrored: Bool) -> Entry {
+        if character.utf8.count == 1, let ascii = character.utf8.first, !isMirrored {
             if let entry = asciiEntries[index * 128 + Int(ascii)] {
                 return entry
             }

@@ -176,7 +176,7 @@ struct TerminalChangedColorTests {
 
     @Test func drawsTheChangedIndexedBackgrounds() async throws {
         let view = try await view(
-            after: "\\033]4;1;#102030;200;#405060\\a\\033[41m  \\033[48;5;200m  \\033[mX"
+            after: "\\033]4;1;#102030;200;#405060;16;#708090\\a\\033[41m  \\033[48;5;200m  \\033[48;5;16m  \\033[mX"
         )
         defer { view.session.terminate() }
         let y = TerminalContentView.topPadding + view.cellSize.height / 2
@@ -184,6 +184,8 @@ struct TerminalChangedColorTests {
         let second = CGPoint(x: TerminalContentView.padding + view.cellSize.width * 3, y: y)
         #expect(try isColor(at: first, of: view, red: 0x10, green: 0x20, blue: 0x30))
         #expect(try isColor(at: second, of: view, red: 0x40, green: 0x50, blue: 0x60))
+        let third = CGPoint(x: TerminalContentView.padding + view.cellSize.width * 5, y: y)
+        #expect(try isColor(at: third, of: view, red: 0x70, green: 0x80, blue: 0x90))
     }
 
     @Test func redrawsAfterEachChange() async throws {
@@ -202,6 +204,7 @@ struct TerminalChangedColorTests {
             y: TerminalContentView.topPadding + view.cellSize.height / 2
         )
         #expect(try isColor(at: point, of: view, red: 0x10, green: 0x20, blue: 0x30))
+        _ = try pixel(at: point, of: view)
         session.send("\n")
         await session.waitForText("Y")
         #expect(try isColor(at: point, of: view, red: 0x40, green: 0x50, blue: 0x60))

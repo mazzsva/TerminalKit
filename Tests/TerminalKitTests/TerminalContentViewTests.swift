@@ -325,6 +325,28 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: cell, of: word) != pixels(in: next, of: word))
     }
 
+    @Test func drawsTheGlyphOfLeftToRightTextUnmirrored() async throws {
+        func inkCenter(_ text: String) async throws -> CGFloat {
+            let view = try await drawnView(running: "printf '\\033[?25l\(text)\\n'")
+            let representation = try representation(of: view)
+            let scale = CGFloat(representation.pixelsWide) / representation.size.width
+            let background = color(in: representation, at: CGPoint(x: 190, y: 90))?.brightnessComponent ?? 0
+            var (sum, weight): (CGFloat, CGFloat) = (0, 0)
+            for x in stride(from: 10, to: 10 + view.cellSize.width, by: 1 / scale) {
+                for y in stride(from: 7, to: 7 + view.cellSize.height, by: 1 / scale) {
+                    let pixel = color(in: representation, at: CGPoint(x: x, y: y))
+                    let ink = abs((pixel?.brightnessComponent ?? 0) - background)
+                    sum += x * ink
+                    weight += ink
+                }
+            }
+            return sum / weight
+        }
+        let open = try await inkCenter("(")
+        let close = try await inkCenter(")")
+        #expect(open < close)
+    }
+
     @Test func drawsTheMirroredGlyphInRightToLeftText() async throws {
         let word = try await drawnView(running: "printf '\\327\\220(\\327\\221)\\n'")
         let open = try await drawnView(running: "printf '(\\n'")
@@ -414,9 +436,10 @@ struct TerminalContentViewTests {
     func keysTheGlyphsByTheExactScalarsOfACharacter(drawn: String, character: String) {
         let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
         let cache = GlyphCache()
-        _ = cache.entry(for: drawn, font: font, index: 0)
-        let glyphs = cache.entry(for: character, font: font, index: 0).runs.map(\.glyphs)
-        #expect(glyphs == GlyphCache().entry(for: character, font: font, index: 0).runs.map(\.glyphs))
+        _ = cache.entry(for: drawn, font: font, index: 0, isMirrored: false)
+        let glyphs = cache.entry(for: character, font: font, index: 0, isMirrored: false).runs.map(\.glyphs)
+        let fresh = GlyphCache().entry(for: character, font: font, index: 0, isMirrored: false)
+        #expect(glyphs == fresh.runs.map(\.glyphs))
     }
 
     @Test(arguments: ["⏺", "⏸"], [1, 2] as [CGFloat])
@@ -429,7 +452,8 @@ struct TerminalContentViewTests {
         #expect(CGFloat(representation.pixelsWide) == scale * view.bounds.width)
         let background = try #require(color(in: representation, at: CGPoint(x: 190, y: 90))?.usingColorSpace(.sRGB))
         for (column, glyph) in [(0, "a"), (2, character)] {
-            let run = try #require(view.fonts.glyphs.entry(for: glyph, font: font, index: 0).runs.first)
+            let entry = view.fonts.glyphs.entry(for: glyph, font: font, index: 0, isMirrored: false)
+            let run = try #require(entry.runs.first)
             let bounds = CTFontGetBoundingRectsForGlyphs(run.font, .default, run.glyphs, nil, 1)
             let x = 10 + CGFloat(column) * view.cellSize.width
             let top = stride(from: 7, to: 7 + view.cellSize.height, by: 1 / scale)
@@ -681,6 +705,19 @@ struct TerminalContentViewTests {
         let fill = color(in: full, at: CGPoint(x: rect.minX + center.x, y: rect.minY + center.y))
         #expect(isClose(color(in: part, at: center), to: fill))
         #expect(!isClose(fill, to: color(in: full, at: CGPoint(x: 190, y: rect.minY + center.y))))
+    }
+
+    @Test func drawsTheEdgeOfATruecolorRowWithoutBlending() async throws {
+        let view = try await drawnView(running: "printf '\\033[48;2;0;200;0m    \\033[m\\033[?25l'")
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: 120))
+        let window = ScaledWindow(contentView: container)
+        window.scale = 1
+        container.addSubview(view)
+        view.setFrameOrigin(CGPoint(x: 0.25, y: 0.25))
+        let representation = try representation(of: container)
+        let y = container.bounds.height - view.frame.maxY + 7 + view.cellSize.height / 2
+        let edge = color(in: representation, at: CGPoint(x: 10, y: y))
+        #expect(isClose(edge, to: color(in: representation, at: CGPoint(x: 20, y: y))))
     }
 
     @Test func fillsARowOfTruecolorCellsWithOneImage() async throws {
@@ -1280,6 +1317,14 @@ struct TerminalContentViewTests {
         #expect(view.validAttributesForMarkedText() == [.underlineStyle, .markedClauseSegment])
         view.unmarkText()
         #expect(view.selectedRange() == NSRange(location: 0, length: 0))
+    }
+
+    @Test func asksToDrawTheMarkedText() {
+        let view = TerminalContentView(session: readingSession())
+        let window = NSWindow(contentView: view)
+        window.viewsNeedDisplay = false
+        mark(1, in: view)
+        #expect(window.viewsNeedDisplay)
     }
 
     @Test(arguments: [1, 2] as [CGFloat])

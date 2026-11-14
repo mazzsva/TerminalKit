@@ -572,8 +572,7 @@ final class TerminalContentView: NSView {
                     let visual = order?.columns[column] ?? column
                     pixels[visual] = fill
                 }
-                let drawsText = selected != nil || hasInk
-                if drawsText {
+                if hasInk {
                     runs.append((line, row, columns, style, foreground, order, joined))
                 }
             }
@@ -751,7 +750,7 @@ final class TerminalContentView: NSView {
             glyphs.removeAll(keepingCapacity: true)
             positions.removeAll(keepingCapacity: true)
         }
-        for column in columns where line[column].isText && !line[column].isSpace {
+        for column in columns where !line[column].isSpace {
             if joined?.headsOfFollowers[column] != nil {
                 continue
             }
