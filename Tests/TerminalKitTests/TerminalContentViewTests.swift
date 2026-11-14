@@ -1317,6 +1317,14 @@ struct TerminalContentViewTests {
         #expect(view.selectedRange() == NSRange(location: 0, length: 0))
     }
 
+    @Test func asksToDrawTheMarkedText() {
+        let view = TerminalContentView(session: readingSession())
+        let window = NSWindow(contentView: view)
+        window.viewsNeedDisplay = false
+        mark(1, in: view)
+        #expect(window.viewsNeedDisplay)
+    }
+
     @Test(arguments: [1, 2] as [CGFloat])
     func drawsTheEndOfTheMarkedTextAtTheRightEdge(scale: CGFloat) async throws {
         let view = try await drawnView(running: "printf '\\033[49G'")
