@@ -15,7 +15,6 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
         drawsBackground = false
         textFinder.client = terminalView
         textFinder.findBarContainer = self
-        textFinder.isIncrementalSearchingEnabled = true
         session.isShown = true
     }
 
