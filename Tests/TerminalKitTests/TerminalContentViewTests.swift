@@ -438,7 +438,8 @@ struct TerminalContentViewTests {
         let cache = GlyphCache()
         _ = cache.entry(for: drawn, font: font, index: 0, isMirrored: false)
         let glyphs = cache.entry(for: character, font: font, index: 0, isMirrored: false).runs.map(\.glyphs)
-        #expect(glyphs == GlyphCache().entry(for: character, font: font, index: 0, isMirrored: false).runs.map(\.glyphs))
+        let fresh = GlyphCache().entry(for: character, font: font, index: 0, isMirrored: false)
+        #expect(glyphs == fresh.runs.map(\.glyphs))
     }
 
     @Test(arguments: ["⏺", "⏸"], [1, 2] as [CGFloat])
@@ -451,7 +452,8 @@ struct TerminalContentViewTests {
         #expect(CGFloat(representation.pixelsWide) == scale * view.bounds.width)
         let background = try #require(color(in: representation, at: CGPoint(x: 190, y: 90))?.usingColorSpace(.sRGB))
         for (column, glyph) in [(0, "a"), (2, character)] {
-            let run = try #require(view.fonts.glyphs.entry(for: glyph, font: font, index: 0, isMirrored: false).runs.first)
+            let entry = view.fonts.glyphs.entry(for: glyph, font: font, index: 0, isMirrored: false)
+            let run = try #require(entry.runs.first)
             let bounds = CTFontGetBoundingRectsForGlyphs(run.font, .default, run.glyphs, nil, 1)
             let x = 10 + CGFloat(column) * view.cellSize.width
             let top = stride(from: 7, to: 7 + view.cellSize.height, by: 1 / scale)
