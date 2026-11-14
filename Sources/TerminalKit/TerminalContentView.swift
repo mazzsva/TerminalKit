@@ -39,7 +39,7 @@ final class TerminalContentView: NSView {
             needsDisplay = true
         }
     }
-    var markedSelection = NSRange(location: 0, length: 0)
+    var markedSelection = NSRange()
     var insertedText = ""
     var markedText: String {
         markedString.string
