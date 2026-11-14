@@ -488,6 +488,14 @@ struct TerminalViewTests {
         #expect(try #require(contentView(in: hostingView)).palette == palette)
     }
 
+    @Test func leavesTheOptionKeyToTheInputSystemByDefault() throws {
+        let hostingView = NSHostingView(rootView: TerminalView(session: TerminalSession(running: "exit")))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        hostingView.layoutSubtreeIfNeeded()
+        let key = try keyDown("å", charactersIgnoringModifiers: "a", modifierFlags: .option)
+        #expect(try #require(contentView(in: hostingView)).keyInput(key) == .text)
+    }
+
     @Test func usesOptionAsTheMetaKey() throws {
         let hostingView = NSHostingView(
             rootView: TerminalView(session: TerminalSession(running: "exit"))
