@@ -39,7 +39,7 @@ final class TerminalContentView: NSView {
             needsDisplay = true
         }
     }
-    var markedSelection = NSRange(location: 0, length: 0)
+    var markedSelection = NSRange()
     var insertedText = ""
     var markedText: String {
         markedString.string
@@ -397,19 +397,13 @@ final class TerminalContentView: NSView {
     }
 
     override func becomeFirstResponder() -> Bool {
-        guard super.becomeFirstResponder() else {
-            return false
-        }
         isFocused = window?.isKeyWindow == true
-        return true
+        return super.becomeFirstResponder()
     }
 
     override func resignFirstResponder() -> Bool {
-        guard super.resignFirstResponder() else {
-            return false
-        }
         isFocused = false
-        return true
+        return super.resignFirstResponder()
     }
 
     @objc private func windowKeyStateDidChange() {

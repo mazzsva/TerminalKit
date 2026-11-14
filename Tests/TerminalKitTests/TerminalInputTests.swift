@@ -38,6 +38,12 @@ struct TerminalInputTests {
                 .terminalKeyInput(TerminalKeyModes()) == .nothing)
     }
 
+    @Test func sendsNothingForAControlKeyThatGivesASpace() throws {
+        #expect(
+            try keyDown(" ", charactersIgnoringModifiers: "a", modifierFlags: .control)
+                .terminalKeyInput(TerminalKeyModes()) == .nothing)
+    }
+
     @Test func sendsNothingForControlReturn() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 2 | od -An -tx1")
         let view = TerminalContentView(session: session)

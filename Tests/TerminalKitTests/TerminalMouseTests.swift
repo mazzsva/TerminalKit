@@ -22,6 +22,13 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains("E[<0;2;1ME[<32;4;2M"))
     }
 
+    @Test func reportsADragOutsideTheViewInTheLastCell() async throws {
+        let (view, session) = try await viewReading("head -c 21", modes: "?1002h\\033[?1006h")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 100, column: 200, in: view))
+        #expect(await session.linesAfterExit().contains("E[<0;2;1ME[<32;54;18M"))
+    }
+
     @Test func reportsAMoveToAnotherCellInsideTheView() async throws {
         let (view, session) = try await viewReading("head -c 30", modes: "?1003h\\033[?1006h")
         let window = NSWindow(contentView: view)
@@ -358,6 +365,14 @@ struct TerminalMouseTests {
         view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 8.5, in: view, modifierFlags: .option))
         session.send(Array("done\n".utf8))
         #expect(await session.linesAfterExit().contains("$ echo hello" + String(repeating: key, count: 4) + "done"))
+    }
+
+    @Test func movesTheCursorWithOptionToTheFirstColumn() async throws {
+        let (view, session) = try await viewTyping("printf '$ echo hello'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 0.5, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 0.5, in: view, modifierFlags: .option))
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().contains("$ echo hello" + String(repeating: "E[D", count: 12) + "done"))
     }
 
     @Test func movesTheCursorWithOptionAcrossAWrappedRow() async throws {

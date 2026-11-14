@@ -70,9 +70,10 @@ extension TerminalContentView: NSTextInputClient {
     }
 
     private func deletions(replacing range: NSRange) -> [UInt8] {
-        let replaced = Range(range, in: insertedText).map { insertedText[$0] }
-        let count = replaced?.endIndex == insertedText.endIndex ? replaced?.count ?? 0 : 0
-        return Array(repeating: 0x7F, count: count)
+        guard let replaced = Range(range, in: insertedText), replaced.upperBound == insertedText.endIndex else {
+            return []
+        }
+        return Array(repeating: 0x7F, count: insertedText[replaced].count)
     }
 }
 
