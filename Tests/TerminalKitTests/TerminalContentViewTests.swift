@@ -42,7 +42,7 @@ struct TerminalContentViewTests {
             #expect(session.terminal.rows == 24)
             #expect(session.sizingView == nil)
         }
-        view.fit(to: cells(10.5, 2.5, in: view))
+        view.fit(to: cells(10, 2.5, in: view))
         #expect(session.terminal.columns == 10)
         #expect(session.terminal.rows == 2)
     }
