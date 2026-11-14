@@ -204,6 +204,7 @@ struct TerminalChangedColorTests {
             y: TerminalContentView.topPadding + view.cellSize.height / 2
         )
         #expect(try isColor(at: point, of: view, red: 0x10, green: 0x20, blue: 0x30))
+        _ = try pixel(at: point, of: view)
         session.send("\n")
         await session.waitForText("Y")
         #expect(try isColor(at: point, of: view, red: 0x40, green: 0x50, blue: 0x60))
