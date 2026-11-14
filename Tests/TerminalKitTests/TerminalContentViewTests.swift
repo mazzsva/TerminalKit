@@ -705,6 +705,19 @@ struct TerminalContentViewTests {
         #expect(!isClose(fill, to: color(in: full, at: CGPoint(x: 190, y: rect.minY + center.y))))
     }
 
+    @Test func drawsTheEdgeOfATruecolorRowWithoutBlending() async throws {
+        let view = try await drawnView(running: "printf '\\033[48;2;0;200;0m    \\033[m\\033[?25l'")
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: 120))
+        let window = ScaledWindow(contentView: container)
+        window.scale = 1
+        container.addSubview(view)
+        view.setFrameOrigin(CGPoint(x: 0.25, y: 0.25))
+        let representation = try representation(of: container)
+        let y = container.bounds.height - view.frame.maxY + 7 + view.cellSize.height / 2
+        let edge = color(in: representation, at: CGPoint(x: 10, y: y))
+        #expect(isClose(edge, to: color(in: representation, at: CGPoint(x: 20, y: y))))
+    }
+
     @Test func fillsARowOfTruecolorCellsWithOneImage() async throws {
         let cells = (0 ..< 48).map { "\\033[38;2;\($0 * 5);0;0;48;2;0;\($0 * 5);0m\(["▀", "▄", "█", " "][$0 % 4])" }
         let view = try await drawnView(running: "printf '\(cells.joined())\\033[m\\r'")
