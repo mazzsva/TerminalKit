@@ -750,7 +750,7 @@ final class TerminalContentView: NSView {
             glyphs.removeAll(keepingCapacity: true)
             positions.removeAll(keepingCapacity: true)
         }
-        for column in columns where line[column].isText && !line[column].isSpace {
+        for column in columns where !line[column].isSpace {
             if joined?.headsOfFollowers[column] != nil {
                 continue
             }
