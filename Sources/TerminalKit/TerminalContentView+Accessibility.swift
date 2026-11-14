@@ -46,7 +46,7 @@ extension TerminalContentView {
                 }
             let screen = terminal.screen.indices.map { row in
                 let line = terminal.screen[row]
-                return Self.row(line, continues: line.isWrapped && row < terminal.rows - 1, graphemes: graphemes)
+                return Self.row(line, continues: line.isWrapped, graphemes: graphemes)
             }
             let allRows = scrollback + screen
             var string = ""
