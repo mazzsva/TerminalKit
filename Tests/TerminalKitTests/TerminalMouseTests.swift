@@ -367,6 +367,14 @@ struct TerminalMouseTests {
         #expect(await session.linesAfterExit().contains("$ echo hello" + String(repeating: key, count: 4) + "done"))
     }
 
+    @Test func movesTheCursorWithOptionToTheFirstColumn() async throws {
+        let (view, session) = try await viewTyping("printf '$ echo hello'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 0.5, in: view, modifierFlags: .option))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, row: 1, column: 0.5, in: view, modifierFlags: .option))
+        session.send(Array("done\n".utf8))
+        #expect(await session.linesAfterExit().contains("$ echo hello" + String(repeating: "E[D", count: 12) + "done"))
+    }
+
     @Test func movesTheCursorWithOptionAcrossAWrappedRow() async throws {
         let (view, session) = try await viewTyping("printf %$(stty size | cut -d' ' -f2)s ''; printf hello")
         let column = CGFloat(session.terminal.columns) - 0.5
