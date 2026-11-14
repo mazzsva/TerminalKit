@@ -325,6 +325,28 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: cell, of: word) != pixels(in: next, of: word))
     }
 
+    @Test func drawsTheGlyphOfLeftToRightTextUnmirrored() async throws {
+        func inkCenter(_ text: String) async throws -> CGFloat {
+            let view = try await drawnView(running: "printf '\\033[?25l\(text)\\n'")
+            let representation = try representation(of: view)
+            let scale = CGFloat(representation.pixelsWide) / representation.size.width
+            let background = color(in: representation, at: CGPoint(x: 190, y: 90))?.brightnessComponent ?? 0
+            var (sum, weight): (CGFloat, CGFloat) = (0, 0)
+            for x in stride(from: 10, to: 10 + view.cellSize.width, by: 1 / scale) {
+                for y in stride(from: 7, to: 7 + view.cellSize.height, by: 1 / scale) {
+                    let pixel = color(in: representation, at: CGPoint(x: x, y: y))
+                    let ink = abs((pixel?.brightnessComponent ?? 0) - background)
+                    sum += x * ink
+                    weight += ink
+                }
+            }
+            return sum / weight
+        }
+        let open = try await inkCenter("(")
+        let close = try await inkCenter(")")
+        #expect(open < close)
+    }
+
     @Test func drawsTheMirroredGlyphInRightToLeftText() async throws {
         let word = try await drawnView(running: "printf '\\327\\220(\\327\\221)\\n'")
         let open = try await drawnView(running: "printf '(\\n'")
