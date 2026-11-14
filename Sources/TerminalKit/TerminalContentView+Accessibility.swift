@@ -177,10 +177,8 @@ extension TerminalContentView {
             return NSRange(location: cursor, length: 0)
         }
         let start = min(selection.anchor, selection.head)
-        let end = max(selection.anchor, selection.head)
         let lowerBound = index(row: start.line - terminal.removedScrollbackCount, column: start.column, in: text)
-        let upperBound = index(row: end.line - terminal.removedScrollbackCount, column: end.column, in: text)
-        return NSRange(location: lowerBound, length: max(upperBound - lowerBound, 0))
+        return NSRange(location: lowerBound, length: selectedText?.utf16.count ?? 0)
     }
 
     override func accessibilityInsertionPointLineNumber() -> Int {

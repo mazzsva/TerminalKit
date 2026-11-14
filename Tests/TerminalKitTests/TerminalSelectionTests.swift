@@ -268,10 +268,8 @@ struct TerminalSelectionTests {
         let row = terminal.scrollback.count + terminal.rows - 2
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: row, column: 1, in: view, clickCount: 3))
         let line = terminal.removedScrollbackCount + row
-        #expect(
-            view.selection
-                == Selection(anchor: .init(line: line, column: 0), head: .init(line: line, column: terminal.columns))
-        )
+        let head = Selection.Point(line: line + 1, column: 0)
+        #expect(view.selection == Selection(anchor: .init(line: line, column: 0), head: head))
         #expect(view.selectedText == "12000\n")
     }
 
@@ -320,12 +318,11 @@ struct TerminalSelectionTests {
 
     @Test func extendsByLinesWhenDraggingAfterATripleClick() async throws {
         let view = try await view(running: "printf 'one\\n\\nthree\\nfour'")
-        let columns = view.session.terminal.columns
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 2, in: view, clickCount: 3))
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 3, column: 1, in: view))
         #expect(view.selectedText == "three\nfour\n")
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 2, in: view))
-        #expect(view.selection == Selection(anchor: .init(line: 2, column: columns), head: .init(line: 1, column: 0)))
+        #expect(view.selection == Selection(anchor: .init(line: 3, column: 0), head: .init(line: 1, column: 0)))
     }
 
     @Test func extendsTheSelectionWithAShiftClick() async throws {
@@ -530,6 +527,17 @@ struct TerminalSelectionTests {
         let view = try await view(running: "printf 'abc\\ndef\\n'")
         view.selection = Selection(anchor: .init(line: 0, column: 0), head: .init(line: line, column: column))
         #expect(view.selectedText == text)
+        #expect(view.accessibilitySelectedTextRange() == NSRange(location: 0, length: text.utf16.count))
+    }
+
+    @Test func copiesTheLineBreakOfAFullRowWithATripleClick() async throws {
+        let session = TerminalSession(running: "printf 'abcd\\r\\nef'")
+        session.resize(columns: 4, rows: 4)
+        let view = TerminalContentView(session: session)
+        try session.start()
+        await session.waitForExit()
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1, in: view, clickCount: 3))
+        #expect(view.selectedText == "abcd\n")
     }
 
     @Test(arguments: [
