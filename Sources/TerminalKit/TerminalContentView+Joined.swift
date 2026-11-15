@@ -32,8 +32,7 @@ extension TerminalContentView {
             if line[column].isText, !line[column].isSpace {
                 var text = graphemes.character(of: line[column])
                 var followers: [Int] = []
-                while next < line.count, !line[next].isASCII, line[next].width > 0,
-                    text.utf8.count < maximumJoinedBytes,
+                while next < line.count, !line[next].isASCII, text.utf8.count < maximumJoinedBytes,
                     hasTheSamePaint(line[next].style, line[column].style),
                     isInVisualOrder(next, after: column, width: next - column, order)
                 {
