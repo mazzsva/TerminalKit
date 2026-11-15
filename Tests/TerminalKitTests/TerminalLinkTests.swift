@@ -98,6 +98,31 @@ struct TerminalLinkTests {
         #expect(view.link(atRow: 9, column: 0) == nil)
     }
 
+    @Test func findsALinkOnlyWithin64RowsOfThePointer() {
+        let session = TerminalSession()
+        session.resize(columns: 10, rows: 4)
+        session.receive(Array(("https://e.co/" + String(repeating: "a", count: 687)).utf8))
+        let view = TerminalContentView(session: session)
+        #expect(view.link(atRow: 0, column: 0)?.spans.count == 65)
+        #expect(view.link(atRow: 64, column: 0) != nil)
+        #expect(view.link(atRow: 65, column: 0) == nil)
+    }
+
+    @Test func findsALinkThatEndsInAWrappedLastRow() async {
+        await #expect(processExitsWith: .success) {
+            await MainActor.run {
+                let session = TerminalSession()
+                session.resize(columns: 20, rows: 4)
+                let text = "https://e.co/" + String(repeating: "a", count: 32) + "\r\u{1B}[K\u{1B}[H"
+                session.receive(Array(text.utf8))
+                session.resize(columns: 10, rows: 4)
+                precondition(session.terminal.screen[3].isWrapped)
+                let link = TerminalContentView(session: session).link(atRow: 3, column: 0)
+                precondition(link?.url == URL(string: "https://e.co/" + String(repeating: "a", count: 27)))
+            }
+        }
+    }
+
     @Test func opensALinkWithCommandClick() async throws {
         let view = try await linkView(running: "printf 'https://example.com'")
         var actions: [TerminalContentView.LinkAction] = []
