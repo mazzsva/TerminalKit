@@ -804,6 +804,8 @@ struct TerminalContentViewTests {
             #expect(isClose(color(in: representation, at: CGPoint(x: tipX, y: cell.minY)), to: background))
             #expect(isClose(color(in: representation, at: CGPoint(x: tipX, y: cell.maxY)), to: background))
         }
+        let space = view.rect(row: 0, columns: 1 ..< 2).insetBy(dx: inset, dy: inset)
+        #expect(try pixels(in: space, of: view).allSatisfy { isClose($0, to: background) })
     }
 
     @Test(arguments: ["1", "2", "3", "4"])
