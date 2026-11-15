@@ -210,6 +210,24 @@ struct TerminalChangedColorTests {
         #expect(try isColor(at: point, of: view, red: 0x40, green: 0x50, blue: 0x60))
     }
 
+    @Test func drawsTheNormalColorsAfterReverseVideoEnds() async throws {
+        let session = TerminalSession(
+            running: "printf '\\033]4;1;#102030\\a\\033[?5hX'; read a; printf '\\033[?5lY'; sleep 30")
+        let view = TerminalContentView(session: session)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        view.palette.foreground = Color(.sRGB, red: 1, green: 0, blue: 0)
+        view.palette.background = Color(.sRGB, red: 0, green: 0, blue: 1)
+        session.sizingView = view
+        defer { session.terminate() }
+        try session.start()
+        await session.waitForText("X")
+        let corner = CGPoint(x: view.bounds.maxX - 1, y: view.bounds.maxY - 1)
+        #expect(try pixel(at: corner, of: view).redComponent > 0.9)
+        session.send("\n")
+        await session.waitForText("Y")
+        #expect(try pixel(at: corner, of: view).blueComponent > 0.9)
+    }
+
     private func boldView(after output: String) async throws -> TerminalContentView {
         let session = TerminalSession(running: "printf '\(output)\\033[1;7m  \\033[?25lX'; sleep 30")
         let view = TerminalContentView(session: session)

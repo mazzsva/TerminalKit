@@ -246,6 +246,21 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains("1b  5b  49  1b  5b  4f"))
     }
 
+    @Test func reportsNoFocusLossWhenItJoinsAWindowThatIsNotKey() async throws {
+        let session = TerminalSession(
+            running: "stty raw -echo; printf '\\033[?1004h'; dd bs=1 count=3 2>/dev/null | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        let window = KeyWindow(contentView: NSView())
+        window.isKey = false
+        try session.start()
+        for await isEnabled in Observations({ session.terminal.usesFocusReporting }) where isEnabled {
+            break
+        }
+        window.contentView = view
+        window.isKey = true
+        #expect(await session.linesAfterExit().contains("1b  5b  49"))
+    }
+
     @Test func reportsNoFocusWhenTheProcessDoesNotAsk() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; dd bs=1 count=1 2>/dev/null | od -An -tx1")
         let view = TerminalContentView(session: session)
@@ -804,6 +819,8 @@ struct TerminalContentViewTests {
             #expect(isClose(color(in: representation, at: CGPoint(x: tipX, y: cell.minY)), to: background))
             #expect(isClose(color(in: representation, at: CGPoint(x: tipX, y: cell.maxY)), to: background))
         }
+        let space = view.rect(row: 0, columns: 1 ..< 2).insetBy(dx: inset, dy: inset)
+        #expect(try pixels(in: space, of: view).allSatisfy { isClose($0, to: background) })
     }
 
     @Test(arguments: ["1", "2", "3", "4"])
@@ -811,6 +828,13 @@ struct TerminalContentViewTests {
         let plain = try image(of: try await drawnView(running: "printf 'X\\n'"))
         let styled = try image(of: try await drawnView(running: "printf '\\033[\(parameter)mX\\n'"))
         #expect(styled != plain)
+    }
+
+    @Test func drawsEachTextStyleInOneRowWithItsOwnFont() async throws {
+        let view = try await drawnView(running: "printf '\\033[?25lX \\033[1mX \\033[22;3mX \\033[1mX\\n'")
+        view.palette = highContrastPalette
+        let cells = try [0, 2, 4, 6].map { try pixels(in: view.rect(row: 0, columns: $0 ..< $0 + 1), of: view) }
+        #expect(Set(cells).count == 4)
     }
 
     @Test func drawsInverseText() async throws {
@@ -1327,6 +1351,27 @@ struct TerminalContentViewTests {
         #expect(window.viewsNeedDisplay)
     }
 
+    @Test func asksToDrawAfterEachChangeOfTheLook() throws {
+        let view = TerminalContentView(session: readingSession())
+        let window = KeyWindow(contentView: view)
+        let point = TerminalContentView.Selection.Point(line: 0, column: 0)
+        let link = TerminalContentView.Link(
+            url: try #require(URL(string: "https://example.com")), spans: [.init(row: 0, columns: 0 ..< 1)])
+        let changes: [() -> Void] = [
+            { view.font = .monospacedSystemFont(ofSize: 20, weight: .regular) },
+            { view.palette = highContrastPalette },
+            { view.selection = TerminalContentView.Selection(anchor: point, head: point) },
+            { window.isKey = false },
+            { view.hoveredLink = link },
+            { view.hidesScrollback = true },
+        ]
+        for change in changes {
+            window.viewsNeedDisplay = false
+            change()
+            #expect(window.viewsNeedDisplay)
+        }
+    }
+
     @Test(arguments: [1, 2] as [CGFloat])
     func drawsTheEndOfTheMarkedTextAtTheRightEdge(scale: CGFloat) async throws {
         let view = try await drawnView(running: "printf '\\033[49G'")
@@ -1532,7 +1577,7 @@ private final class ComposingInputContext: NSTextInputContext {
     }
 }
 
-private final class KeyRecorder: NSResponder {
+final class KeyRecorder: NSResponder {
     var keys: [String?] = []
 
     override func keyDown(with event: NSEvent) {
