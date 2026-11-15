@@ -186,8 +186,7 @@ extension TerminalContentView {
     }
 
     override func accessibilityLine(for index: Int) -> Int {
-        let text = accessibilityText
-        return text.row(containing: min(max(index, 0), text.length))
+        accessibilityText.row(containing: index)
     }
 
     override func accessibilityRange(forLine line: Int) -> NSRange {
@@ -217,9 +216,6 @@ extension TerminalContentView {
             return NSRange(location: NSNotFound, length: 0)
         }
         let row = text.row(containing: index)
-        guard index < text.rows[row].upperBound else {
-            return NSRange(location: index, length: 1)
-        }
         var location = text.rows[row].location
         let terminal = session.terminal
         let graphemes = terminal.graphemes
@@ -245,10 +241,10 @@ extension TerminalContentView {
         if column < line.count, line[column].width == 0 {
             column -= 1
         }
-        while column > 0, column < line.count, line[column].isTabGap {
+        while line.indices.contains(column), line[column].isTabGap {
             column -= 1
         }
-        return accessibilityRange(for: min(index(row: row, column: column, in: text), max(text.length - 1, 0)))
+        return accessibilityRange(for: min(index(row: row, column: column, in: text), text.length - 1))
     }
 
     override func accessibilityFrame(for range: NSRange) -> NSRect {
@@ -257,7 +253,7 @@ extension TerminalContentView {
             return .zero
         }
         let start = position(of: range.location, in: text)
-        let end = range.length > 0 ? position(of: range.upperBound - 1, in: text) : start
+        let end = position(of: max(range.location, range.upperBound - 1), in: text)
         let endLine = line(at: end.row)
         let endColumn = end.column + (endLine.indices.contains(end.column) ? endLine.columnCount(at: end.column) : 1)
         let frame =
