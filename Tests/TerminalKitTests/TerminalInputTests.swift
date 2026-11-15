@@ -64,6 +64,17 @@ struct TerminalInputTests {
                 .terminalKeyInput(TerminalKeyModes()) == .text)
     }
 
+    @Test func leavesAKeypadDigitToTheInputMethod() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        object_setClass(view.inputContext, FullWidthInputContext.self)
+        try session.start()
+        await session.waitForText("ready")
+        view.keyDown(with: try keyDown("5", modifierFlags: .numericPad, keyCode: 87))
+        session.send("ab")
+        #expect(await session.linesAfterExit().contains("ef  bc  95"))
+    }
+
     @Test func scrollsForTheHomeKeysOutsideTheAlternateScreen() throws {
         let home = try keyDown(NSHomeFunctionKey)
         #expect(home.terminalKeyInput(TerminalKeyModes()) == .scroll)
@@ -83,6 +94,13 @@ struct TerminalInputTests {
         #expect(
             try keyDown("\r", modifierFlags: [.command, .shift]).terminalKeyInput(TerminalKeyModes())
                 == .bytes([0x1B, 0x0D]))
+    }
+}
+
+private final class FullWidthInputContext: NSTextInputContext {
+    override func handleEvent(_ event: NSEvent) -> Bool {
+        client.insertText("５", replacementRange: NSRange(location: NSNotFound, length: 0))
+        return true
     }
 }
 
