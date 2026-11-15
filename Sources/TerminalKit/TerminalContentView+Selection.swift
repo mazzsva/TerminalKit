@@ -97,7 +97,7 @@ extension TerminalContentView {
             return
         }
         var row = terminal.cursor.row
-        var column = min(terminal.cursor.column, terminal.columns - 1)
+        var column = terminal.cursor.column
         var keys = ""
         let cursorKey = terminal.usesApplicationCursorKeys ? "\u{1B}O" : "\u{1B}["
         func press(_ final: String, _ count: Int) {
@@ -107,10 +107,8 @@ extension TerminalContentView {
             let isUp = target.row < row
             let isBoundary = isUp ? row == 0 || !terminal.screen[row - 1].isWrapped : !terminal.screen[row].isWrapped
             if isBoundary {
-                if target.column < column {
-                    press("D", column - target.column)
-                    column = target.column
-                }
+                press("D", column - target.column)
+                column = min(column, target.column)
                 press(isUp ? "A" : "B", 1)
                 row += isUp ? -1 : 1
             } else if isUp {

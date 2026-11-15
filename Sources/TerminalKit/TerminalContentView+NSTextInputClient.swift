@@ -41,8 +41,7 @@ extension TerminalContentView: NSTextInputClient {
     }
 
     func markedRange() -> NSRange {
-        hasMarkedText()
-            ? NSRange(location: 0, length: markedText.utf16.count) : NSRange(location: NSNotFound, length: 0)
+        NSRange(location: hasMarkedText() ? 0 : NSNotFound, length: markedText.utf16.count)
     }
 
     func hasMarkedText() -> Bool {
