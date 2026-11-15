@@ -246,6 +246,21 @@ struct TerminalContentViewTests {
         #expect(await session.linesAfterExit().contains("1b  5b  49  1b  5b  4f"))
     }
 
+    @Test func reportsNoFocusLossWhenItJoinsAWindowThatIsNotKey() async throws {
+        let session = TerminalSession(
+            running: "stty raw -echo; printf '\\033[?1004h'; dd bs=1 count=3 2>/dev/null | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        let window = KeyWindow(contentView: NSView())
+        window.isKey = false
+        try session.start()
+        for await isEnabled in Observations({ session.terminal.usesFocusReporting }) where isEnabled {
+            break
+        }
+        window.contentView = view
+        window.isKey = true
+        #expect(await session.linesAfterExit().contains("1b  5b  49"))
+    }
+
     @Test func reportsNoFocusWhenTheProcessDoesNotAsk() async throws {
         let session = TerminalSession(running: "stty raw -echo; echo ready; dd bs=1 count=1 2>/dev/null | od -An -tx1")
         let view = TerminalContentView(session: session)
