@@ -830,6 +830,13 @@ struct TerminalContentViewTests {
         #expect(styled != plain)
     }
 
+    @Test func drawsEachTextStyleInOneRowWithItsOwnFont() async throws {
+        let view = try await drawnView(running: "printf '\\033[?25lX \\033[1mX \\033[22;3mX \\033[1mX\\n'")
+        view.palette = highContrastPalette
+        let cells = try [0, 2, 4, 6].map { try pixels(in: view.rect(row: 0, columns: $0 ..< $0 + 1), of: view) }
+        #expect(Set(cells).count == 4)
+    }
+
     @Test func drawsInverseText() async throws {
         let view = try await drawnView(running: "printf '\\033[7m  \\033[m'")
         let center = CGPoint(x: 10 + view.cellSize.width / 2, y: 7 + view.cellSize.height / 2)
