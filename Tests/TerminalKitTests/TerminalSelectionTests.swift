@@ -70,7 +70,7 @@ struct TerminalSelectionTests {
         #expect(view.selection == Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 4)))
     }
 
-    @Test(arguments: [(1.4, 5.4, 2, 6, "文字"), (0.6, 4.6, 0, 4, "中文")])
+    @Test(arguments: [(1.4, 5.4, 2, 6, "文字"), (0.6, 4.6, 0, 4, "中文"), (1, 4.6, 2, 4, "文")])
     func selectsAWideCharacterAsAWholeWithTheMouse(
         start: CGFloat, end: CGFloat, anchor: Int, head: Int, text: String
     ) async throws {
@@ -358,6 +358,26 @@ struct TerminalSelectionTests {
         view.selectAll(nil)
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 4, in: view, modifierFlags: .shift))
         #expect(view.selectedText == "two three" + String(repeating: "\n", count: view.session.terminal.rows))
+    }
+
+    @Test func extendsFromTheNearerEndWithAShiftClickInTheMiddle() async throws {
+        let session = TerminalSession(running: "printf 'one two\\nabcdefghij\\nthree four'")
+        session.resize(columns: 10, rows: 5)
+        let view = TerminalContentView(session: session)
+        view.frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        try session.start()
+        await session.waitForExit()
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 2, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 1, column: 6, in: view))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 4, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "ef")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 0, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 2, column: 0, in: view))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 1, column: 5, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "fghij\n")
+        view.selectAll(nil)
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 2, column: 6, in: view, modifierFlags: .shift))
+        #expect(view.selectedText == "one two\nabcdefghij\nthree ")
     }
 
     @Test func copiesATabAsOneCharacter() async throws {
