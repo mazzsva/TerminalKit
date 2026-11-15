@@ -61,6 +61,9 @@ struct ByteStreamTests {
         if let row = terminal.screen.firstIndex(where: { $0.count < terminal.columns }) {
             return "\(terminal.screen[row].count) cells in row \(row)"
         }
+        if let row = terminal.screen.firstIndex(where: { $0[0].width == 0 }) {
+            return "the second half of a wide character starts row \(row)"
+        }
         if !(0 ..< terminal.rows).contains(terminal.cursor.row)
             || !(0 ..< terminal.columns).contains(terminal.cursor.column)
         {
@@ -79,6 +82,7 @@ struct ByteStreamTests {
             height: screen.maxY + TerminalContentView.bottomPadding)
         view.cacheDisplay(in: screen, to: try #require(view.bitmapImageRepForCachingDisplay(in: screen)))
         _ = view.accessibilityValue()
+        #expect(!terminal.scrollback.contains { $0.first?.width == 0 })
     }
 }
 
