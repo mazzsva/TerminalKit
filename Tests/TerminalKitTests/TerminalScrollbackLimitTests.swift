@@ -27,6 +27,25 @@ struct TerminalScrollbackLimitTests {
         #expect(topLine(in: scrollView) == text)
     }
 
+    @Test func keepsTheTextInPlaceWhenTheOldestLineGoes() async throws {
+        let session = TerminalSession(running: "seq 1 100100; read line; printf x")
+        let scrollView = TerminalScrollView(session: session)
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        scrollView.layoutSubtreeIfNeeded()
+        try session.start()
+        await session.waitForText("100100")
+        scrollView.layoutSubtreeIfNeeded()
+        let removedLines = session.terminal.removedScrollbackCount
+        let view = scrollView.terminalView
+        view.scroll(CGPoint(x: 0, y: TerminalContentView.topPadding + 50_000 * view.cellSize.height))
+        let text = topLine(in: scrollView)
+        session.send(Array("\r".utf8))
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        #expect(session.terminal.removedScrollbackCount == removedLines + 1)
+        #expect(topLine(in: scrollView) == text)
+    }
+
     private func topLine(in scrollView: TerminalScrollView) -> String {
         let view = scrollView.terminalView
         let terminal = view.session.terminal
