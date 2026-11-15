@@ -32,8 +32,7 @@ extension TerminalContentView {
             if line[column].isText, !line[column].isSpace {
                 var text = graphemes.character(of: line[column])
                 var followers: [Int] = []
-                while next < line.count, !line[next].isASCII, line[next].width > 0,
-                    text.utf8.count < maximumJoinedBytes,
+                while next < line.count, !line[next].isASCII, text.utf8.count < maximumJoinedBytes,
                     hasTheSamePaint(line[next].style, line[column].style),
                     isInVisualOrder(next, after: column, width: next - column, order)
                 {
@@ -70,9 +69,6 @@ extension TerminalContentView {
     }
 
     private static func joins(_ text: String, width: Int, _ next: String, width nextWidth: Int) -> Bool {
-        guard let first = text.unicodeScalars.first else {
-            return false
-        }
-        return !first.isASCII && width == 1 && nextWidth == 1 && (text + next).count == 1
+        text.unicodeScalars.first?.isASCII == false && width == 1 && nextWidth == 1 && (text + next).count == 1
     }
 }

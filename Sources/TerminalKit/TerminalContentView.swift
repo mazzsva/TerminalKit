@@ -741,8 +741,8 @@ final class TerminalContentView: NSView {
             if let batchFont, !glyphs.isEmpty {
                 CTFontDrawGlyphs(batchFont, glyphs, positions, glyphs.count, context)
             }
-            glyphs.removeAll(keepingCapacity: true)
-            positions.removeAll(keepingCapacity: true)
+            glyphs.removeAll()
+            positions.removeAll()
         }
         for column in columns where !line[column].isSpace {
             if joined?.headsOfFollowers[column] != nil {
