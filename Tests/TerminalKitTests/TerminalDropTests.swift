@@ -35,6 +35,12 @@ struct TerminalDropTests {
         #expect(TerminalContentView.droppedText(from: pasteboard) == nil)
         pasteboard.setString("echo hi", forType: .string)
         #expect(TerminalContentView.droppedText(from: pasteboard) == "echo hi")
+        pasteboard.clearContents()
+        let link = NSPasteboardItem()
+        link.setString("https://example.com/a", forType: .URL)
+        link.setString("https://example.com/a", forType: .string)
+        pasteboard.writeObjects([link])
+        #expect(TerminalContentView.droppedText(from: pasteboard) == "https://example.com/a")
     }
 
     @Test func acceptsADrop() async throws {
