@@ -59,18 +59,18 @@ struct TerminalAccessibilityTests {
     @Test func rebuildsTheLastScrollbackRowForTheAlternateScreen() {
         var terminal = Terminal(columns: 10, rows: 3)
         _ = terminal.receive(Array("abcdefghij0123456789KLM\r\nx\r\ny".utf8))
-        let before = TerminalContentView.AccessibilityText(terminal, revision: 0)
+        let before = TerminalContentView.AccessibilityText(terminal, revision: 0, resizeCount: 0)
         _ = terminal.receive(Array("\u{1B}[?1049h\u{1B}[Hvim".utf8))
-        let after = TerminalContentView.AccessibilityText(terminal, revision: 1, reusing: before)
+        let after = TerminalContentView.AccessibilityText(terminal, revision: 1, resizeCount: 0, reusing: before)
         #expect(after.string == "abcdefghij0123456789KLM\nx\ny\nvim\n\n\n")
     }
 
     @Test func rebuildsTheScrollbackRowsAfterTheAlternateScreen() {
         var terminal = Terminal(columns: 4, rows: 2)
         _ = terminal.receive(Array("a\r\nb\u{1B}[?1049h".utf8))
-        let before = TerminalContentView.AccessibilityText(terminal, revision: 0)
+        let before = TerminalContentView.AccessibilityText(terminal, revision: 0, resizeCount: 0)
         _ = terminal.receive(Array("\u{1B}[?1049l\u{1B}[Hc\r\nd\r\ne".utf8))
-        let after = TerminalContentView.AccessibilityText(terminal, revision: 1, reusing: before)
+        let after = TerminalContentView.AccessibilityText(terminal, revision: 1, resizeCount: 0, reusing: before)
         #expect(after.string == "c\nd\ne\n")
     }
 
@@ -189,7 +189,7 @@ struct TerminalAccessibilityTests {
             let marker = "#\(step)#"
             session.send(Array("\(pieces.randomElement(using: &generator) ?? "")\(marker)\n".utf8))
             for await text in Observations({
-                TerminalContentView.AccessibilityText(session.terminal, revision: 0).string
+                TerminalContentView.AccessibilityText(session.terminal, revision: 0, resizeCount: 0).string
             })
             where text.contains(marker) {
                 break
@@ -197,7 +197,7 @@ struct TerminalAccessibilityTests {
             if step % 3 == 0 {
                 session.resize(columns: [2, 3, 6, 9].randomElement(using: &generator) ?? 6, rows: 2)
             }
-            let fresh = TerminalContentView.AccessibilityText(session.terminal, revision: 0)
+            let fresh = TerminalContentView.AccessibilityText(session.terminal, revision: 0, resizeCount: 0)
             #expect(view.accessibilityValue() as? String == fresh.string)
             #expect(view.accessibilityText.rows == fresh.rows)
         }

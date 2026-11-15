@@ -21,7 +21,7 @@ extension TerminalContentView {
         init(
             _ terminal: Terminal,
             revision: Int,
-            resizeCount: Int = 0,
+            resizeCount: Int,
             reusing previous: AccessibilityText? = nil
         ) {
             self.revision = revision
