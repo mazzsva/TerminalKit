@@ -54,6 +54,11 @@ struct TerminalFindTests {
         view.selectedRanges = [NSValue(range: (view.string as NSString).range(of: "two\nth"))]
         #expect(view.selectedText == "two\nth")
         #expect(view.firstSelectedRange == (view.string as NSString).range(of: "two\nth"))
+        view.selectedRanges = [NSValue(range: NSRange(location: 1, length: 1))]
+        #expect(view.selectedText == "n")
+        let all = NSRange(location: 0, length: view.string.utf16.count)
+        view.selectedRanges = [NSValue(range: all)]
+        #expect(view.firstSelectedRange == all)
         view.selectedRanges = [NSValue(range: NSRange(location: 2, length: 0))]
         #expect(view.selection == nil)
     }
