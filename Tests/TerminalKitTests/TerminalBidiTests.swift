@@ -27,18 +27,27 @@ struct TerminalBidiTests {
         #expect(TerminalContentView.visualOrder(of: terminal.screen[0], graphemes: terminal.graphemes) == nil)
     }
 
-    @Test func selectsTheLogicalTextUnderADragOverRightToLeftText() async throws {
+    @Test(arguments: [0.5, 0.8])
+    func selectsTheLogicalTextUnderADragOverRightToLeftText(column: CGFloat) async throws {
         let view = try await view(running: "printf '\\327\\220\\327\\221 cd'")
         view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1.8, in: view))
-        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 0.8, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: column, in: view))
         #expect(view.selectedText == "א")
     }
 
-    @Test func selectsTheRightToLeftTextFromTheLeftEdgeOfItsFirstCell() async throws {
+    @Test(arguments: [0, 0.2])
+    func selectsTheRightToLeftTextFromTheLeftEdgeOfItsFirstCell(column: CGFloat) async throws {
         let view = try await view(running: "printf '\\327\\220\\327\\221 cd'")
-        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 0.2, in: view))
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: column, in: view))
         view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 1.8, in: view))
         #expect(view.selectedText == "אב")
+    }
+
+    @Test func selectsNothingInADragInsideTheRightHalfOfAWideCharacter() async throws {
+        let view = try await view(running: "printf '\\344\\270\\255\\327\\220\\327\\221'")
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, row: 0, column: 1.2, in: view))
+        view.mouseDragged(with: try mouseEvent(.leftMouseDragged, row: 0, column: 1.8, in: view))
+        #expect(view.selectedText == nil)
     }
 
     @Test func selectsTheRightToLeftWordUnderADoubleClick() async throws {
@@ -61,6 +70,7 @@ struct TerminalBidiTests {
         let view = try await view(running: "printf '\\327\\220\\327\\221\\r'")
         #expect(view.cursorRect == view.rect(row: 0, columns: 1 ..< 2))
         #expect(view.characterRects(for: NSRange(location: 1, length: 1)) == [view.rect(row: 0, columns: 0 ..< 1)])
+        #expect(view.characterRects(for: NSRange(location: 0, length: 2)) == [view.rect(row: 0, columns: 0 ..< 2)])
     }
 }
 
