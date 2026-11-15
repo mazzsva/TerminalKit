@@ -1577,7 +1577,7 @@ private final class ComposingInputContext: NSTextInputContext {
     }
 }
 
-private final class KeyRecorder: NSResponder {
+final class KeyRecorder: NSResponder {
     var keys: [String?] = []
 
     override func keyDown(with event: NSEvent) {

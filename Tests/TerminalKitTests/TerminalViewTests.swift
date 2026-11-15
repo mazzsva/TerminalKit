@@ -305,6 +305,18 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.minY == min(max(position, 0), view.frame.height - visibleHeight))
     }
 
+    @Test func passesOnlyTheCommandKeysThatDoNotScrollToTheNextResponder() async throws {
+        let (scrollView, session) = try await scrollView(running: "seq 1 100")
+        await session.waitForExit()
+        scrollView.layoutSubtreeIfNeeded()
+        let view = scrollView.terminalView
+        let responder = KeyRecorder()
+        view.nextResponder = responder
+        view.keyDown(with: try keyDown(NSPageUpFunctionKey, modifierFlags: [.command, .function]))
+        view.keyDown(with: try keyDown("c", modifierFlags: .command))
+        #expect(responder.keys == ["c"])
+    }
+
     @Test func keepsTheRowEdgeWithThePageKeys() async throws {
         let session = TerminalSession(running: "seq 1 200")
         let scrollView = TerminalScrollView(session: session)
