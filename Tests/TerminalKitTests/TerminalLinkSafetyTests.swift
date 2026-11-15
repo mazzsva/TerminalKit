@@ -125,7 +125,7 @@ struct TerminalLinkSafetyTests {
     }
 
     @Test func opensAFileLinkOnlyOnThisMac() throws {
-        let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + " é")
         try Data("text".utf8).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
         let path = file.path(percentEncoded: true)
