@@ -1329,6 +1329,27 @@ struct TerminalContentViewTests {
         #expect(window.viewsNeedDisplay)
     }
 
+    @Test func asksToDrawAfterEachChangeOfTheLook() throws {
+        let view = TerminalContentView(session: readingSession())
+        let window = KeyWindow(contentView: view)
+        let point = TerminalContentView.Selection.Point(line: 0, column: 0)
+        let link = TerminalContentView.Link(
+            url: try #require(URL(string: "https://example.com")), spans: [.init(row: 0, columns: 0 ..< 1)])
+        let changes: [() -> Void] = [
+            { view.font = .monospacedSystemFont(ofSize: 20, weight: .regular) },
+            { view.palette = highContrastPalette },
+            { view.selection = TerminalContentView.Selection(anchor: point, head: point) },
+            { window.isKey = false },
+            { view.hoveredLink = link },
+            { view.hidesScrollback = true },
+        ]
+        for change in changes {
+            window.viewsNeedDisplay = false
+            change()
+            #expect(window.viewsNeedDisplay)
+        }
+    }
+
     @Test(arguments: [1, 2] as [CGFloat])
     func drawsTheEndOfTheMarkedTextAtTheRightEdge(scale: CGFloat) async throws {
         let view = try await drawnView(running: "printf '\\033[49G'")
