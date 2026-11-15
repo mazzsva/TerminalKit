@@ -69,9 +69,6 @@ extension TerminalContentView {
     }
 
     private static func joins(_ text: String, width: Int, _ next: String, width nextWidth: Int) -> Bool {
-        guard let first = text.unicodeScalars.first else {
-            return false
-        }
-        return !first.isASCII && width == 1 && nextWidth == 1 && (text + next).count == 1
+        text.unicodeScalars.first?.isASCII == false && width == 1 && nextWidth == 1 && (text + next).count == 1
     }
 }
