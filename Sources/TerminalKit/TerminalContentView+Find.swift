@@ -90,7 +90,7 @@ extension TerminalContentView: NSTextFinderClient {
     }
 
     private func select(_ range: NSRange) {
-        guard range.length > 0, let (start, end) = cellPositions(of: range) else {
+        guard let (start, end) = cellPositions(of: range) else {
             selection = nil
             return
         }
@@ -104,12 +104,12 @@ extension TerminalContentView: NSTextFinderClient {
 
     private func cellPositions(of range: NSRange) -> (start: (row: Int, column: Int), end: (row: Int, column: Int))? {
         let text = accessibilityText
-        guard range.location != NSNotFound, range.location >= 0, range.length >= 0, range.upperBound <= text.length
+        guard range.location != NSNotFound, range.location >= 0, range.length > 0, range.upperBound <= text.length
         else {
             return nil
         }
         let start = position(of: range.location, in: text)
-        let last = range.length > 0 ? position(of: range.upperBound - 1, in: text) : start
+        let last = position(of: range.upperBound - 1, in: text)
         let line = line(at: last.row)
         let width = line.indices.contains(last.column) ? line.columnCount(at: last.column) : 1
         return (start, (last.row, last.column + width))
