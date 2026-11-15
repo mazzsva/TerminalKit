@@ -8,10 +8,10 @@ extension TerminalContentView {
         var isReversed: [Bool]
 
         func logicalColumn(at x: CGFloat, in line: Terminal.Line) -> Int? {
-            guard x >= 0, x < CGFloat(line.count), var column = columns.firstIndex(of: Int(x)) else {
+            guard x >= 0, var column = columns.firstIndex(of: Int(x)) else {
                 return nil
             }
-            if line[column].width == 0, column > 0 {
+            if line[column].width == 0 {
                 column -= 1
             }
             let width = max(Int(line[column].width), 1)
