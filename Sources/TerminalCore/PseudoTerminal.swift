@@ -85,9 +85,9 @@ package final class PseudoTerminal: Sendable {
 
     deinit {
         let group = readSource.isCancelled ? -1 : tcgetpgrp(fileDescriptor)
+        killLater(foregroundGroup: group > 0 ? group : nil)
         cancelSources()
         wakeUp.finish()
-        killLater(foregroundGroup: group > 0 ? group : nil)
     }
 
     package var foregroundProcessGroup: pid_t? {
@@ -108,10 +108,10 @@ package final class PseudoTerminal: Sendable {
 
     package func hangUp() {
         let group = foregroundProcessGroup
+        killLater(foregroundGroup: group)
         queue.async { [weak self] in
             self?.cancelSources()
         }
-        killLater(foregroundGroup: group)
     }
 
     package func write(_ bytes: [UInt8], isReply: Bool = false) {
