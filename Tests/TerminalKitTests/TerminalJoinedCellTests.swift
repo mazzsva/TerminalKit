@@ -109,6 +109,24 @@ struct TerminalJoinedCellTests {
         #expect(text.utf8.count >= 256)
     }
 
+    @Test func drawsTheCellAfterTheByteLimitApart() async throws {
+        let marks = String(repeating: "\u{FE00}", count: 83)
+        let atTheLimit = "\u{915}\u{34F}\u{34F}" + marks
+        let pastTheLimit = "\u{915}\u{34F}\u{FE00}" + marks
+        #expect(atTheLimit.utf8.count == 256 && pastTheLimit.utf8.count == 257)
+        let limit = try await drawn(atTheLimit + "\u{903}")
+        let apart = try await drawn(pastTheLimit + "\u{903}")
+        let rect = limit.rect(row: 0, columns: 1 ..< 2)
+        #expect(try image(of: limit, in: rect) == image(of: apart, in: rect))
+    }
+
+    @Test func drawsTheCursorTextInItsOwnStyleAfterAShape() async throws {
+        let shape = try await focused("\\033[32m\u{915}\u{93F}\\033[my\\b")
+        let spaces = try await focused("\\033[32m  \\033[my\\b")
+        let rect = shape.view.cursorRect
+        #expect(try image(of: shape.view, in: rect) == image(of: spaces.view, in: rect))
+    }
+
     @Test func expandsARangeToItsShape() throws {
         let (line, graphemes) = cells("x\u{915}\u{94D}\u{937}y")
         let joined = try #require(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil))
