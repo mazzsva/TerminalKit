@@ -27,6 +27,16 @@ struct TerminalScrollerTests {
         #expect(scrollView.contentSize.width < 300)
     }
 
+    @Test func keepsTheTranslucentBackgroundOfThePalette() throws {
+        let scrollView = TerminalScrollView(session: TerminalSession(running: "exit"))
+        scrollView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        scrollView.layoutSubtreeIfNeeded()
+        let representation = try #require(scrollView.bitmapImageRepForCachingDisplay(in: scrollView.bounds))
+        scrollView.cacheDisplay(in: scrollView.bounds, to: representation)
+        let color = representation.colorAt(x: representation.pixelsWide / 2, y: representation.pixelsHigh / 2)
+        #expect(try #require(color?.alphaComponent) < 1)
+    }
+
     @Test func fitsTheSpaceBesideALegacyScroller() async throws {
         let session = TerminalSession(running: "seq 1 100")
         let scrollView = TerminalScrollView(session: session)
