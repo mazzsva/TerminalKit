@@ -150,9 +150,8 @@ public final class TerminalSession {
             return false
         }
         var information = proc_bsdshortinfo()
-        let size = proc_pidinfo(
-            group, PROC_PIDT_SHORTBSDINFO, 0, &information, Int32(MemoryLayout<proc_bsdshortinfo>.size))
-        return size <= 0 || pid_t(information.pbsi_ppid) != pseudoTerminal.processIdentifier
+        proc_pidinfo(group, PROC_PIDT_SHORTBSDINFO, 0, &information, Int32(MemoryLayout<proc_bsdshortinfo>.size))
+        return pid_t(information.pbsi_ppid) != pseudoTerminal.processIdentifier
     }
 
     public func terminate() {
