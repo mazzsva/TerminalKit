@@ -27,7 +27,7 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityInsertionPointLineNumber() == 3)
         #expect(view.accessibilityRange(forLine: 2) == NSRange(location: 4, length: 2))
         #expect(view.accessibilityRange(forLine: 3) == NSRange(location: 6, length: 2))
-        #expect(view.accessibilityRange(forLine: 4).location == NSNotFound)
+        #expect(view.accessibilityRange(forLine: 4) == NSRange(location: NSNotFound, length: 0))
         #expect(view.accessibilityLine(for: 5) == 2)
     }
 
@@ -121,6 +121,7 @@ struct TerminalAccessibilityTests {
     @Test func clampsTheRequestedRanges() async throws {
         let view = try await accessibleView(running: "printf 'ab'")
         #expect(view.accessibilityString(for: NSRange(location: 1, length: 99)) == "b\n\n\n")
+        #expect(view.accessibilityString(for: NSRange(location: 5, length: 0)) == "")
         #expect(view.accessibilityString(for: NSRange(location: 6, length: 1)) == nil)
         #expect(view.accessibilityString(for: NSRange(location: NSNotFound, length: 0)) == nil)
         #expect(view.accessibilityAttributedString(for: NSRange(location: 0, length: 2))?.string == "ab")
@@ -128,6 +129,7 @@ struct TerminalAccessibilityTests {
         #expect(view.accessibilityLine(for: 99) == 2)
         #expect(view.accessibilityRange(for: 0) == NSRange(location: 0, length: 1))
         #expect(view.accessibilityRange(for: 99) == NSRange(location: NSNotFound, length: 0))
+        #expect(view.accessibilityRange(for: CGPoint.zero) == NSRange(location: NSNotFound, length: 0))
     }
 
     @Test func followsTheErasedScrollback() async throws {
@@ -234,7 +236,7 @@ struct TerminalAccessibilityTests {
 
     @Test func givesTheVisibleRangeOutsideAWindow() async throws {
         let view = try await accessibleView(running: "printf 'ab'")
-        #expect(view.accessibilityVisibleCharacterRange().location == 0)
+        #expect(view.accessibilityVisibleCharacterRange() == NSRange(location: 0, length: 5))
     }
 
     @Test func framesTheEndOfAFullRow() async throws {
@@ -268,6 +270,33 @@ struct TerminalAccessibilityTests {
         let cell = view.rect(row: 0, columns: 10 ..< 11)
         let point = window.convertPoint(toScreen: view.convert(CGPoint(x: cell.midX, y: cell.midY), to: nil))
         #expect(view.accessibilityRange(for: point) == NSRange(location: 2, length: 1))
+    }
+
+    @Test func findsATabAtTheStartOfARowOverItsGap() async throws {
+        let view = try await accessibleView(running: "printf '\\tb'")
+        let window = NSWindow(contentView: view)
+        let cell = view.rect(row: 0, columns: 3 ..< 4)
+        let point = window.convertPoint(toScreen: view.convert(CGPoint(x: cell.midX, y: cell.midY), to: nil))
+        #expect(view.accessibilityRange(for: point) == NSRange(location: 0, length: 1))
+    }
+
+    @Test func findsTheFirstCharacterLeftOfTheTextInATinyFont() async throws {
+        let view = try await accessibleView(running: "printf 'ab'")
+        view.font = .monospacedSystemFont(ofSize: 1, weight: .regular)
+        let window = NSWindow(contentView: view)
+        let cell = view.rect(row: 0, columns: 0 ..< 1)
+        let point = window.convertPoint(toScreen: view.convert(CGPoint(x: cell.minX / 2, y: cell.midY), to: nil))
+        #expect(view.accessibilityRange(for: point) == NSRange(location: 0, length: 1))
+    }
+
+    @Test func findsTheLastCharacterPastTheEndOfAWrappedLastRow() async throws {
+        let view = try await accessibleView(running: "printf 'x\\r\\n0123456789ab\\033[2K\\033[H'")
+        view.session.resize(columns: 10, rows: 2)
+        #expect(view.accessibilityValue() as? String == "x\n0123456789")
+        let window = NSWindow(contentView: view)
+        let cell = view.rect(row: 1, columns: 10 ..< 11)
+        let point = window.convertPoint(toScreen: view.convert(CGPoint(x: cell.midX, y: cell.midY), to: nil))
+        #expect(view.accessibilityRange(for: point) == NSRange(location: 11, length: 1))
     }
 
     @Test func givesTheVisibleText() async throws {
