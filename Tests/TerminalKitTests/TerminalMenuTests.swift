@@ -12,6 +12,7 @@ struct TerminalMenuTests {
         try session.start()
         await session.waitForExit()
         #expect(view.selectedText == nil)
+        #expect(view.validateMenuItem(NSMenuItem(title: "", action: #selector(view.selectAll(_:)), keyEquivalent: "")))
         view.selectAll(nil)
         let lines = try #require(view.selectedText).split(separator: "\n", omittingEmptySubsequences: false)
         #expect(lines.prefix(3) == ["1", "2", "3"])
