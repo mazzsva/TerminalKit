@@ -975,11 +975,6 @@ package struct Terminal: Sendable {
     }
 
     private mutating func removeCells(_ range: Range<Int>) {
-        let overflow = screen[cursor.row].count - columns
-        guard overflow > 0 else {
-            erase(range, row: cursor.row, with: blank)
-            return
-        }
         breakTab(at: range.lowerBound, row: cursor.row)
         breakTab(at: range.upperBound - 1, row: cursor.row)
         screen[cursor.row].removeSubrange(range)
