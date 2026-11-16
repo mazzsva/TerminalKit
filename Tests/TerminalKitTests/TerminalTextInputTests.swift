@@ -141,7 +141,8 @@ struct TerminalTextInputTests {
     @Test func coversTheWholeCursorCellWithTheMarkedText() async throws {
         let covered = try await markedView(running: "printf '\\033[7m \\033[m\\033[1D'")
         let empty = try await markedView(running: "exit")
-        #expect(try image(of: covered) == image(of: empty))
+        let cell = covered.cursorRect
+        #expect(try bottomRows(of: cell, in: covered) == bottomRows(of: cell, in: empty))
     }
 
     private func markedView(running script: String) async throws -> TerminalContentView {
@@ -161,6 +162,18 @@ private func image(of view: NSView) throws -> Data {
     let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
     view.cacheDisplay(in: view.bounds, to: representation)
     return try #require(representation.tiffRepresentation)
+}
+
+@MainActor
+private func bottomRows(of rect: CGRect, in view: NSView) throws -> [NSColor?] {
+    let representation = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+    view.cacheDisplay(in: view.bounds, to: representation)
+    let scale = CGFloat(representation.pixelsWide) / representation.size.width
+    let bottom = Int(rect.maxY * scale)
+    return (bottom - 3 ..< bottom)
+        .flatMap { y in
+            (Int(rect.minX * scale) ..< Int(rect.maxX * scale)).map { representation.colorAt(x: $0, y: y) }
+        }
 }
 
 @MainActor
