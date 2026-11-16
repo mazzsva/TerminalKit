@@ -141,17 +141,18 @@ package struct Terminal: Sendable {
     private mutating func relaidScreen(
         _ screen: [Line],
         usedRows: Int,
-        cursor: Position?,
+        cursor: Position,
         columns: Int,
         rows: Int,
         restoredRows: Int
     ) -> (screen: [Line], cursor: Position) {
         let restored = scrollback.removeLast(coveringRows: restoredRows, columns: columns)
         removedScrollbackCount += scrollback.relayOut(columns: columns)
-        let storedCursor = cursor.map { Position(row: restored.count + $0.row, column: $0.column) }
-        var (lines, target) = Self.reflow(restored + screen.prefix(usedRows), columns: columns, cursor: storedCursor)
+        var (lines, target) = Self.reflow(
+            restored + screen.prefix(usedRows), columns: columns,
+            cursor: Position(row: restored.count + cursor.row, column: cursor.column))
         var column = target?.column ?? 0
-        if let cursor, usedRows == self.rows, (lines.last?.textCount ?? 0) >= columns {
+        if usedRows == self.rows, (lines.last?.textCount ?? 0) >= columns {
             if cursor.row == self.rows - 1 || hasMovedCursorForFullRow {
                 lines[lines.count - 1].isWrapped = true
                 lines.append(Line())
@@ -164,18 +165,15 @@ package struct Terminal: Sendable {
             hasMovedCursorForFullRow = false
         }
         var top = max(lines.count - rows, 0)
-        var row = 0
-        if let cursor {
-            row = target?.row ?? lines.count + cursor.row - usedRows + (cursor.column > 0 ? 1 : 0)
-            if target == nil {
-                top = max(top, min(row - rows + 1, lines.count - usedRows + self.rows - 2 * rows))
-                if rows < self.rows, row >= top + rows, top + rows <= lines.count {
-                    row = lines.count + cursor.row - usedRows
-                    column = cursor.column
-                    top = max(top, row - rows + 1)
-                }
-                lines += Array(repeating: Line(), count: max(top - lines.count, 0))
+        var row = target?.row ?? lines.count + cursor.row - usedRows + (cursor.column > 0 ? 1 : 0)
+        if target == nil {
+            top = max(top, min(row - rows + 1, lines.count - usedRows + self.rows - 2 * rows))
+            if rows < self.rows, row >= top + rows, top + rows <= lines.count {
+                row = lines.count + cursor.row - usedRows
+                column = cursor.column
+                top = max(top, row - rows + 1)
             }
+            lines += Array(repeating: Line(), count: max(top - lines.count, 0))
         }
         keepInScrollback(lines[..<top])
         var newScreen = lines[top...].map { Self.padded($0, columns: columns) }
