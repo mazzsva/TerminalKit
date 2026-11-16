@@ -100,7 +100,6 @@ package struct Terminal: Sendable {
     private var synchronizedSnapshot: [Terminal] = []
 
     package init(columns: Int, rows: Int) {
-        precondition(columns > 1 && rows > 0)
         self.columns = columns
         self.rows = rows
         screen = Array(repeating: Self.blankLine(columns: columns), count: rows)
@@ -113,7 +112,6 @@ package struct Terminal: Sendable {
     }
 
     mutating func resize(columns: Int, rows: Int, restoredRows: Int) {
-        precondition(columns > 1 && rows > 0)
         endSynchronizedOutput()
         isTextRunClipped = false
         isLastCharacterDropped = false
