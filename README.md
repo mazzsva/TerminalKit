@@ -53,13 +53,21 @@ struct ContentView: View {
 
 Call `terminate()` when the window closes, as the example app does in `onDisappear`. macOS can keep a closed window that it restored, and the `@State` session of that window keeps its shell alive until the app quits. `onDisappear` also runs when a container such as a `TabView` hides the view, and it does not run when an AppKit window closes. In such a host, call `terminate()` when the host closes the window or the tab of the session.
 
+The process starts when the view has space for 10 columns and 2 rows, which is 90 by 47 points with the default font. In a smaller view, such as a collapsed pane, `state` stays `.idle` and nothing reports it. While the view waits for its size, `start()` returns with no error, and a process that cannot start then shows as `.exited(.exit(127))`. `start()` throws when the session has no view, and when the view already has its size. A session starts one time, and `start()` after the end does nothing. For a restart, make a new `TerminalSession` and show it in a view with `.id(session)`. Without the `.id(session)`, SwiftUI can run `start()` before it makes the new view, and the program starts at 80 by 24 columns.
+
+A new view takes the keyboard focus when its window has no other first responder. To move the focus, use `.focused` on `TerminalView`.
+
 Send input with `send(_:)` or `paste(_:)` only after `start()`. Input sent before `start()` is dropped.
 
-In bracketed paste mode, `paste(_:)` sends nothing when the text contains the end marker `ESC [201~`, also when a combining mark follows it.
+In bracketed paste mode, `paste(_:)` sends nothing when the text contains the end marker `ESC [201~`, also when a combining mark follows it. When the program did not turn bracketed paste on, `paste(_:)` sends the text as it is, so in a shell a line break runs a command.
 
-Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`.
+Set the font, the colors, and Option as Meta with `terminalFont(_:)`, `terminalPalette(_:)`, and `terminalOptionAsMetaKey(_:)`. To show the find bar with Command-F, add `TextEditingCommands()` to the `commands` of the scene. In an AppKit window, put `TerminalView` in an `NSHostingView`. `terminalPalette(_:)` takes 16 `ansiColors`. A shorter array takes the rest from the standard palette, and a color after the 16th does nothing. The host must turn the App Sandbox off, as the example app does with `ENABLE_APP_SANDBOX` set to `NO`, because the library starts the shell and the programs of the user.
 
-To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, `programStatus`, and `state` of `TerminalSession`. A login shell runs under `/usr/bin/login`, so its `state` at the end is an exit with status 0, also when the shell ends with another status or by a signal. A configuration with an executable of its own gives the real status.
+To follow a session, observe `title`, `currentDirectoryURL`, `bellCount`, `programStatus`, and `state` of `TerminalSession`. `currentDirectoryURL` holds only what a shell reports, so it is nil for a program that is not a shell, also when the configuration has a directory. A login shell runs under `/usr/bin/login`, so its `state` at the end is an exit with status 0, also when the shell ends with another status or by a signal. This holds for `.loginShell(running:)` too, where a command that the shell does not find also gives status 0. A configuration with an executable of its own gives the real status. To get the real status of a command, use the shell as the executable and `-lic` and the command as the arguments, such as `Configuration(executableURL: URL(filePath: "/bin/zsh"), arguments: ["-lic", "claude"])`. The shell then gives 127 for a command that it does not find.
+
+A `Configuration` also has `environment` and `currentDirectoryURL`. `.loginShell(running:)` starts in the home folder. `hasForegroundProcess` tells if a program runs in the shell. It is not observable, so read it when you need it, such as when the window closes.
+
+Each bell plays the alert sound, at most one time in 0.5 s and only while the view is in a window. Command-K in the view clears the saved lines and the screen above the cursor. The host has no switch for the sound and no command for the clear.
 
 Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the session as Terminal.app, so the command changes the user's Terminal.app profile, not the host. Shift-Return makes a new line with no setup. Claude Code names that command when an Option shortcut does nothing. For those shortcuts, turn on `terminalOptionAsMetaKey(_:)`.
 
@@ -69,7 +77,7 @@ With its default setting, Claude Code rings the bell only when the Terminal.app 
 
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
-A held letter key with accents, such as E, shows the accent menu of macOS and does not repeat, as in a text view. For a key that repeats as in Terminal, register `ApplePressAndHoldEnabled` as `false` in the `UserDefaults` of the host app, as the example app does.
+A held letter key with accents, such as E, shows the accent menu of macOS and does not repeat, as in a text view. For a key that repeats as in Terminal, register `ApplePressAndHoldEnabled` as `false` in the `UserDefaults` of the host app, as the example app does. The accent menu was not tested.
 
 macOS gives microphone access to the host app, not to the program in the terminal. For voice input in a program such as Claude Code, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement, as the example app has. Voice input was not tested.
 
@@ -87,13 +95,14 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 
 **The right size from the first frame.** When the host calls `start()` after it makes the view, as in the example, the process waits until the view has its size, so a full-screen program never draws its first frame at the wrong width and then redraws.
 
-**Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts.
+**Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts. Input methods were not tested.
 
 **Never touches the shell.** There are no shell integration scripts and no changes to startup files. The user's own shell starts through `/usr/bin/login`. Programs see `TERM_PROGRAM=Apple_Terminal`, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file. The library also sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1`, so Claude Code uses synchronized output.
 
 ## Known limits
 
-- TerminalKit keeps at most 100,000 saved lines.
+- TerminalKit keeps at most 100,000 saved lines. In a measurement, 100,000 saved lines of 199 cells took 314 MB. Shorter lines take less. The host has no setting for the limit.
+- After the process ends, the view prints no line and drops typed keys. The host shows the end from `state`.
 - TerminalKit draws with the 12 pt system monospaced font in a 7 by 15 point cell, not with the font of Terminal.app, so some glyph shapes differ a little.
 - A person cannot drag the selected text out of the view to another app, as Terminal.app permits.
 - Terminal.app acts on these, and TerminalKit ignores them, because no listed program needs them:
