@@ -382,7 +382,7 @@ package struct Terminal: Sendable {
 
     private mutating func print(_ scalar: Unicode.Scalar) {
         let width = scalar.width
-        if width == 0 || isAfterPrint && extendsEmoji(with: scalar) {
+        if width == 0 || isAfterPrint && extendsFlag(with: scalar) {
             combine(scalar)
         } else {
             place(scalar, width: width)
@@ -390,38 +390,8 @@ package struct Terminal: Sendable {
         isAfterPrint = true
     }
 
-    private static func extendsEmoji(_ character: String, with scalar: Unicode.Scalar) -> Bool {
-        guard let base = character.unicodeScalars.first, base.properties.isEmoji else {
-            return false
-        }
-        if isRegionalIndicator(scalar) {
-            return isRegionalIndicator(base)
-        }
-        if scalar == "\u{20E3}" {
-            return base.isASCII
-        }
-        if scalar.properties.isEmojiModifier {
-            return base.properties.isEmojiModifierBase
-        }
-        return !base.isASCII && !isRegionalIndicator(base) && !base.properties.isEmojiModifier
-            && (scalar == "\u{200D}" || scalar.properties.isEmoji || ("\u{E0020}" ... "\u{E007F}").contains(scalar))
-    }
-
     private static func isRegionalIndicator(_ scalar: Unicode.Scalar) -> Bool {
         ("\u{1F1E6}" ... "\u{1F1FF}").contains(scalar)
-    }
-
-    private static func isWideEmoji(_ character: String) -> Bool {
-        let scalars = Array(character.unicodeScalars)
-        guard scalars[0].properties.isEmoji else {
-            return false
-        }
-        if isRegionalIndicator(scalars[0]) {
-            return isRegionalIndicator(scalars[1])
-        }
-        return scalars[1] == "\u{FE0F}"
-            || scalars[0].properties.isEmojiModifierBase && scalars[1].properties.isEmojiModifier
-            || zip(scalars, scalars.dropFirst()).contains { $0 == "\u{200D}" && $1.properties.isEmoji }
     }
 
     private var combiningColumn: Int? {
@@ -432,12 +402,12 @@ package struct Terminal: Sendable {
         return column >= 0 ? column : nil
     }
 
-    private func extendsEmoji(with scalar: Unicode.Scalar) -> Bool {
-        guard !scalar.isASCII, !isLastCharacterDropped, let column = combiningColumn else {
+    private func extendsFlag(with scalar: Unicode.Scalar) -> Bool {
+        guard Self.isRegionalIndicator(scalar), !isLastCharacterDropped, let column = combiningColumn else {
             return false
         }
         var text = graphemes.character(of: screen[cursor.row][column])
-        guard Self.extendsEmoji(text, with: scalar) else {
+        guard let base = text.unicodeScalars.first, Self.isRegionalIndicator(base) else {
             return false
         }
         text.unicodeScalars.append(scalar)
@@ -530,7 +500,7 @@ package struct Terminal: Sendable {
         }
         text.unicodeScalars.append(scalar)
         screen[cursor.row][column] = graphemes.cell(screen[cursor.row][column], with: text)
-        if isAfterPrint, screen[cursor.row][column].width == 1, Self.isWideEmoji(text) {
+        if Self.isRegionalIndicator(scalar) {
             widen(column)
         }
     }
