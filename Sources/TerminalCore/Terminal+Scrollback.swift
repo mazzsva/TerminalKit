@@ -238,9 +238,6 @@ extension Terminal {
         }
 
         private mutating func removeRemovedParagraphs() {
-            guard firstParagraph > 0 else {
-                return
-            }
             let lineCount = firstLine
             let rowCount = removedRowCount
             storedLines.removeSubrange(..<lineCount)
@@ -250,7 +247,7 @@ extension Terminal {
                 paragraphs[index].start -= lineCount
                 rowEnds[index] -= rowCount
             }
-            storedRelaidCount = Swift.max(storedRelaidCount - firstParagraph, 0)
+            storedRelaidCount -= firstParagraph
             firstParagraph = 0
         }
 
