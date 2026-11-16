@@ -646,6 +646,13 @@ struct TerminalTests {
         #expect(terminal.title.isEmpty)
     }
 
+    @Test(arguments: ["2147483648", "4294967296", "99999999999999999999999"])
+    func ignoresAnOperatingSystemCommandWithANumberTooLargeForInt32(number: String) {
+        var terminal = Terminal(columns: 4, rows: 2)
+        terminal.receive("\u{1B}]2;vim\u{7}\u{1B}]\(number);x\u{7}")
+        #expect(terminal.title == "vim")
+    }
+
     @Test func keepsTheTitleAfterAReset() {
         var terminal = Terminal(columns: 4, rows: 2)
         terminal.receive("\u{1B}]2;vim\u{7}\u{1B}c")
