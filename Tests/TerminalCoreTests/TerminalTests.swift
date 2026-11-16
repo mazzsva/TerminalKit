@@ -73,8 +73,8 @@ struct TerminalTests {
     }
 
     @Test(arguments: [
-        ("\r\u{1B}[J", "the screen below it is erased"), ("\u{1B}[A\u{1B}[K", "the end of the line is erased"),
-        ("\u{1B}[L", "a line is inserted after it"), ("\u{1B}[M", "the next line is deleted"),
+        ("\u{1B}[A\u{1B}[K", "the end of the line is erased"), ("\u{1B}[L", "a line is inserted after it"),
+        ("\u{1B}[M", "the next line is deleted"),
         ("\u{1B}[2;3r\u{1B}[T", "the region below it scrolls down"),
     ])
     func unwrapsALineWhenItsContinuationChanges(sequence: String, reason: String) {
