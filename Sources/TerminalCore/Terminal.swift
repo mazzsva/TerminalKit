@@ -945,9 +945,6 @@ package struct Terminal: Sendable {
     private mutating func eraseInDisplay(_ mode: Int) {
         switch mode {
         case 0:
-            if cursor.column == 0 {
-                unwrapLine(before: cursor.row)
-            }
             eraseInLine(0)
             screen.replaceSubrange(cursor.row + 1 ..< rows, with: blankLines(rows - cursor.row - 1))
         case 1:
