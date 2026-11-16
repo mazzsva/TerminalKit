@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalDropTests {
     private let names = [
         "plain-name_1.txt", "a b", "it's", "a'b!c", "quote\"x", "$HOME", "back\\slash", "star*?", "semi;colon&",

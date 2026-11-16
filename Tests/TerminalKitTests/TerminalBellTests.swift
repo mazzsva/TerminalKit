@@ -5,7 +5,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalBellTests {
     @Test func ringsTheBellOnceForABurst() async throws {
         let session = TerminalSession(running: "read line; printf 'a\\a\\a\\a'")

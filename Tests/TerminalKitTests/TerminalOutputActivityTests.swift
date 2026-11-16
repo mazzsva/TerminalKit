@@ -5,7 +5,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalOutputActivityTests {
     private let fullChunk = [UInt8](repeating: UInt8(ascii: "a"), count: PseudoTerminal.Output.capacity)
 

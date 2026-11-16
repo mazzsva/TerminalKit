@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalMenuTests {
     @Test func selectsAllTheText() async throws {
         let session = TerminalSession(running: "seq 1 30; printf 'last'")

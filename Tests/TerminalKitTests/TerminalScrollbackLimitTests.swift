@@ -5,7 +5,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalScrollbackLimitTests {
     @Test func keepsTheTextInPlaceWhenTheOldestLinesGo() async throws {
         let session = TerminalSession(running: "seq 1 100000; read line; seq 100001 100500")

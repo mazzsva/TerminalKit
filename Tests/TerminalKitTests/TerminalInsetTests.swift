@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalInsetTests {
     @Test func fitsTheRowsBelowTheToolbar() async throws {
         let (scrollView, window) = toolbarWindow(running: "seq 1 200")

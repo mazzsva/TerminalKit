@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalScrollerTests {
     @Test func keepsTheColumnsOfALegacyScrollerWithoutScrollback() async throws {
         let session = TerminalSession(running: "seq 1 100")

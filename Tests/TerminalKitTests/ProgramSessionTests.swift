@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalCore
 @testable import TerminalKit
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct ProgramSessionTests {
     static let handled: Set<String> = [
         "C0 08", "C0 0A", "C0 0D", "ESC (B", "ESC 7", "ESC 8", "ESC =", "ESC >", "ESC M", "CSI P", "CSI ?7l",

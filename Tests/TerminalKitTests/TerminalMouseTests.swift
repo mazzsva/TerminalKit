@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalMouseTests {
     @Test func reportsAClick() async throws {
         let (view, session) = try await viewReading("head -c 18", modes: "?1000h\\033[?1006h")

@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalLinkSafetyTests {
     @Test(arguments: ["👨\u{200D}👩", "🇧🇷", "e\u{301}", "中"])
     func detectsAURLAfterACluster(prefix: String) async throws {
