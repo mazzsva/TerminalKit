@@ -223,13 +223,13 @@ struct TerminalViewTests {
 
     @Test(.enabled(if: isInXCTest)) func keepsThePositionAfterAPageDownAboveTheLastRow() async throws {
         let output = OutputWindow()
-        for key in [NSPageUpFunctionKey, NSPageUpFunctionKey, NSPageDownFunctionKey] {
-            try output.press(key)
-            try await output.receiveLines(for: .milliseconds(500))
-        }
         let top = output.top
+        for (key, pages) in [(NSPageUpFunctionKey, 1.0), (NSPageUpFunctionKey, 2), (NSPageDownFunctionKey, 1)] {
+            try output.press(key)
+            try await output.receiveLines { output.top == top - pages * output.page }
+        }
         try await output.receiveLines(for: .milliseconds(500))
-        #expect(output.top == top)
+        #expect(output.top == top - output.page)
         #expect(!output.isAtBottom)
     }
 
@@ -631,6 +631,10 @@ private final class OutputWindow {
         scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height
     }
 
+    var page: CGFloat {
+        CGFloat(session.terminal.rows - 1) * scrollView.terminalView.cellSize.height
+    }
+
     func press(_ key: Int) throws {
         let characters = String(try #require(UnicodeScalar(key)))
         let event = try #require(
@@ -654,6 +658,13 @@ private final class OutputWindow {
     func receiveLines(for duration: Duration) async throws {
         let end = ContinuousClock.now + duration
         while ContinuousClock.now < end {
+            try await Task.sleep(for: .milliseconds(30))
+            receiveLine()
+        }
+    }
+
+    func receiveLines(until condition: () -> Bool) async throws {
+        while !condition() {
             try await Task.sleep(for: .milliseconds(30))
             receiveLine()
         }
