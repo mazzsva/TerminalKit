@@ -221,10 +221,7 @@ extension Terminal {
 
         private mutating func removeOldest() -> Int {
             let count = self.count
-            guard count > Self.maximumCount else {
-                return 0
-            }
-            while firstParagraph < paragraphs.count, self.count > Self.maximumCount {
+            while self.count > Self.maximumCount {
                 for index in storedRange(of: firstParagraph) {
                     storedLines[index] = Line()
                 }
