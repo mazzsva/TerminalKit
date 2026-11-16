@@ -555,14 +555,11 @@ final class TerminalContentView: NSView {
         let rows = firstRow ..< max(lastRow + 1, firstRow)
         var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor, VisualOrder?, JoinedCells?)] = []
         for row in rows {
-            var line = line(at: row, in: terminal)
-            if line.count > terminal.columns {
-                line.removeLast(line.count - terminal.columns)
-            }
+            let line = line(at: row, in: terminal)
             let order = Self.visualOrder(of: line, graphemes: graphemes)
             let joined = Self.joinedCells(in: line, graphemes: graphemes, order: order)
             let selected = selection?
-                .columns(inLine: terminal.removedScrollbackCount + row, count: max(line.count, terminal.columns))
+                .columns(inLine: terminal.removedScrollbackCount + row, count: terminal.columns)
             var pixels = [UInt32](repeating: 0, count: line.count)
             for (columns, style) in Self.runs(in: line) {
                 let (foreground, background) = colors.colors(for: style)
@@ -671,7 +668,7 @@ final class TerminalContentView: NSView {
         case .block:
             cursor.fill(using: .sourceOver)
         }
-        let line = terminal.screen[terminal.cursor.row]
+        let line = Self.screenLine(terminal.cursor.row, in: terminal)
         let order = Self.visualOrder(of: line, graphemes: graphemes)
         let joined = Self.joinedCells(in: line, graphemes: graphemes, order: order)
         let columns = joined?.expanded(cursorColumns) ?? cursorColumns
@@ -709,7 +706,16 @@ final class TerminalContentView: NSView {
     }
 
     func line(at row: Int, in terminal: Terminal) -> Terminal.Line {
-        row < terminal.scrollback.count ? terminal.scrollback[row] : terminal.screen[row - terminal.scrollback.count]
+        row < terminal.scrollback.count
+            ? terminal.scrollback[row] : Self.screenLine(row - terminal.scrollback.count, in: terminal)
+    }
+
+    nonisolated static func screenLine(_ row: Int, in terminal: Terminal) -> Terminal.Line {
+        var line = terminal.screen[row]
+        if line.count > terminal.columns {
+            line.removeLast(line.count - terminal.columns)
+        }
+        return line
     }
 
     static func runs(in line: Terminal.Line) -> [(columns: Range<Int>, style: Terminal.Style)] {
