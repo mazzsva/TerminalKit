@@ -90,6 +90,20 @@ struct TerminalContentViewTests {
         await session.waitForExit()
     }
 
+    @Test func drawsNoCellPastTheLastColumnOfAScreenRow() throws {
+        let session = TerminalSession(running: "exit")
+        let view = TerminalContentView(session: session)
+        view.fit(to: cells(20.5, 4.5, in: view))
+        session.receive(Array("\u{1B}[?1049h\u{1B}[H\u{1B}[41m\(String(repeating: "X", count: 20))".utf8))
+        view.fit(to: cells(10.5, 4.5, in: view))
+        let row = view.rect(row: session.terminal.scrollback.count, columns: 0 ..< 10)
+        let representation = try representation(of: view)
+        let background = color(in: representation, at: CGPoint(x: row.maxX + 8, y: row.midY + 2 * row.height))
+        #expect(session.terminal.screen[0].count == 20)
+        #expect(!isClose(color(in: representation, at: CGPoint(x: row.maxX - 3, y: row.midY)), to: background))
+        #expect(isClose(color(in: representation, at: CGPoint(x: row.maxX + 8, y: row.midY)), to: background))
+    }
+
     @Test func keepsTheScrollbackWhenTheViewCollapses() async throws {
         let session = TerminalSession(running: "seq -f 'line %g abcdefghijklmnopqrstuvwxyz' 1 2000")
         let view = TerminalContentView(session: session)
