@@ -277,16 +277,15 @@ struct TerminalSessionTests {
         let session = TerminalSession(
             running: """
                 stty raw -echo; q=$(printf '\\033[c%.0s' $(seq 1000)); i=0
-                while :; do printf %s "$q"; i=$((i + 1)); [ $i = 1000 ] && echo "flooded $$"; done
+                while [ $i -lt 1000 ]; do printf %s "$q"; i=$((i + 1)); done
+                stty min 0 time 20; echo "read $(cat | wc -c | tr -d ' ')"
                 """
         )
         try session.start()
-        await session.waitForText("flooded")
-        let line = try #require(session.lines.first { $0.hasPrefix("flooded") })
-        let processIdentifier = try #require(pid_t(line.dropFirst("flooded ".count)))
-        #expect(try #require(session.pseudoTerminal).unsentInputCount < 5 << 20)
-        #expect(kill(processIdentifier, SIGKILL) == 0)
-        await session.waitForExit()
+        let line = try #require(await session.linesAfterExit().first { $0.hasPrefix("read ") })
+        let count = try #require(Int(line.dropFirst("read ".count)))
+        #expect(count > 1 << 20)
+        #expect(count < 5 << 20)
     }
 
     @Test func keepsTheMainActorFreeWhileOutputFloods() async throws {

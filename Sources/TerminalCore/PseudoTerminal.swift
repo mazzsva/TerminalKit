@@ -100,12 +100,6 @@ package final class PseudoTerminal: Sendable {
         }
     }
 
-    package var unsentInputCount: Int {
-        queue.sync {
-            input.withLock { $0.bytes.count - $0.offset }
-        }
-    }
-
     package func hangUp() {
         let group = foregroundProcessGroup
         killLater(foregroundGroup: group)
