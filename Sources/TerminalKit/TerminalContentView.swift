@@ -545,7 +545,10 @@ final class TerminalContentView: NSView {
         let rows = firstRow ..< max(lastRow + 1, firstRow)
         var runs: [(Terminal.Line, Int, Range<Int>, Terminal.Style, NSColor, VisualOrder?, JoinedCells?)] = []
         for row in rows {
-            let line = line(at: row, in: terminal)
+            var line = line(at: row, in: terminal)
+            if line.count > terminal.columns {
+                line.removeLast(line.count - terminal.columns)
+            }
             let order = Self.visualOrder(of: line, graphemes: graphemes)
             let joined = Self.joinedCells(in: line, graphemes: graphemes, order: order)
             let selected = selection?
