@@ -181,9 +181,6 @@ package struct Terminal: Sendable {
         }
         keepInScrollback(lines[..<top])
         var newScreen = lines[top...].map { Self.padded($0, columns: columns) }
-        guard cursor != nil else {
-            return (newScreen, Position(row: 0, column: 0))
-        }
         newScreen += Array(repeating: Self.blankLine(columns: columns), count: rows - newScreen.count)
         if row < top {
             row = top + rows - 1
