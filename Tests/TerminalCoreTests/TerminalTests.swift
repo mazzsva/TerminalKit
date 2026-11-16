@@ -1655,14 +1655,20 @@ struct TerminalTests {
         terminal.receive(String(repeating: "中a", count: 200_000) + String(repeating: "\r\nx", count: 200))
         terminal.resize(columns: 199, rows: 24)
         let scrollback = terminal.scrollback
-        let duration = ContinuousClock()
-            .measure {
-                for row in stride(from: 0, to: scrollback.count, by: 10) {
-                    _ = scrollback[row]
+        func fastestRead(of rows: Range<Int>) -> Duration {
+            let durations = (0 ..< 10)
+                .map { _ in
+                    ContinuousClock()
+                        .measure {
+                            for row in rows {
+                                _ = scrollback[row]
+                            }
+                        }
                 }
-            }
-        #expect(scrollback.count > 2_000)
-        #expect(duration < .milliseconds(500))
+            return durations.min() ?? .zero
+        }
+        #expect(scrollback[2_999].isWrapped)
+        #expect(fastestRead(of: 2_900 ..< 3_000) < fastestRead(of: 0 ..< 100) * 4)
     }
 
     @Test func laysOutRandomSavedCellsLikeAFullReflow() {
