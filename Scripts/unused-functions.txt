@@ -10,9 +10,6 @@ Terminal.Scrollback.lines.getter
 Terminal.Scrollback.relaidCount.getter
     only TerminalCoreTests read it, to compare the saved lines with a full reflow
 
-Terminal.Scrollback.firstLine.getter
-    removes the paragraphs that the scrollback dropped at its line limit, and no counted test gets to that step
-
 static TerminalContentView.performWithWorkspace(_:)
     opens a link with NSWorkspace, and the tests replace it so that no app opens
 
