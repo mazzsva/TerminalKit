@@ -620,6 +620,31 @@ struct TerminalScrollKeyTests {
 }
 
 @MainActor
+@Suite(.serialized)
+struct TerminalWheelTests {
+    @Test(arguments: [nil, 18], [1, 2, 3, -1, -2, -3])
+    func movesOneRowForEachLineOfTheWheelInTheSavedLines(fontSize: CGFloat?, lines: Int32) async throws {
+        let output = OutputWindow()
+        if let fontSize {
+            output.setFont(.monospacedSystemFont(ofSize: fontSize, weight: .regular))
+        }
+        try output.press(NSPageUpFunctionKey)
+        let start = output.top
+        for _ in 0 ..< 5 where output.top == start {
+            try output.turnWheel(lines: lines)
+            for _ in 0 ..< 50 where output.top == start {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        let top = start - CGFloat(lines) * output.rowHeight
+        for _ in 0 ..< 50 where output.top != top {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(output.top == top)
+    }
+}
+
+@MainActor
 private final class OutputWindow {
     private let session = TerminalSession(running: "exit")
     private let scrollView: TerminalScrollView
@@ -647,8 +672,21 @@ private final class OutputWindow {
         CGFloat(session.terminal.rows - 1) * scrollView.terminalView.cellSize.height
     }
 
+    var rowHeight: CGFloat {
+        scrollView.terminalView.cellSize.height
+    }
+
+    func setFont(_ font: NSFont) {
+        scrollView.terminalView.font = font
+        scrollView.layoutSubtreeIfNeeded()
+    }
+
     func press(_ key: Int) throws {
         scrollView.terminalView.keyDown(with: try keyDown(key, modifierFlags: .function))
+    }
+
+    func turnWheel(lines: Int32) throws {
+        scrollView.terminalView.scrollWheel(with: try scrollWheelEvent(lines: lines))
     }
 
     func post(_ key: Int) throws {
