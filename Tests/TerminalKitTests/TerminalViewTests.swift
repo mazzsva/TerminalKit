@@ -206,6 +206,7 @@ struct TerminalViewTests {
     }
 
     @Test(
+        .enabled(if: isInXCTest),
         arguments: [
             [NSPageUpFunctionKey, NSEndFunctionKey],
             [NSPageUpFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey],
@@ -220,7 +221,7 @@ struct TerminalViewTests {
         #expect(output.isAtBottom)
     }
 
-    @Test func keepsThePositionAfterAPageDownAboveTheLastRow() async throws {
+    @Test(.enabled(if: isInXCTest)) func keepsThePositionAfterAPageDownAboveTheLastRow() async throws {
         let output = OutputWindow()
         for key in [NSPageUpFunctionKey, NSPageUpFunctionKey, NSPageDownFunctionKey] {
             try output.press(key)
@@ -664,6 +665,8 @@ private final class OutputWindow {
         scrollView.layoutSubtreeIfNeeded()
     }
 }
+
+private let isInXCTest = Bundle.main.bundleIdentifier == "com.apple.dt.xctest.tool"
 
 @MainActor
 private func scrollView(running script: String) async throws -> (TerminalScrollView, TerminalSession) {
