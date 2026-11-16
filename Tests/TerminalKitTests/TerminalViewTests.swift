@@ -620,19 +620,25 @@ struct TerminalScrollKeyTests {
 }
 
 @MainActor
+@Suite(.serialized)
 struct TerminalWheelTests {
     @Test(arguments: [nil, 18], [1, 2, 3, -1, -2, -3])
-    func movesOneRowForEachLineOfTheWheelInTheSavedLines(fontSize: CGFloat?, lines: Int32) throws {
+    func movesOneRowForEachLineOfTheWheelInTheSavedLines(fontSize: CGFloat?, lines: Int32) async throws {
         let output = OutputWindow()
         if let fontSize {
             output.setFont(.monospacedSystemFont(ofSize: fontSize, weight: .regular))
         }
         try output.press(NSPageUpFunctionKey)
-        let top = output.top - CGFloat(lines) * output.rowHeight
-        try output.turnWheel(lines: lines)
-        let deadline = Date(timeIntervalSinceNow: 5)
-        while output.top != top, Date() < deadline {
-            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
+        let start = output.top
+        for _ in 0 ..< 5 where output.top == start {
+            try output.turnWheel(lines: lines)
+            for _ in 0 ..< 50 where output.top == start {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        let top = start - CGFloat(lines) * output.rowHeight
+        for _ in 0 ..< 50 where output.top != top {
+            try await Task.sleep(for: .milliseconds(20))
         }
         #expect(output.top == top)
     }
