@@ -45,6 +45,12 @@ struct ColorQueryTests {
             ])
     }
 
+    @Test func changesAnIndexedColorWithTheBytesOfInitc() {
+        var terminal = coloredTerminal()
+        terminal.receive("\u{1B}]4;1;rgb:FF/7F/00\u{1B}\\")
+        #expect(terminal.changedColors.indexed == [1: Terminal.RGB(red: 0xFFFF, green: 0x7F7F, blue: 0x0000)])
+    }
+
     @Test func clearsOnlyTheIndexedColorsOnAReset() {
         for reset in ["\u{1B}c", "\u{1B}[!p"] {
             var terminal = coloredTerminal()
