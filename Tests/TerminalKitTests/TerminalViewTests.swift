@@ -578,33 +578,44 @@ private struct FocusedPanes: View {
 }
 
 @MainActor
-@Suite(.serialized, .timeLimit(.minutes(3)), .enabled(if: isInXCTest))
 struct TerminalScrollKeyTests {
     @Test(
         arguments: [
             [NSPageUpFunctionKey, NSEndFunctionKey],
-            [NSPageUpFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey],
+            [NSPageUpFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey],
             [NSEndFunctionKey],
         ])
-    func followsNewOutputAfterAScrollToTheLastRow(keys: [Int]) async throws {
+    func followsNewOutputAfterAScrollToTheLastRow(keys: [Int]) throws {
         let output = OutputWindow()
         for key in keys {
             try output.press(key)
-            try await output.receiveLines(for: .milliseconds(500))
+            output.receiveLines(1)
         }
+        #expect(output.isAtBottom)
+        output.receiveLines(10)
         #expect(output.isAtBottom)
     }
 
-    @Test func keepsThePositionAfterAPageDownAboveTheLastRow() async throws {
+    @Test func keepsThePositionAfterAPageDownAboveTheLastRow() throws {
         let output = OutputWindow()
         let top = output.top
-        for (key, pages) in [(NSPageUpFunctionKey, 1.0), (NSPageUpFunctionKey, 2), (NSPageDownFunctionKey, 1)] {
+        for key in [NSPageUpFunctionKey, NSPageUpFunctionKey, NSPageDownFunctionKey] {
             try output.press(key)
-            try await output.receiveLines { output.top == top - pages * output.page }
+            output.receiveLines(1)
         }
-        try await output.receiveLines(for: .milliseconds(500))
+        output.receiveLines(10)
         #expect(output.top == top - output.page)
         #expect(!output.isAtBottom)
+    }
+
+    @Test(.enabled(if: isInXCTest)) func movesOnePageUpFromTheBottomWhileOutputArrives() throws {
+        let output = OutputWindow()
+        let top = output.top
+        try output.post(NSPageUpFunctionKey)
+        output.receiveLines(1)
+        #expect(output.top == top - output.page)
+        output.receiveLines(10)
+        #expect(output.top == top - output.page)
     }
 }
 
@@ -621,9 +632,7 @@ private final class OutputWindow {
         window.setContentSize(CGSize(width: 400, height: 600))
         scrollView.layoutSubtreeIfNeeded()
         window.makeFirstResponder(scrollView.terminalView)
-        for _ in 0 ..< 200 {
-            receiveLine()
-        }
+        receiveLines(200)
     }
 
     var top: CGFloat {
@@ -639,6 +648,10 @@ private final class OutputWindow {
     }
 
     func press(_ key: Int) throws {
+        scrollView.terminalView.keyDown(with: try keyDown(key, modifierFlags: .function))
+    }
+
+    func post(_ key: Int) throws {
         let characters = String(try #require(UnicodeScalar(key)))
         let event = try #require(
             NSEvent.keyEvent(
@@ -658,25 +671,12 @@ private final class OutputWindow {
             try #require(NSApp.nextEvent(matching: .any, until: .distantPast, inMode: .default, dequeue: true)))
     }
 
-    func receiveLines(for duration: Duration) async throws {
-        let end = ContinuousClock.now + duration
-        while ContinuousClock.now < end {
-            try await Task.sleep(for: .milliseconds(30))
-            receiveLine()
+    func receiveLines(_ count: Int) {
+        for _ in 0 ..< count {
+            lineCount += 1
+            session.receive(Array("line \(lineCount)\r\n".utf8))
+            scrollView.layoutSubtreeIfNeeded()
         }
-    }
-
-    func receiveLines(until condition: () -> Bool) async throws {
-        while !condition() {
-            try await Task.sleep(for: .milliseconds(30))
-            receiveLine()
-        }
-    }
-
-    private func receiveLine() {
-        lineCount += 1
-        session.receive(Array("line \(lineCount)\r\n".utf8))
-        scrollView.layoutSubtreeIfNeeded()
     }
 }
 
