@@ -44,7 +44,6 @@ struct EscapeSequenceParser: Sendable {
     private var privateMarker: Unicode.Scalar?
     private var parameters: [Int] = []
     private var isOverflowing = false
-    private var hasLargeParameter = false
     private var subparameters: [Int: Int] = [:]
     private var colons = 0
     private var string: [Unicode.Scalar] = []
@@ -138,7 +137,6 @@ struct EscapeSequenceParser: Sendable {
             if colons == 0 {
                 let value = (parameters.popLast() ?? 0) * 10 + digit
                 parameters.append(min(value, Self.maximumParameterValue + 1))
-                hasLargeParameter = hasLargeParameter || value > Self.maximumParameterValue
             } else if colons == 1, let value = subparameters[parameters.count - 1] {
                 subparameters[parameters.count - 1] = min(value * 10 + digit, Self.maximumParameterValue)
             }
@@ -213,7 +211,6 @@ struct EscapeSequenceParser: Sendable {
         privateMarker = nil
         parameters = []
         isOverflowing = false
-        hasLargeParameter = false
         subparameters = [:]
         colons = 0
         string = []
@@ -224,8 +221,7 @@ struct EscapeSequenceParser: Sendable {
         return .controlSequence(
             ControlSequence(
                 privateMarker: privateMarker,
-                parameters: hasLargeParameter
-                    ? parameters.map { $0 > Self.maximumParameterValue ? 0 : $0 } : parameters,
+                parameters: parameters.map { $0 > Self.maximumParameterValue ? 0 : $0 },
                 intermediates: intermediates,
                 final: final,
                 subparameters: subparameters
