@@ -28,10 +28,6 @@ extension Terminal {
                 details?[0].rowOffsets
             }
 
-            var needsMarks: Bool {
-                details?[0].widths?.needsMarks ?? true
-            }
-
             func rowCount(of lines: ArraySlice<Line>, columns: Int) -> (rows: Int, used: Int) {
                 details?[0].widths?.rowCount(columns: columns) ?? Widths(lines).rowCount(columns: columns)
             }
@@ -197,9 +193,7 @@ extension Terminal {
             storedRelaidCount = paragraphs.count
             var end = 0
             for index in paragraphs.indices {
-                if !paragraphs[index].isSimple, paragraphs[index].textCount > columns,
-                    paragraphs[index].needsMarks
-                {
+                if !paragraphs[index].isSimple, paragraphs[index].textCount > columns {
                     paragraphs[index]
                         .updateWidths(of: storedLines[storedRange(of: index)]) { $0.markRows(columns: columns) }
                 }
@@ -274,11 +268,11 @@ extension Terminal {
                 isSimple
                 ? Widths.simpleRowCount(textCount: textCount, columns: columns)
                 : paragraphs[index].rowCount(of: storedLines[range], columns: columns)
-            return rows + (keepsEmptyRow(index, storedRows: range.count, used: used, columns: columns) ? 1 : 0)
+            return rows + (keepsEmptyRow(index, used: used, columns: columns) ? 1 : 0)
         }
 
-        private func keepsEmptyRow(_ index: Int, storedRows: Int, used: Int, columns: Int) -> Bool {
-            storedRows > 1 && paragraphs[index].lastRowTextCount == 0 && used == columns
+        private func keepsEmptyRow(_ index: Int, used: Int, columns: Int) -> Bool {
+            paragraphs[index].lastRowTextCount == 0 && used == columns
         }
 
         fileprivate func row(_ row: Int, of index: Int) -> Line {
@@ -320,7 +314,6 @@ extension Terminal {
 
         private func cells(_ offsets: Range<Int>, of paragraph: Paragraph, storedRange range: Range<Int>) -> Line {
             var line = Line()
-            line.reserveCapacity(offsets.count + 1)
             var storedRow = range.lowerBound
             var rowStart = 0
             if let rowOffsets = paragraph.rowOffsets {
@@ -396,7 +389,7 @@ extension Terminal {
 
                 func breakPoint(_ number: Int, columns: Int, used: Int) -> (unit: Int, used: Int) {
                     let width = Int(width)
-                    if count == 1 || width == 0 {
+                    if width == 0 {
                         return (0, used)
                     }
                     if width >= columns {
