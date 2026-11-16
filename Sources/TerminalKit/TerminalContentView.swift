@@ -479,7 +479,7 @@ final class TerminalContentView: NSView {
         scrollClipView(to: bounds.maxY)
     }
 
-    private func scrollClipView(to y: CGFloat) {
+    func scrollClipView(to y: CGFloat) {
         guard let clipView = superview as? NSClipView else {
             return
         }

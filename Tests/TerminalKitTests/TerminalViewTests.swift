@@ -617,6 +617,18 @@ struct TerminalScrollKeyTests {
         output.receiveLines(10)
         #expect(output.top == top - output.page)
     }
+
+    @Test(.enabled(if: isInXCTest)) func keepsTheTopLineWhenSavedLinesGoWhileAKeyIsHandled() throws {
+        let output = OutputWindow()
+        output.receiveSavedLineLimit()
+        try output.post(NSPageUpFunctionKey) {
+            let line = output.topLine
+            output.receiveLines(1)
+            #expect(output.topLine == line)
+            output.receiveLines(10)
+            #expect(output.topLine == line)
+        }
+    }
 }
 
 @MainActor
@@ -689,7 +701,18 @@ private final class OutputWindow {
         scrollView.terminalView.scrollWheel(with: try scrollWheelEvent(lines: lines))
     }
 
-    func post(_ key: Int) throws {
+    var topLine: Int {
+        session.terminal.removedScrollbackCount + Int(((top - TerminalContentView.topPadding) / rowHeight).rounded())
+    }
+
+    func receiveSavedLineLimit() {
+        let text = (0 ..< 100_000).map { "line \(lineCount + $0 + 1)\r\n" }.joined()
+        lineCount += 100_000
+        session.receive(Array(text.utf8))
+        scrollView.layoutSubtreeIfNeeded()
+    }
+
+    func post(_ key: Int, whileHandled handle: () -> Void = {}) throws {
         let characters = String(try #require(UnicodeScalar(key)))
         let event = try #require(
             NSEvent.keyEvent(
@@ -697,6 +720,7 @@ private final class OutputWindow {
                 timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
                 characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: 0))
         try send(event)
+        handle()
         let otherEvent = NSEvent.otherEvent(
             with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0,
             windowNumber: window.windowNumber, context: nil, subtype: 0, data1: 0, data2: 0)

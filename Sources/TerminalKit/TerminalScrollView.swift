@@ -83,7 +83,7 @@ final class TerminalScrollView: NSScrollView, NSMenuItemValidation {
             terminalView.scrollToBottom()
         } else if removedLines > 0 {
             let offset = CGFloat(removedLines) * terminalView.cellSize.height
-            terminalView.scroll(CGPoint(x: 0, y: contentView.bounds.minY - offset))
+            terminalView.scrollClipView(to: contentView.bounds.minY - offset)
         }
     }
 
