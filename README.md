@@ -16,7 +16,7 @@ TerminalKit is a terminal view for Mac apps. In it, the zsh login shell, vim, le
 
 ## Quality gates
 
-- **Tests:** [Swift Testing](https://github.com/swiftlang/swift-testing) tests in three targets. `TerminalCoreTests` tests the emulator and plays byte streams recorded from Terminal.app. `TerminalKitTests` runs the listed programs in pseudo terminals and tests the view. `BadInputTests` sends 1,000,000 random byte streams in a process of its own.
+- **Tests:** [Swift Testing](https://github.com/swiftlang/swift-testing) tests in three targets. `TerminalCoreTests` tests the emulator and plays byte streams recorded from Terminal.app. `TerminalKitTests` runs the listed programs in pseudo terminals and tests the view. `BadInputTests` sends 1,000,000 random byte streams and measures the memory that combining marks take, in a process of its own.
 - **Programs:** The zsh login shell, vim, less, man, top, nano, git, and Claude Code each complete a fixed script in `ProgramSessionTests`. After each step, the test checks the screen.
 - **Claude Code:** The real session runs only on request, with Claude Code installed and signed in. It runs one time in a pseudo terminal, and one time in a window that hosts the view, where the test sends key and scroll wheel events to the window and resizes it. CI plays a recorded session that holds no private data, and the value `record` records it again. Without `TERMINALKIT_CLAUDE_SESSION` or without Claude Code, the two tests report that they did not run:
   `TEST_RUNNER_TERMINALKIT_CLAUDE_SESSION=1 xcodebuild test -scheme TerminalKit -destination 'platform=macOS' -only-testing:TerminalKitTests/ProgramSessionTests`
