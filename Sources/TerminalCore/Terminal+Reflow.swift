@@ -30,7 +30,7 @@ extension Terminal {
                 cells.append(contentsOf: lines[row][..<rowCount])
             }
             if var offset = cursorOffset, offset < cells.count {
-                while offset > 0, cells[offset].isTabGap || cells[offset].width == 0 {
+                while cells[offset].isTabGap || cells[offset].width == 0 {
                     offset -= 1
                 }
                 cursorOffset = offset
