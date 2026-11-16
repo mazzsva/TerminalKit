@@ -216,8 +216,6 @@ package struct Terminal: Sendable {
                 continue
             }
             isTextRunClipped = false
-            isLastCharacterDropped = false
-            isAfterPrint = false
             switch action {
             case .execute("\n"), .execute("\u{B}"), .execute("\u{C}"):
                 lineFeed()
