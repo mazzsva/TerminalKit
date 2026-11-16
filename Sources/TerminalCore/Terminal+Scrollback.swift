@@ -28,10 +28,6 @@ extension Terminal {
                 details?[0].rowOffsets
             }
 
-            var needsMarks: Bool {
-                details?[0].widths?.needsMarks ?? true
-            }
-
             func rowCount(of lines: ArraySlice<Line>, columns: Int) -> (rows: Int, used: Int) {
                 details?[0].widths?.rowCount(columns: columns) ?? Widths(lines).rowCount(columns: columns)
             }
@@ -197,9 +193,7 @@ extension Terminal {
             storedRelaidCount = paragraphs.count
             var end = 0
             for index in paragraphs.indices {
-                if !paragraphs[index].isSimple, paragraphs[index].textCount > columns,
-                    paragraphs[index].needsMarks
-                {
+                if !paragraphs[index].isSimple, paragraphs[index].textCount > columns {
                     paragraphs[index]
                         .updateWidths(of: storedLines[storedRange(of: index)]) { $0.markRows(columns: columns) }
                 }
