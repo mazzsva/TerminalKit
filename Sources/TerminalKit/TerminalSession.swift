@@ -40,11 +40,9 @@ public final class TerminalSession {
     var liveTerminal = Terminal(columns: 80, rows: 24) {
         didSet {
             revision += 1
-            terminalDidChange?()
         }
     }
     @ObservationIgnored var synchronizedOutputClock: any Clock<Duration> = ContinuousClock()
-    @ObservationIgnored var terminalDidChange: (() -> Void)?
     @ObservationIgnored private(set) var revision = 0
     @ObservationIgnored private(set) var resizeCount = 0
     @ObservationIgnored weak var sizingView: TerminalContentView?

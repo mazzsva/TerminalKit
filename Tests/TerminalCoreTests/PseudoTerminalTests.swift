@@ -175,7 +175,7 @@ struct PseudoTerminalTests {
     @Test func keepsTheTypedInputPastTheReplyLimit() async throws {
         let pseudoTerminal = try PseudoTerminal(
             executableURL: URL(filePath: "/bin/sh"),
-            arguments: ["-c", "stty raw -echo; echo ready; exec /bin/sleep 100"],
+            arguments: ["-c", "stty raw -echo; echo ready; sleep 1; head -c \((5 << 20) + 200) | tr -d a"],
             environment: ["PATH": "/usr/bin:/bin"],
             columns: 80,
             rows: 24
@@ -185,23 +185,16 @@ struct PseudoTerminalTests {
         while !output.contains("ready"), let bytes = await iterator.next() {
             output += String(decoding: bytes, as: UTF8.self)
         }
-        let bytes = [UInt8](repeating: 0x61, count: 100)
         pseudoTerminal.write([UInt8](repeating: 0x61, count: 3 << 20))
-        let first = pseudoTerminal.unsentInputCount
-        pseudoTerminal.write(bytes, isReply: true)
-        let second = pseudoTerminal.unsentInputCount
+        pseudoTerminal.write(Array(String(repeating: "b", count: 100).utf8), isReply: true)
         pseudoTerminal.write([UInt8](repeating: 0x61, count: 2 << 20))
-        let third = pseudoTerminal.unsentInputCount
-        pseudoTerminal.write(bytes, isReply: true)
-        let fourth = pseudoTerminal.unsentInputCount
-        pseudoTerminal.write(bytes)
-        let fifth = pseudoTerminal.unsentInputCount
-        #expect(kill(pseudoTerminal.processIdentifier, SIGKILL) == 0)
-        while await iterator.next() != nil {}
-        #expect(second > first + 50)
-        #expect(third > second + (1 << 20))
-        #expect(fourth < third + 50)
-        #expect(fifth > fourth + 50)
+        pseudoTerminal.write(Array(String(repeating: "c", count: 100).utf8), isReply: true)
+        pseudoTerminal.write(Array(String(repeating: "d", count: 100).utf8))
+        output = ""
+        while let bytes = await iterator.next() {
+            output += String(decoding: bytes, as: UTF8.self)
+        }
+        #expect(output == String(repeating: "b", count: 100) + String(repeating: "d", count: 100))
     }
 
     @Test(arguments: ["/bin/sh", "/bin/zsh", "/bin/dash"])
