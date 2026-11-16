@@ -395,7 +395,7 @@ extension Terminal {
 
                 func breakPoint(_ number: Int, columns: Int, used: Int) -> (unit: Int, used: Int) {
                     let width = Int(width)
-                    if count == 1 || width == 0 {
+                    if width == 0 {
                         return (0, used)
                     }
                     if width >= columns {
