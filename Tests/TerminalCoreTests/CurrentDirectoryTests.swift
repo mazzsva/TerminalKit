@@ -42,9 +42,9 @@ struct CurrentDirectoryTests {
         #expect(terminal.currentDirectory == URL(filePath: path))
     }
 
-    @Test func clearsTheCurrentDirectoryOnAReset() {
+    @Test func keepsTheCurrentDirectoryAfterAReset() {
         var terminal = Terminal(columns: 20, rows: 5)
         terminal.receive("\u{1B}]7;file:///a\u{7}ls\r\n\u{1B}c")
-        #expect(terminal.currentDirectory == nil)
+        #expect(terminal.currentDirectory == URL(filePath: "/a"))
     }
 }

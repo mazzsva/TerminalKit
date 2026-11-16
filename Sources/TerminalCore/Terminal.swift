@@ -711,6 +711,7 @@ package struct Terminal: Sendable {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.programStatus = programStatus
+        terminal.currentDirectory = currentDirectory
         terminal.bellCount = bellCount
         terminal.synchronizedOutputCount = synchronizedOutputCount
         terminal.defaultColors = defaultColors
