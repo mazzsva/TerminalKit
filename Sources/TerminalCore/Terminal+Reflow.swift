@@ -70,14 +70,9 @@ extension Terminal {
                 reflowedCursor = Position(row: firstRow + rowCount, column: 0)
             } else if keepsEmptyRow, cursorOffset == cells.count {
                 reflowedCursor = Position(row: firstRow + rowCount - 1, column: 0)
-            } else if cursorOffset < cells.count {
+            } else {
                 let row = rowStarts.lastIndex { $0 <= cursorOffset } ?? 0
                 reflowedCursor = Position(row: firstRow + row, column: cursorOffset - rowStarts[row])
-            } else {
-                reflowedCursor = Position(
-                    row: firstRow + rowStarts.count - 1,
-                    column: min(cursorOffset - lastStart, columns - 1)
-                )
             }
         }
         return (result, reflowedCursor)
