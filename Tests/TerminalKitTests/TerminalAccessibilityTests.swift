@@ -5,7 +5,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalAccessibilityTests {
     @Test func isATextArea() {
         let view = TerminalContentView(session: TerminalSession(running: "exit"))

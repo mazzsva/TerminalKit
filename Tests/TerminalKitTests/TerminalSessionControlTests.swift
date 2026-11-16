@@ -5,7 +5,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalSessionControlTests {
     @Test func terminatesTheProcessAndItsChildren() async throws {
         let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

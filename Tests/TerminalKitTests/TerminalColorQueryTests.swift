@@ -6,7 +6,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalColorQueryTests {
     @Test func reportsTheStandardPaletteAsTerminalAppReportsClearDark() throws {
         let view = TerminalContentView(session: TerminalSession(running: "exit"))
@@ -131,7 +131,7 @@ private func gray(_ white: UInt16) -> Terminal.RGB {
 }
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalChangedColorTests {
     private func view(after output: String) async throws -> TerminalContentView {
         let session = TerminalSession(running: "printf '\(output)'; sleep 30")

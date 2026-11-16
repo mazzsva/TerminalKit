@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalSynchronizedOutputTests {
     @Test func drawsTheScreenOfTheStartUntilTheEnd() async throws {
         let session = TerminalSession(

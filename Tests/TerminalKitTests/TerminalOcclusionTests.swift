@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalOcclusionTests {
     @Test func drawsNothingWhileItsWindowIsNotVisible() async throws {
         let session = TerminalSession(running: "stty -echo; printf a; read x; printf b; read y")

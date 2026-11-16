@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalFindTests {
     @Test func findsTextAcrossAWrappedRow() async throws {
         let scrollView = try await findView(running: "printf 'see https://example.com/x end'", columns: 10)

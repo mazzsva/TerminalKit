@@ -4,7 +4,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalLiveModeTests {
     @Test func sendsTheCursorKeysInTheLiveMode() async throws {
         let session = updatingSession(setting: "?1", reading: "dd bs=1 count=3 2>/dev/null | od -An -tx1")

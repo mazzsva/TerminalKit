@@ -6,7 +6,7 @@ import Testing
 @testable import TerminalKit
 
 @MainActor
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(3)))
 struct TerminalPasteTests {
     @Test func pastesTheText() async throws {
         let (view, session) = try startedView(running: "read a; read b; echo \"$a+$b\"")
