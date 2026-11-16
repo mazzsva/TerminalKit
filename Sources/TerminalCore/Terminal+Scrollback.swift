@@ -320,7 +320,6 @@ extension Terminal {
 
         private func cells(_ offsets: Range<Int>, of paragraph: Paragraph, storedRange range: Range<Int>) -> Line {
             var line = Line()
-            line.reserveCapacity(offsets.count + 1)
             var storedRow = range.lowerBound
             var rowStart = 0
             if let rowOffsets = paragraph.rowOffsets {
