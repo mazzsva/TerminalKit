@@ -205,34 +205,6 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
     }
 
-    @Test(
-        .serialized, .enabled(if: isInXCTest),
-        arguments: [
-            [NSPageUpFunctionKey, NSEndFunctionKey],
-            [NSPageUpFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey],
-            [NSEndFunctionKey],
-        ])
-    func followsNewOutputAfterAScrollToTheLastRow(keys: [Int]) async throws {
-        let output = OutputWindow()
-        for key in keys {
-            try output.press(key)
-            try await output.receiveLines(for: .milliseconds(500))
-        }
-        #expect(output.isAtBottom)
-    }
-
-    @Test(.enabled(if: isInXCTest)) func keepsThePositionAfterAPageDownAboveTheLastRow() async throws {
-        let output = OutputWindow()
-        let top = output.top
-        for (key, pages) in [(NSPageUpFunctionKey, 1.0), (NSPageUpFunctionKey, 2), (NSPageDownFunctionKey, 1)] {
-            try output.press(key)
-            try await output.receiveLines { output.top == top - pages * output.page }
-        }
-        try await output.receiveLines(for: .milliseconds(500))
-        #expect(output.top == top - output.page)
-        #expect(!output.isAtBottom)
-    }
-
     @Test func keepsTheFirstRowAtTheTopPaddingAtTheBottom() async throws {
         let session = TerminalSession(running: "printf ready; read line; seq 1 100")
         let scrollView = TerminalScrollView(session: session)
@@ -602,6 +574,37 @@ private struct FocusedPanes: View {
         .onChange(of: focus, initial: true) {
             focusedIndex = focus
         }
+    }
+}
+
+@MainActor
+@Suite(.serialized, .timeLimit(.minutes(3)), .enabled(if: isInXCTest))
+struct TerminalScrollKeyTests {
+    @Test(
+        arguments: [
+            [NSPageUpFunctionKey, NSEndFunctionKey],
+            [NSPageUpFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey],
+            [NSEndFunctionKey],
+        ])
+    func followsNewOutputAfterAScrollToTheLastRow(keys: [Int]) async throws {
+        let output = OutputWindow()
+        for key in keys {
+            try output.press(key)
+            try await output.receiveLines(for: .milliseconds(500))
+        }
+        #expect(output.isAtBottom)
+    }
+
+    @Test func keepsThePositionAfterAPageDownAboveTheLastRow() async throws {
+        let output = OutputWindow()
+        let top = output.top
+        for (key, pages) in [(NSPageUpFunctionKey, 1.0), (NSPageUpFunctionKey, 2), (NSPageDownFunctionKey, 1)] {
+            try output.press(key)
+            try await output.receiveLines { output.top == top - pages * output.page }
+        }
+        try await output.receiveLines(for: .milliseconds(500))
+        #expect(output.top == top - output.page)
+        #expect(!output.isAtBottom)
     }
 }
 
