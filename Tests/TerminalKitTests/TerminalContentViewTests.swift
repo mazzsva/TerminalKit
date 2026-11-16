@@ -104,6 +104,53 @@ struct TerminalContentViewTests {
         #expect(isClose(color(in: representation, at: CGPoint(x: row.maxX + 8, y: row.midY)), to: background))
     }
 
+    @Test func copiesNoCellPastTheLastColumnAfterSelectAll() {
+        let view = narrowedAlternateScreen()
+        view.selectAll(nil)
+        #expect(view.selectedText == shownText(of: view))
+    }
+
+    @Test func underlinesNoLinkCellPastTheLastColumn() throws {
+        let view = narrowedAlternateScreen()
+        let row = view.session.terminal.scrollback.count
+        let cell = view.rect(row: row, columns: 5 ..< 6)
+        view.updateHoveredLink(at: CGPoint(x: cell.midX, y: cell.midY), modifierFlags: .command)
+        #expect(view.hoveredLink?.url == URL(string: "https://example.c"))
+        #expect(view.hoveredLink?.spans == [.init(row: row, columns: 3 ..< 20)])
+        let shown = view.rect(row: row, columns: 0 ..< 20)
+        let representation = try representation(of: view)
+        let underline = shown.maxY - 0.5
+        let background = color(in: representation, at: CGPoint(x: shown.maxX + 8, y: underline + shown.height))
+        #expect(!isClose(color(in: representation, at: CGPoint(x: shown.maxX - 3, y: underline)), to: background))
+        #expect(isClose(color(in: representation, at: CGPoint(x: shown.maxX + 8, y: underline)), to: background))
+    }
+
+    @Test func givesVoiceOverNoCellPastTheLastColumn() {
+        let view = narrowedAlternateScreen()
+        #expect(view.accessibilityValue() as? String == shownText(of: view))
+    }
+
+    @Test func findsNoTextPastTheLastColumn() {
+        let view = narrowedAlternateScreen()
+        let text = view.string as NSString
+        #expect(text.range(of: "path").location == NSNotFound)
+        #expect(text.range(of: "HIDDEN").location == NSNotFound)
+    }
+
+    private func narrowedAlternateScreen() -> TerminalContentView {
+        let session = TerminalSession(running: "exit")
+        let view = TerminalContentView(session: session)
+        view.fit(to: cells(30.5, 4.5, in: view))
+        session.receive(Array("\u{1B}[?1049h\u{1B}[Hab https://example.com/path\r\n0123456789abcdefghijHIDDEN".utf8))
+        view.fit(to: cells(20.5, 4.5, in: view))
+        return view
+    }
+
+    private func shownText(of view: TerminalContentView) -> String {
+        String(repeating: "\n", count: view.session.terminal.scrollback.count)
+            + "ab https://example.c\n0123456789abcdefghij\n\n\n"
+    }
+
     @Test func keepsTheScrollbackWhenTheViewCollapses() async throws {
         let session = TerminalSession(running: "seq -f 'line %g abcdefghijklmnopqrstuvwxyz' 1 2000")
         let view = TerminalContentView(session: session)
