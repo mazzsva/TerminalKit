@@ -685,7 +685,12 @@ package struct Terminal: Sendable {
     private mutating func perform(_ command: String) {
         let separator = command.unicodeScalars.firstIndex(of: ";")
         let text = separator.map { command[command.unicodeScalars.index(after: $0)...] }
-        let number = Int(command[..<(separator ?? command.endIndex)]).flatMap { $0 <= Int32.max ? $0 : nil } ?? 0
+        let name = command[..<(separator ?? command.endIndex)]
+        let digits = name.first == "+" || name.first == "-" ? name.dropFirst() : name
+        let isNumber = !digits.isEmpty && digits.allSatisfy { ("0" ... "9").contains($0) }
+        guard let number = Int32(name).map(Int.init) ?? (isNumber ? nil : 0) else {
+            return
+        }
         switch (number, text) {
         case (0, let text?), (2, let text?):
             title = String(text)
@@ -709,6 +714,7 @@ package struct Terminal: Sendable {
         var terminal = Terminal(columns: columns, rows: rows)
         terminal.title = title
         terminal.programStatus = programStatus
+        terminal.currentDirectory = currentDirectory
         terminal.bellCount = bellCount
         terminal.synchronizedOutputCount = synchronizedOutputCount
         terminal.defaultColors = defaultColors
