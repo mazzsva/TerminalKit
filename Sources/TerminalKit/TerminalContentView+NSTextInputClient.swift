@@ -4,14 +4,8 @@ extension TerminalContentView: NSTextInputClient {
     func insertText(_ string: Any, replacementRange: NSRange) {
         let characters = text(of: string)
         let input: [UInt8]? =
-            if hasMarkedText() || characters != keyDownEvent?.characters {
-                nil
-            } else if let event = keyDownEvent {
-                switch keyInput(event) {
-                case .bytes(let bytes): bytes
-                case .nothing, .scroll: []
-                case .text: nil
-                }
+            if let event = keyDownEvent, characters == event.characters, case .bytes(let bytes) = keyInput(event) {
+                bytes
             } else {
                 nil
             }
@@ -33,7 +27,6 @@ extension TerminalContentView: NSTextInputClient {
         if hasMarkedText() {
             insertText(markedText, replacementRange: NSRange(location: NSNotFound, length: 0))
         }
-        markedString = NSAttributedString()
     }
 
     func selectedRange() -> NSRange {
