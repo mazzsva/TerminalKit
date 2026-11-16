@@ -468,7 +468,7 @@ package struct Terminal: Sendable {
     private mutating func clearWideCharacter(at column: Int) {
         breakTab(at: column, row: cursor.row)
         switch screen[cursor.row][column].width {
-        case 0 where column > 0:
+        case 0:
             screen[cursor.row][column - 1] = writtenBlank
         case 2:
             screen[cursor.row][column + 1] = writtenBlank
