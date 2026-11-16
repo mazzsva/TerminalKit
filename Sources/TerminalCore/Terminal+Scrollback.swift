@@ -274,11 +274,11 @@ extension Terminal {
                 isSimple
                 ? Widths.simpleRowCount(textCount: textCount, columns: columns)
                 : paragraphs[index].rowCount(of: storedLines[range], columns: columns)
-            return rows + (keepsEmptyRow(index, storedRows: range.count, used: used, columns: columns) ? 1 : 0)
+            return rows + (keepsEmptyRow(index, used: used, columns: columns) ? 1 : 0)
         }
 
-        private func keepsEmptyRow(_ index: Int, storedRows: Int, used: Int, columns: Int) -> Bool {
-            storedRows > 1 && paragraphs[index].lastRowTextCount == 0 && used == columns
+        private func keepsEmptyRow(_ index: Int, used: Int, columns: Int) -> Bool {
+            paragraphs[index].lastRowTextCount == 0 && used == columns
         }
 
         fileprivate func row(_ row: Int, of index: Int) -> Line {
