@@ -205,6 +205,33 @@ struct TerminalViewTests {
         #expect(scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height)
     }
 
+    @Test(
+        arguments: [
+            [NSPageUpFunctionKey, NSEndFunctionKey],
+            [NSPageUpFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey],
+            [NSEndFunctionKey],
+        ])
+    func followsNewOutputAfterAScrollToTheLastRow(keys: [Int]) async throws {
+        let output = OutputWindow()
+        for key in keys {
+            try output.press(key)
+            try await output.receiveLines(for: .milliseconds(500))
+        }
+        #expect(output.isAtBottom)
+    }
+
+    @Test func keepsThePositionAfterAPageDownAboveTheLastRow() async throws {
+        let output = OutputWindow()
+        for key in [NSPageUpFunctionKey, NSPageUpFunctionKey, NSPageDownFunctionKey] {
+            try output.press(key)
+            try await output.receiveLines(for: .milliseconds(500))
+        }
+        let top = output.top
+        try await output.receiveLines(for: .milliseconds(500))
+        #expect(output.top == top)
+        #expect(!output.isAtBottom)
+    }
+
     @Test func keepsTheFirstRowAtTheTopPaddingAtTheBottom() async throws {
         let session = TerminalSession(running: "printf ready; read line; seq 1 100")
         let scrollView = TerminalScrollView(session: session)
@@ -574,6 +601,67 @@ private struct FocusedPanes: View {
         .onChange(of: focus, initial: true) {
             focusedIndex = focus
         }
+    }
+}
+
+@MainActor
+private final class OutputWindow {
+    private let session = TerminalSession(running: "exit")
+    private let scrollView: TerminalScrollView
+    private let window: NSWindow
+    private var lineCount = 0
+
+    init() {
+        scrollView = TerminalScrollView(session: session)
+        window = NSWindow(contentView: scrollView)
+        window.setContentSize(CGSize(width: 400, height: 600))
+        scrollView.layoutSubtreeIfNeeded()
+        window.makeFirstResponder(scrollView.terminalView)
+        for _ in 0 ..< 200 {
+            receiveLine()
+        }
+    }
+
+    var top: CGFloat {
+        scrollView.contentView.bounds.minY
+    }
+
+    var isAtBottom: Bool {
+        scrollView.contentView.bounds.maxY == scrollView.terminalView.frame.height
+    }
+
+    func press(_ key: Int) throws {
+        let characters = String(try #require(UnicodeScalar(key)))
+        let event = try #require(
+            NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: .function,
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: 0))
+        try send(event)
+        let otherEvent = NSEvent.otherEvent(
+            with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, subtype: 0, data1: 0, data2: 0)
+        try send(try #require(otherEvent))
+    }
+
+    private func send(_ event: NSEvent) throws {
+        NSApp.postEvent(event, atStart: true)
+        window.sendEvent(
+            try #require(NSApp.nextEvent(matching: .any, until: .distantPast, inMode: .default, dequeue: true)))
+    }
+
+    func receiveLines(for duration: Duration) async throws {
+        let end = ContinuousClock.now + duration
+        while ContinuousClock.now < end {
+            try await Task.sleep(for: .milliseconds(30))
+            receiveLine()
+        }
+    }
+
+    private func receiveLine() {
+        lineCount += 1
+        session.receive(Array("line \(lineCount)\r\n".utf8))
+        scrollView.layoutSubtreeIfNeeded()
     }
 }
 
