@@ -72,8 +72,21 @@ extension Terminal {
     }
 
     package struct Graphemes: Sendable {
+        private static let maximumCount = 65_536
+
         private var characters: [String] = []
         private var indices: [[UInt8]: UInt32] = [:]
+        private var requestCount = 0
+        private var rebuildRequestCount = 0
+        private var unsharedIndex: Int?
+
+        var isEmpty: Bool {
+            characters.isEmpty
+        }
+
+        var needsRebuild: Bool {
+            characters.count >= Self.maximumCount && requestCount >= rebuildRequestCount
+        }
 
         package func character(of cell: Cell) -> String {
             guard let index = cell.graphemeIndex else {
@@ -87,14 +100,48 @@ extension Terminal {
 
         mutating func cell(_ cell: Cell, with character: String) -> Cell {
             var cell = cell
-            cell.content = Cell.firstGraphemeIndex + index(of: character)
+            if let index = indices[Array(character.utf8)] {
+                if Int(index) == unsharedIndex {
+                    unsharedIndex = nil
+                }
+                cell.content = Cell.firstGraphemeIndex + index
+                return cell
+            }
+            if let index = cell.graphemeIndex, index == unsharedIndex {
+                indices[Array(characters[index].utf8)] = nil
+                characters[index] = character
+                indices[Array(character.utf8)] = UInt32(index)
+                return cell
+            }
+            requestCount += 1
+            guard characters.count < Self.maximumCount else {
+                return cell
+            }
+            cell.content = Cell.firstGraphemeIndex + append(character)
+            unsharedIndex = cell.graphemeIndex
             return cell
         }
 
-        private mutating func index(of character: String) -> UInt32 {
-            if let index = indices[Array(character.utf8)] {
-                return index
+        mutating func shareCharacters() {
+            unsharedIndex = nil
+        }
+
+        mutating func move(_ line: inout Line, from graphemes: Graphemes) {
+            for column in line.indices {
+                if let index = line[column].graphemeIndex {
+                    let character = graphemes.characters[index]
+                    let newIndex = indices[Array(character.utf8)] ?? append(character)
+                    line[column].content = Cell.firstGraphemeIndex + newIndex
+                }
             }
+        }
+
+        mutating func endRebuild() {
+            requestCount = 0
+            rebuildRequestCount = characters.count
+        }
+
+        private mutating func append(_ character: String) -> UInt32 {
             let index = UInt32(characters.count)
             characters.append(character)
             indices[Array(character.utf8)] = index

@@ -17,7 +17,10 @@ struct ByteStreamTests {
 
     @Test(arguments: 0 ..< streamCount / chunkSize)
     func receivesTheStreamsWithNoCrash(chunk: Int) async throws {
-        try await Task(priority: .background) { try await Self.receiveTheStreams(chunk: chunk) }.value
+        await processMemory.startSharing()
+        let result = await Task(priority: .background) { try await Self.receiveTheStreams(chunk: chunk) }.result
+        await processMemory.leave()
+        try result.get()
     }
 
     private static func receiveTheStreams(chunk: Int) async throws {

@@ -148,6 +148,12 @@ extension Terminal {
             return removeOldest()
         }
 
+        mutating func updateLines(_ body: (inout Line) -> Void) {
+            for index in storedLines.indices {
+                body(&storedLines[index])
+            }
+        }
+
         mutating func unwrapLastRow() {
             if !storedLines.isEmpty {
                 storedLines[storedLines.count - 1].isWrapped = false

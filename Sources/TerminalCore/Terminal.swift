@@ -494,6 +494,9 @@ package struct Terminal: Sendable {
             }
             breakTab(at: column, row: cursor.row)
         }
+        if graphemes.needsRebuild {
+            rebuildGraphemes()
+        }
         var text = graphemes.character(of: screen[cursor.row][column])
         guard text.utf8.count + UTF8.width(scalar) <= Self.maximumBytesPerCell else {
             return
@@ -722,6 +725,25 @@ package struct Terminal: Sendable {
         terminal.repeatsLeft = repeatsLeft
         terminal.usesAutowrap = usesAutowrap
         self = terminal
+        if !graphemes.isEmpty {
+            rebuildGraphemes()
+        }
+    }
+
+    private mutating func rebuildGraphemes() {
+        let graphemes = self.graphemes
+        var rebuilt = Graphemes()
+        for row in screen.indices {
+            rebuilt.move(&screen[row], from: graphemes)
+        }
+        scrollback.updateLines { rebuilt.move(&$0, from: graphemes) }
+        for index in synchronizedSnapshot.indices {
+            for row in synchronizedSnapshot[index].screen.indices {
+                rebuilt.move(&synchronizedSnapshot[index].screen[row], from: graphemes)
+            }
+        }
+        rebuilt.endRebuild()
+        self.graphemes = rebuilt
     }
 
     private mutating func softReset() {
@@ -852,6 +874,7 @@ package struct Terminal: Sendable {
             snapshot.scrollback = Scrollback(columns: columns)
             snapshot.graphemes = Graphemes()
             synchronizedSnapshot = [snapshot]
+            graphemes.shareCharacters()
             synchronizedOutputCount += 1
         case (2026, false):
             endSynchronizedOutput()

@@ -13,7 +13,7 @@ struct GraphemeTests {
 
     @Test func keepsATableForEachTerminal() {
         var full = Terminal(columns: 80, rows: 24)
-        full.receive(clusters(count: 70_000))
+        full.receive(clusters(count: 60_000))
         var other = Terminal(columns: 80, rows: 24)
         other.receive("e\u{301}")
         #expect(other.character(of: other.screen[0][0]) == "e\u{301}")
@@ -31,6 +31,44 @@ struct GraphemeTests {
         var terminal = Terminal(columns: 10, rows: 2)
         terminal.receive("a\u{301}\r\n\r\n\u{1B}c")
         #expect(text(terminal.scrollback, in: terminal) == ["a\u{301}"])
+    }
+
+    @Test func keepsEachCharacterWhenTheTableIsBuiltAgain() {
+        var terminal = Terminal(columns: 10, rows: 3)
+        terminal.receive("a\u{301}\r\n\r\n\r\n\u{1B}[?1049hb\u{302}\u{1B}[?2026h\u{1B}[H")
+        terminal.receive(clusters(count: 70_000))
+        #expect(text(terminal.scrollback.prefix(1), in: terminal) == ["a\u{301}"])
+        #expect(text(terminal.displayed.screen.prefix(1), in: terminal.displayed) == ["b\u{302}"])
+        let last = Array(clusters(count: 70_000)).suffix(30).map(String.init)
+        #expect(terminal.screen.flatMap { $0.map(terminal.character(of:)) } == last)
+    }
+
+    @Test func keepsTheMarksThatACellHasWhenTheTableIsFull() {
+        var terminal = Terminal(columns: 80, rows: 24)
+        var text = ""
+        for index in 0 ..< 70_000 {
+            for value in [0x61 + index / 12_544, 0x300 + index / 112 % 112, 0x300 + index % 112] {
+                text.unicodeScalars.append(Unicode.Scalar(value)!)
+            }
+        }
+        terminal.receive(text)
+        terminal.receive("\u{1B}[2J\u{1B}[Hx\u{330}")
+        #expect(terminal.character(of: terminal.screen[0][0]) == "x")
+        terminal.receive("\u{1B}[3J\u{1B}cx\u{330}")
+        #expect(terminal.character(of: terminal.screen[0][0]) == "x\u{330}")
+    }
+
+    @Test func keepsACharacterThatAnotherCellSharesWhenTheOtherCellGetsAMark() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive("a\u{301}a\u{301}\u{302}")
+        #expect(terminal.screen[0].prefix(2).map(terminal.character(of:)) == ["a\u{301}", "a\u{301}\u{302}"])
+    }
+
+    @Test func keepsTheCharacterOfTheSnapshotWhenItsCellGetsAMark() {
+        var terminal = Terminal(columns: 10, rows: 2)
+        terminal.receive("a\u{301}\u{1B}[?2026h\u{302}")
+        #expect(terminal.displayed.character(of: terminal.displayed.screen[0][0]) == "a\u{301}")
+        #expect(terminal.character(of: terminal.screen[0][0]) == "a\u{301}\u{302}")
     }
 
     @Test func keepsTheScalarsOfCanonicallyEquivalentCharacters() {
