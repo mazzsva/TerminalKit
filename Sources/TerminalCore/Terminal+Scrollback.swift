@@ -221,10 +221,7 @@ extension Terminal {
 
         private mutating func removeOldest() -> Int {
             let count = self.count
-            guard count > Self.maximumCount else {
-                return 0
-            }
-            while firstParagraph < paragraphs.count, self.count > Self.maximumCount {
+            while self.count > Self.maximumCount {
                 for index in storedRange(of: firstParagraph) {
                     storedLines[index] = Line()
                 }
@@ -241,9 +238,6 @@ extension Terminal {
         }
 
         private mutating func removeRemovedParagraphs() {
-            guard firstParagraph > 0 else {
-                return
-            }
             let lineCount = firstLine
             let rowCount = removedRowCount
             storedLines.removeSubrange(..<lineCount)
@@ -253,7 +247,7 @@ extension Terminal {
                 paragraphs[index].start -= lineCount
                 rowEnds[index] -= rowCount
             }
-            storedRelaidCount = Swift.max(storedRelaidCount - firstParagraph, 0)
+            storedRelaidCount -= firstParagraph
             firstParagraph = 0
         }
 
