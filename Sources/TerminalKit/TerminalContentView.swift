@@ -476,7 +476,13 @@ final class TerminalContentView: NSView {
     }
 
     func scrollToBottom() {
-        scroll(CGPoint(x: 0, y: bounds.maxY))
+        guard let clipView = superview as? NSClipView else {
+            return
+        }
+        var visibleBounds = clipView.bounds
+        visibleBounds.origin.y = bounds.maxY
+        clipView.scroll(to: clipView.constrainBoundsRect(visibleBounds).origin)
+        enclosingScrollView?.reflectScrolledClipView(clipView)
     }
 
     private func scrollsView(for event: NSEvent) -> Bool {
@@ -500,6 +506,7 @@ final class TerminalContentView: NSView {
         case .home where !byLine: scroll(CGPoint(x: 0, y: -insets.top))
         case .end where !byLine: scrollToBottom()
         case .pageUp: scroll(CGPoint(x: 0, y: clipView.bounds.minY - step))
+        case .pageDown where clipView.bounds.maxY + step >= bounds.maxY + insets.bottom: scrollToBottom()
         case .pageDown: scroll(CGPoint(x: 0, y: clipView.bounds.minY + step))
         default: return false
         }
