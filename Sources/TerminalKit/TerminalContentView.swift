@@ -443,7 +443,7 @@ final class TerminalContentView: NSView {
             insertedText = ""
             session.send(bytes)
         case .nothing, .scroll:
-            insertedText = ""
+            break
         case .text:
             keyDownEvent = event
             interpretKeyEvents([event])
