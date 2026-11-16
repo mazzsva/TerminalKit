@@ -206,7 +206,7 @@ struct TerminalViewTests {
     }
 
     @Test(
-        .enabled(if: isInXCTest),
+        .serialized, .enabled(if: isInXCTest),
         arguments: [
             [NSPageUpFunctionKey, NSEndFunctionKey],
             [NSPageUpFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey, NSPageDownFunctionKey],
