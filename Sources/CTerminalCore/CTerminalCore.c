@@ -21,7 +21,6 @@ int terminalkit_spawn_in_terminal(
     if (pipe(status_pipe) != 0) {
         return errno;
     }
-    fcntl(status_pipe[0], F_SETFD, FD_CLOEXEC);
     fcntl(status_pipe[1], F_SETFD, FD_CLOEXEC);
 
     sigset_t all_signals;
