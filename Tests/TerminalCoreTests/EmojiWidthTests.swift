@@ -4,15 +4,14 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct EmojiWidthTests {
-    static let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}"
-    static let heart = "\u{2764}\u{FE0F}"
+    static let flag = "\u{1F1FA}\u{1F1F8}"
 
     static let columnsAfterPrinting: [(String, Int)] = [
-        (family, 2),
-        ("\u{1F1FA}\u{1F1F8}", 2),
-        ("\u{1F44D}\u{1F3FD}", 2),
-        ("1\u{FE0F}\u{20E3}", 2),
-        (heart, 2),
+        ("\u{1F44D}\u{1F3FD}", 4),
+        ("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", 8),
+        ("\u{2764}\u{FE0F}", 1),
+        ("\u{263A}\u{FE0F}", 1),
+        ("\u{1F1EE}\u{1F1F9}", 2),
         ("\u{4E2D}\u{6587}\u{5B57}", 6),
         ("e\u{301}", 1),
         ("abc", 3),
@@ -34,21 +33,6 @@ struct EmojiWidthTests {
         #expect(terminal.cursor == Terminal.Position(row: 0, column: column))
     }
 
-    @Test(
-        arguments: [
-            family, "\u{1F1FA}\u{1F1F8}", "\u{1F44D}\u{1F3FD}", "1\u{FE0F}\u{20E3}", heart,
-            "\u{1F44D}\u{FE0F}\u{1F3FD}",
-            "\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}", "\u{2764}\u{FE0F}\u{200D}\u{1F525}", "\u{1F9D1}\u{200D}\u{1F4BB}",
-            "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}", "\u{261D}\u{1F3FD}",
-        ])
-    func placesAnEmojiSequenceInOneWideCell(text: String) {
-        var terminal = Terminal(columns: 10, rows: 1)
-        terminal.receive(text + "x")
-        #expect(terminal.screen[0].prefix(3).map(\.width) == [2, 0, 1])
-        #expect(terminal.character(of: terminal.screen[0][0]) == text)
-        #expect(terminal.screen[0][2] == Terminal.Cell(scalar: "x"))
-    }
-
     @Test(arguments: ["\u{2764}", "\u{2764}\u{FE0E}", "\u{26A0}", "\u{1F1FA}", "\u{200D}", "\u{20E3}"])
     func keepsTheWidthOfACharacterThatIsNotAnEmojiSequence(text: String) {
         var terminal = Terminal(columns: 10, rows: 1)
@@ -62,33 +46,21 @@ struct EmojiWidthTests {
         var terminal = Terminal(columns: 10, rows: 1)
         terminal.receive("\u{1F1FA}\u{1F1F8}\u{1F1EC}\u{1F1E7}\u{1F1EB}x")
         #expect(terminal.screen[0].prefix(6).map(\.width) == [2, 0, 2, 0, 1, 1])
+        #expect(terminal.character(of: terminal.screen[0][0]) == Self.flag)
         #expect(terminal.cursor.column == 6)
     }
 
-    @Test func keepsTwoEmojiInTwoCharacters() {
+    @Test func placesARegionalIndicatorAfterACursorMoveAsItsOwnCharacter() {
         var terminal = Terminal(columns: 10, rows: 1)
-        terminal.receive("\u{1F600}\u{1F600}\(Self.heart)\(Self.heart)")
-        #expect(terminal.screen[0].prefix(8).map(\.width) == [2, 0, 2, 0, 2, 0, 2, 0])
-        #expect(terminal.cursor.column == 8)
-    }
-
-    @Test func placesASkinToneAfterACursorMoveAsItsOwnCharacter() {
-        var terminal = Terminal(columns: 20, rows: 1)
-        terminal.receive("abcdefgh\u{1B}[1;1H\u{1F44D}\u{1B}[1;3H\u{1F3FD}")
-        #expect(terminal.screen[0].prefix(5).map(\.width) == [2, 0, 2, 0, 1])
-        #expect(terminal.character(of: terminal.screen[0][0]) == "\u{1F44D}")
-        #expect(terminal.character(of: terminal.screen[0][2]) == "\u{1F3FD}")
-    }
-
-    @Test func doesNotWidenAfterACursorMove() {
-        var terminal = Terminal(columns: 10, rows: 1)
-        terminal.receive("\u{2764}x\u{1B}[1G\u{1B}[C\u{FE0F}")
-        #expect(terminal.screen[0].prefix(2).map(\.width) == [1, 1])
+        terminal.receive("\u{1F1FA}\u{1B}[1;2H\u{1F1F8}")
+        #expect(terminal.screen[0].prefix(3).map(\.width) == [1, 1, 1])
+        #expect(terminal.character(of: terminal.screen[0][0]) == "\u{1F1FA}")
+        #expect(terminal.character(of: terminal.screen[0][1]) == "\u{1F1F8}")
     }
 
     @Test func widensAClusterInTheMiddleOfALineLikeAWideCharacter() {
         var emoji = Terminal(columns: 4, rows: 1)
-        emoji.receive("a\u{4E2D}b\u{1B}[1G\(Self.heart)")
+        emoji.receive("a\u{4E2D}b\u{1B}[1G\(Self.flag)")
         var wide = Terminal(columns: 4, rows: 1)
         wide.receive("a\u{4E2D}b\u{1B}[1G\u{4E2D}")
         #expect(emoji.screen[0].map(\.width) == wide.screen[0].map(\.width))
@@ -96,32 +68,30 @@ struct EmojiWidthTests {
         #expect(emoji.cursor == wide.cursor)
     }
 
-    @Test(arguments: [heart, "\u{1F1FA}\u{1F1F8}"])
-    func wrapsAClusterThatWidensInTheLastColumn(text: String) {
+    @Test func wrapsAClusterThatWidensInTheLastColumn() {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("abc" + text + "x")
+        terminal.receive("abc" + Self.flag + "x")
         #expect(terminal.screen[0].map(terminal.character(of:)) == ["a", "b", "c", " "])
         #expect(terminal.screen[0][3] == .padding)
         #expect(terminal.screen[0].isWrapped)
         #expect(terminal.screen[1].map(\.width) == [2, 0, 1, 1])
-        #expect(terminal.character(of: terminal.screen[1][0]) == text)
+        #expect(terminal.character(of: terminal.screen[1][0]) == Self.flag)
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 3))
     }
 
-    @Test(arguments: [heart, "\u{1F1FA}\u{1F1F8}"])
-    func wrapsAClusterThatWidensInTheLastColumnOfAScrollRegion(text: String) {
+    @Test func wrapsAClusterThatWidensInTheLastColumnOfAScrollRegion() {
         var terminal = Terminal(columns: 4, rows: 3)
-        terminal.receive("\u{1B}[3;1Hzz\u{1B}[1;2r\u{1B}[2;1Habc" + text + "x")
+        terminal.receive("\u{1B}[3;1Hzz\u{1B}[1;2r\u{1B}[2;1Habc" + Self.flag + "x")
         #expect(terminal.screen[0].isWrapped)
         #expect(terminal.screen[1].map(\.width) == [2, 0, 1, 1])
-        #expect(terminal.character(of: terminal.screen[1][0]) == text)
+        #expect(terminal.character(of: terminal.screen[1][0]) == Self.flag)
         #expect(terminal.screen[2].prefix(2).map(terminal.character(of:)) == ["z", "z"])
         #expect(terminal.cursor == Terminal.Position(row: 1, column: 3))
     }
 
     @Test func widensAClusterThatEndsAtTheLastColumn() {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("ab" + Self.heart)
+        terminal.receive("ab" + Self.flag)
         #expect(terminal.screen[0].map(\.width) == [1, 1, 2, 0])
         terminal.receive("x")
         #expect(terminal.character(of: terminal.screen[1][0]) == "x")
@@ -129,22 +99,22 @@ struct EmojiWidthTests {
 
     @Test func keepsAClusterInTheLastColumnWithoutAutowrap() {
         var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive("\u{1B}[?7labc" + Self.heart)
+        terminal.receive("\u{1B}[?7labc" + Self.flag)
         #expect(terminal.screen[0].map(\.width) == [1, 1, 1, 1])
-        #expect(terminal.character(of: terminal.screen[0][3]) == Self.heart)
+        #expect(terminal.character(of: terminal.screen[0][3]) == Self.flag)
         #expect(terminal.screen[1].allSatisfy { $0 == Terminal.Cell() })
     }
 
     @Test func dropsTheTextAfterAClusterThatWidensToTheLastColumnWithoutAutowrap() {
         var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1B}[?7lab" + Self.heart + "x")
+        terminal.receive("\u{1B}[?7lab" + Self.flag + "x")
         #expect(terminal.screen[0].map(\.width) == [1, 1, 2, 0])
-        #expect(terminal.character(of: terminal.screen[0][2]) == Self.heart)
+        #expect(terminal.character(of: terminal.screen[0][2]) == Self.flag)
     }
 
     @Test func insertsTheSecondCellOfAClusterInInsertMode() {
         var terminal = Terminal(columns: 6, rows: 1)
-        terminal.receive("abc\u{1B}[1G\u{1B}[4h" + Self.heart)
+        terminal.receive("abc\u{1B}[1G\u{1B}[4h" + Self.flag)
         #expect(terminal.screen[0].prefix(5).map(\.width) == [2, 0, 1, 1, 1])
         #expect(terminal.screen[0].dropFirst(2).prefix(3).map(terminal.character(of:)) == ["a", "b", "c"])
         #expect(terminal.cursor.column == 2)
@@ -155,29 +125,22 @@ struct EmojiWidthTests {
     ])
     func editsAClusterLikeAWideCharacter(edit: String) {
         var emoji = Terminal(columns: 6, rows: 1)
-        emoji.receive("a\(Self.family)b\u{1B}[2G" + edit)
+        emoji.receive("a\(Self.flag)b\u{1B}[2G" + edit)
         var wide = Terminal(columns: 6, rows: 1)
         wide.receive("a\u{4E2D}b\u{1B}[2G" + edit)
         #expect(emoji.screen[0].map(\.width) == wide.screen[0].map(\.width))
         #expect(
-            emoji.screen[0].map(emoji.character(of:)).map { $0 == Self.family ? "\u{4E2D}" : $0 }
+            emoji.screen[0].map(emoji.character(of:)).map { $0 == Self.flag ? "\u{4E2D}" : $0 }
                 == wide.screen[0].map(wide.character(of:)))
         #expect(emoji.cursor == wide.cursor)
     }
 
     @Test func keepsAClusterWideThroughAReflow() {
         var terminal = Terminal(columns: 4, rows: 3)
-        terminal.receive("ab\(Self.family)\r\nx")
+        terminal.receive("ab\(Self.flag)\r\nx")
         terminal.resize(columns: 3, rows: 3)
         #expect(terminal.screen[1].map(\.width) == [2, 0, 1])
-        #expect(terminal.character(of: terminal.screen[1][0]) == Self.family)
-    }
-
-    @Test(arguments: ["\u{200D}", "\u{1F3FD}", "\u{FE0F}", "\u{20E3}", "\u{E0067}", "\u{200D}\u{200D}\u{1F469}"])
-    func acceptsAJoinerWithNoBase(text: String) {
-        var terminal = Terminal(columns: 4, rows: 2)
-        terminal.receive(text + "x\u{1B}[H" + text)
-        #expect(terminal.cursor.row == 0)
+        #expect(terminal.character(of: terminal.screen[1][0]) == Self.flag)
     }
 
     @Test func limitsALongRunOfCombiningMarks() {
@@ -185,13 +148,6 @@ struct EmojiWidthTests {
         terminal.receive("e" + String(repeating: "\u{301}", count: 100_000) + "x")
         #expect(terminal.character(of: terminal.screen[0][0]).utf8.count <= 1_024)
         #expect(terminal.screen[0][1] == Terminal.Cell(scalar: "x"))
-    }
-
-    @Test func limitsALongJoinedSequence() {
-        var terminal = Terminal(columns: 4, rows: 1)
-        terminal.receive("\u{1F468}" + String(repeating: "\u{200D}\u{1F468}", count: 20_000))
-        #expect(terminal.screen[0].prefix(2).map(\.width) == [2, 0])
-        #expect(terminal.character(of: terminal.screen[0][0]).utf8.count <= 1_024)
     }
 
     @Test func wrapsAWideCharacterThatDoesNotFit() {

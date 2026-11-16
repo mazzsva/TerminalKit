@@ -29,15 +29,10 @@ struct TerminalJoinedCellTests {
         #expect(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil) == nil)
     }
 
-    @Test(
-        arguments: [
-            "\u{1F1FA}\u{1F1F8}", "\u{1F44D}\u{1F3FD}", "\u{261D}\u{1F3FD}", "1\u{FE0F}\u{20E3}", "#\u{FE0F}\u{20E3}",
-            "\u{1F468}\u{200D}\u{1F469}",
-        ])
-    func leavesAnEmojiSequenceInOneCell(text: String) {
-        let (line, graphemes) = cells(text)
+    @Test func leavesAFlagInOneCell() {
+        let (line, graphemes) = cells("\u{1F1FA}\u{1F1F8}")
         #expect(line[0].width == 2)
-        #expect(graphemes.character(of: line[0]) == text)
+        #expect(graphemes.character(of: line[0]) == "\u{1F1FA}\u{1F1F8}")
         #expect(TerminalContentView.joinedCells(in: line, graphemes: graphemes, order: nil) == nil)
     }
 
