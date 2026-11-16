@@ -725,9 +725,6 @@ package struct Terminal: Sendable {
         terminal.repeatsLeft = repeatsLeft
         terminal.usesAutowrap = usesAutowrap
         self = terminal
-        if !graphemes.isEmpty {
-            rebuildGraphemes()
-        }
     }
 
     private mutating func rebuildGraphemes() {

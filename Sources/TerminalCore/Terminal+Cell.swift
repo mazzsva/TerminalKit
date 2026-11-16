@@ -80,10 +80,6 @@ extension Terminal {
         private var rebuildRequestCount = 0
         private var unsharedIndex: Int?
 
-        var isEmpty: Bool {
-            characters.isEmpty
-        }
-
         var needsRebuild: Bool {
             characters.count >= Self.maximumCount && requestCount >= rebuildRequestCount
         }

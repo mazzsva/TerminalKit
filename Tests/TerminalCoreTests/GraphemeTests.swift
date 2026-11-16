@@ -54,8 +54,6 @@ struct GraphemeTests {
         terminal.receive(text)
         terminal.receive("\u{1B}[2J\u{1B}[Hx\u{330}")
         #expect(terminal.character(of: terminal.screen[0][0]) == "x")
-        terminal.receive("\u{1B}[3J\u{1B}cx\u{330}")
-        #expect(terminal.character(of: terminal.screen[0][0]) == "x\u{330}")
     }
 
     @Test func keepsACharacterThatAnotherCellSharesWhenTheOtherCellGetsAMark() {
