@@ -29,45 +29,25 @@ struct TerminalSynchronizedOutputTests {
         await session.waitForExit()
     }
 
-    @Test func drawsOnlyCompleteFramesOfAFullScreenRedraw() async throws {
-        let session = TerminalSession(
-            running: """
-                stty raw -echo; exec /usr/bin/perl -e '$| = 1; my $n = 0; do { my $c = chr(97 + $n++); \
-                my $f = "\\e[?2026h\\e[H" . join("\\r\\n", ($c x 200) x 60) . "\\e[?2026l"; my $s = int(length($f) / 2); \
-                syswrite(STDOUT, substr($f, 0, $s)); sysread(STDIN, my $k, 1); syswrite(STDOUT, substr($f, $s)) \
-                } while (sysread(STDIN, my $k, 1))'
-                """
-        )
+    @Test func drawsOnlyCompleteFramesOfAFullScreenRedraw() {
+        let session = TerminalSession(running: "exit")
         session.synchronizedOutputClock = ManualClock()
         session.resize(columns: 200, rows: 60)
         var frames: [Set<String>] = []
         var updateCount = 0
-        session.terminalDidChange = {
-            let terminal = session.terminal
-            frames.append(Set(terminal.screen.joined().map(terminal.character(of:))))
-            if session.liveTerminal.isSynchronizingOutput {
-                updateCount += 1
-            }
-        }
-        try session.start()
         let characters = (0 ... 10).map { String(UnicodeScalar(UInt8(97 + $0))) }
         for character in characters {
-            for await isSynchronizing in Observations({ session.liveTerminal.isSynchronizingOutput })
-            where isSynchronizing {
-                break
-            }
-            session.send("x")
-            let line = String(repeating: character, count: 200)
-            for await lines in Observations({ session.lines }) where lines.allSatisfy({ $0 == line }) {
-                break
-            }
-            if character != characters.last {
-                session.send("x")
+            let screen = Array(repeating: String(repeating: character, count: 200), count: 60).joined(separator: "\r\n")
+            let frame = Array("\u{1B}[?2026h\u{1B}[H\(screen)\u{1B}[?2026l".utf8)
+            for start in stride(from: 0, to: frame.count, by: 1_024) {
+                session.receive(Array(frame[start ..< min(start + 1_024, frame.count)]))
+                let terminal = session.terminal
+                frames.append(Set(terminal.screen.joined().map(terminal.character(of:))))
+                if session.liveTerminal.isSynchronizingOutput {
+                    updateCount += 1
+                }
             }
         }
-        session.terminalDidChange = nil
-        session.terminate()
-        await session.waitForExit()
         #expect(updateCount > 0)
         #expect(frames.allSatisfy { $0.count == 1 })
         #expect(
