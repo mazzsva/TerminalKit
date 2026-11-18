@@ -111,6 +111,17 @@ struct TerminalLinkSafetyTests {
         }
     }
 
+    @Test func opensTheFileThatASymbolicLinkPointsTo() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let text = directory.appending(path: "notes.txt")
+        try Data("text".utf8).write(to: text)
+        let link = directory.appending(path: "notes")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: text)
+        #expect(TerminalContentView.action(for: link) == .open(text.resolvingSymlinksInPath()))
+    }
+
     @Test(arguments: [
         "webloc", "fileloc", "inetloc", "vncloc", "ftploc", "url", "mobileconfig", "prefpane", "saver", "term",
         "configprofile", "ipa", "tcl", "inputplugin", "cin", "provisionprofile",
