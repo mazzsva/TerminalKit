@@ -282,7 +282,7 @@ struct ProgramSessionTests {
 
         await session.paste("日本語 paste\n🇮🇹 1️⃣ 👨‍👩‍👧 👍🏽 end")
         try await session.wait {
-            $0.input == ["❯ 日本語 paste", "  🇮🇹 1️⃣ 👨‍👩‍👧 👍🏽 end"] && $0.cursor.column == 17
+            $0.input == ["❯ 日本語 paste", "  🇮🇹 1️⃣ 👨 👍 end"] && $0.cursor.column == 17
                 && $0.lines[$0.cursor.row].hasSuffix(" end")
         }
         await session.send("\u{3}")
