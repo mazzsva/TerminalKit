@@ -47,8 +47,47 @@ struct ProgramStatusTests {
 
     @Test func ignoresUnknownKeys() {
         var terminal = Terminal(columns: 20, rows: 5)
-        terminal.receive("\u{1B}]7501;id=7:state=done:progress=40:title=t:flag\u{7}")
+        terminal.receive("\u{1B}]7501;size=7:state=done:progress=40:title=t:flag\u{7}")
         #expect(terminal.programStatus == .init(state: .done))
+    }
+
+    @Test func ignoresTheReportsOfAChildTask() {
+        var terminal = Terminal(columns: 20, rows: 5)
+        terminal.receive("\u{1B}]7501;state=done:app=claude-code:id=7\u{7}")
+        #expect(terminal.programStatus == nil)
+        terminal.receive("\u{1B}]7501;state=working:app=claude-code\u{7}\u{1B}]7501;state=clear:id=7\u{7}")
+        #expect(terminal.programStatus == .init(state: .working, application: "claude-code"))
+    }
+
+    @Test func keepsTheQuestionWhileASubagentWorks() {
+        var terminal = Terminal(columns: 20, rows: 5)
+        let question = Terminal.ProgramStatus(
+            state: .blocked, application: "claude-code", kind: "question", message: "Pick a color")
+        terminal.receive(
+            "\u{1B}]7501;state=working:app=claude-code\u{7}"
+                + "\u{1B}]7501;state=blocked:app=claude-code:kind=question:msg=UGljayBhIGNvbG9y\u{7}"
+                + "\u{1B}]7501;state=working:app=claude-code:id=a1b2c3:title=RXhwbG9yZSB0aGUgY29kZQ==\u{7}")
+        #expect(terminal.programStatus == question)
+        terminal.receive("\u{1B}]7501;state=clear:id=a1b2c3\u{7}")
+        #expect(terminal.programStatus == question)
+        terminal.receive("\u{1B}]7501;state=working:app=claude-code\u{7}\u{1B}]7501;state=done:app=claude-code\u{7}")
+        #expect(terminal.programStatus == .init(state: .done, application: "claude-code"))
+    }
+
+    @Test func keepsTheWorkingStateWhileABackgroundCommandRuns() {
+        var terminal = Terminal(columns: 20, rows: 5)
+        let working = Terminal.ProgramStatus(state: .working, application: "claude-code")
+        terminal.receive(
+            "\u{1B}]7501;state=working:app=claude-code\u{7}"
+                + "\u{1B}]7501;state=working:app=claude-code:id=b1:title=UnVuIHRoZSB0ZXN0cw==\u{7}"
+                + "\u{1B}]7501;state=working:app=claude-code:msg=VGVzdHMgcnVu\u{7}")
+        #expect(
+            terminal.programStatus
+                == .init(state: .working, application: "claude-code", kind: nil, message: "Tests run"))
+        terminal.receive("\u{1B}]7501;state=working:app=claude-code\u{7}\u{1B}]7501;state=clear:id=b1\u{7}")
+        #expect(terminal.programStatus == working)
+        terminal.receive("\u{1B}]7501;state=done:app=claude-code\u{7}")
+        #expect(terminal.programStatus == .init(state: .done, application: "claude-code"))
     }
 
     @Test func dropsTheControlCharactersOfTheMessage() {

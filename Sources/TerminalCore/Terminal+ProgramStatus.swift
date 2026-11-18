@@ -25,6 +25,9 @@ extension Terminal {
             let pair = field.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
             fields[pair[0]] = pair.count == 2 ? pair[1] : ""
         }
+        guard fields["id"] == nil else {
+            return
+        }
         guard fields["state"] != "clear" else {
             programStatus = nil
             return
