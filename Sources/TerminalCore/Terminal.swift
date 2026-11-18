@@ -677,9 +677,7 @@ package struct Terminal: Sendable {
         let separator = command.unicodeScalars.firstIndex(of: ";")
         let text = separator.map { command[command.unicodeScalars.index(after: $0)...] }
         let name = command[..<(separator ?? command.endIndex)]
-        let digits = name.first == "+" || name.first == "-" ? name.dropFirst() : name
-        let isNumber = !digits.isEmpty && digits.allSatisfy { ("0" ... "9").contains($0) }
-        guard let number = Int32(name).map(Int.init) ?? (isNumber ? nil : 0) else {
+        guard let number = Int32(name).map(Int.init) else {
             return
         }
         switch (number, text) {
