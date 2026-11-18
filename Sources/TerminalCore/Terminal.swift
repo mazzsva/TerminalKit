@@ -420,8 +420,8 @@ package struct Terminal: Sendable {
         } else if isWrapPending || cursor.column + width > columns {
             let row = cursor.row
             let scrolls = row == scrollRegion.upperBound - 1
-            if !isWrapPending, screen[row][columns - 1] == Cell() {
-                screen[row][columns - 1] = .padding
+            for column in cursor.column + (isWrapPending ? 1 : 0) ..< columns where screen[row][column] == Cell() {
+                screen[row][column] = .padding
             }
             screen[row].isWrapped = true
             carriageReturn()
