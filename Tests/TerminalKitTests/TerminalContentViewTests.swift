@@ -939,7 +939,7 @@ struct TerminalContentViewTests {
     }
 
     @Test func fillsARowOfTruecolorCellsWithOneImage() async throws {
-        let cells = (0 ..< 48).map { "\\033[38;2;\($0 * 5);0;0;48;2;0;\($0 * 5);0m\(["▀", "▄", "█", " "][$0 % 4])" }
+        let cells = (0 ..< 48).map { "\\033[38;2;\($0 * 5);0;0;48;2;0;\($0 * 5);0m\(["a", "b", "c", " "][$0 % 4])" }
         let view = try await drawnView(running: "printf '\(cells.joined())\\033[m\\r'")
         let counts = try operatorCounts(in: view.dataWithPDF(inside: view.bounds))
         #expect(counts.fills < 4)
