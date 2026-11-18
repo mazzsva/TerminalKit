@@ -2,22 +2,59 @@ import AppKit
 import CoreText
 
 extension TerminalContentView {
-    static func drawsSeparator(_ character: String, in rect: CGRect, context: CGContext) -> Bool {
-        guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first,
-            (0xE0B0 ... 0xE0B3).contains(scalar.value)
+    static func drawsPowerlineSymbol(_ character: String, in rect: CGRect, font: NSFont, context: CGContext) -> Bool {
+        guard character.unicodeScalars.count == 1, let value = character.unicodeScalars.first?.value,
+            (0xE0A0 ... 0xE0A3).contains(value) || (0xE0B0 ... 0xE0B3).contains(value)
         else {
             return false
         }
-        let (edge, tip) = scalar.value < 0xE0B2 ? (rect.minX, rect.maxX) : (rect.maxX, rect.minX)
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + rect.width * x / 7, y: rect.minY + rect.height * y / 15)
+        }
+        func size(_ width: CGFloat, _ height: CGFloat) -> CGSize {
+            CGSize(width: rect.width * width / 7, height: rect.width * height / 7)
+        }
         context.saveGState()
         context.clip(to: rect)
-        context.move(to: CGPoint(x: edge, y: rect.minY))
-        context.addLine(to: CGPoint(x: tip, y: rect.midY))
-        context.addLine(to: CGPoint(x: edge, y: rect.maxY))
-        if scalar.value.isMultiple(of: 2) {
-            context.fillPath()
-        } else {
+        if value < 0xE0B0 {
+            context.setLineWidth(rect.width / 6)
+        }
+        switch value {
+        case 0xE0A0:
+            context.move(to: point(1.75, 0))
+            context.addLine(to: point(1.75, 15))
+            context.move(to: point(4.7, 4))
+            context.addLine(to: point(4.7, 9))
+            context.addQuadCurve(to: point(1.75, 11.5), control: point(4.7, 11.5))
             context.strokePath()
+            context.fillEllipse(in: CGRect(origin: point(3.7, 3.05), size: size(3, 3)))
+        case 0xE0A2:
+            let shackle = CGRect(origin: point(2.35, 4.2), size: size(2.85, 4))
+            let radius = shackle.width / 2
+            context.addPath(CGPath(roundedRect: shackle, cornerWidth: radius, cornerHeight: radius, transform: nil))
+            context.strokePath()
+            let body = CGRect(origin: point(0.95, 6.7), size: size(5.8, 4.9))
+            let corner = rect.width / 7
+            context.addPath(CGPath(roundedRect: body, cornerWidth: corner, cornerHeight: corner, transform: nil))
+            context.fillPath()
+        case 0xE0A1, 0xE0A3:
+            let small =
+                CTFontCreateCopyWithSymbolicTraits(font, font.pointSize / 2, nil, .traitBold, .traitBold) ?? font
+            var glyphs: [CGGlyph] = [0, 0]
+            CTFontGetGlyphsForCharacters(small, Array((value == 0xE0A1 ? "LN" : "CN").utf16), &glyphs, 2)
+            let x = point(3.75, 0).x - CTFontGetAdvancesForGlyphs(small, .horizontal, glyphs, nil, 1) / 2
+            let positions = [CGPoint(x: x, y: -point(0, 7.25).y), CGPoint(x: x, y: -point(0, 12).y)]
+            CTFontDrawGlyphs(small, glyphs, positions, 2, context)
+        default:
+            let (edge, tip) = value < 0xE0B2 ? (rect.minX, rect.maxX) : (rect.maxX, rect.minX)
+            context.move(to: CGPoint(x: edge, y: rect.minY))
+            context.addLine(to: CGPoint(x: tip, y: rect.midY))
+            context.addLine(to: CGPoint(x: edge, y: rect.maxY))
+            if value.isMultiple(of: 2) {
+                context.fillPath()
+            } else {
+                context.strokePath()
+            }
         }
         context.restoreGState()
         return true

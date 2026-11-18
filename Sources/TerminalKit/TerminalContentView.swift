@@ -771,7 +771,7 @@ final class TerminalContentView: NSView {
             let visual = order?.columns[column] ?? column
             let x = Self.padding + CGFloat(visual) * cellSize.width
             let cell = CGRect(origin: CGPoint(x: x, y: top), size: cellSize)
-            if Self.drawsSeparator(character, in: cell, context: context) {
+            if Self.drawsPowerlineSymbol(character, in: cell, font: font, context: context) {
                 continue
             }
             let entry = fonts.glyphs.entry(

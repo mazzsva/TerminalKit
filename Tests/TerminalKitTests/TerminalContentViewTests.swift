@@ -884,6 +884,28 @@ struct TerminalContentViewTests {
         #expect(try pixels(in: space, of: view).allSatisfy { isClose($0, to: background) })
     }
 
+    @Test(arguments: ["\\240", "\\241", "\\242", "\\243"], [1, 2] as [CGFloat])
+    func drawsThePowerlineSymbolsInsideTheCell(lastByte: String, scale: CGFloat) async throws {
+        func drawn(_ byte: String) async throws -> (TerminalContentView, NSWindow) {
+            let view = try await drawnView(running: "printf '\\033[?25l \\356\\202\(byte) \\n'")
+            let window = ScaledWindow(contentView: view)
+            window.scale = scale
+            view.palette = highContrastPalette
+            return (view, window)
+        }
+        let (view, window) = try await drawn(lastByte)
+        let (box, boxWindow) = try await drawn("\\244")
+        let cell = view.rect(row: 0, columns: 1 ..< 2)
+        let ink = try pixels(in: cell, of: view).compactMap { $0?.usingColorSpace(.sRGB)?.brightnessComponent }
+        #expect(ink.contains { $0 < 0.5 })
+        let around = [(-cell.width, 0), (cell.width, 0), (0, cell.height)].map { cell.offsetBy(dx: $0, dy: $1) }
+        for rect in around {
+            #expect(try pixels(in: rect, of: view).allSatisfy { isClose($0, to: [1, 1, 1]) })
+        }
+        #expect(try pixels(in: cell, of: view) != pixels(in: cell, of: box))
+        withExtendedLifetime((window, boxWindow)) {}
+    }
+
     @Test(arguments: ["1", "2", "3", "4"])
     func drawsTheTextStyle(parameter: String) async throws {
         let plain = try image(of: try await drawnView(running: "printf 'X\\n'"))
