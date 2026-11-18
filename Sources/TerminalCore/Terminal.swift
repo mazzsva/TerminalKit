@@ -91,7 +91,6 @@ package struct Terminal: Sendable {
     private var savedCursor = SavedCursor()
     private var scrollRegion: Range<Int>
     private var hasScrollRegion = false
-    private var hasMovedCursorForFullRow = false
     private var tabStops = TabStops()
     var replies: [UInt8] = []
     private var normalSavedCursor: SavedCursor?
@@ -153,16 +152,12 @@ package struct Terminal: Sendable {
             cursor: Position(row: restored.count + cursor.row, column: cursor.column))
         var column = target?.column ?? 0
         if usedRows == self.rows, (lines.last?.textCount ?? 0) >= columns {
-            if cursor.row == self.rows - 1 || hasMovedCursorForFullRow {
+            if cursor.row == self.rows - 1 || !restored.isEmpty {
                 lines[lines.count - 1].isWrapped = true
                 lines.append(Line())
-                hasMovedCursorForFullRow = false
             } else {
                 column += 1
-                hasMovedCursorForFullRow = true
             }
-        } else {
-            hasMovedCursorForFullRow = false
         }
         var top = max(lines.count - rows, 0)
         var row = target?.row ?? lines.count + cursor.row - usedRows + (cursor.column > 0 ? 1 : 0)
