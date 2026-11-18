@@ -30,7 +30,7 @@ TerminalKit is a terminal view for Mac apps. In it, the zsh login shell, vim, le
 Add the package with Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/mazzsva/TerminalKit", from: "2.3.0")
+.package(url: "https://github.com/mazzsva/TerminalKit", from: "3.0.0")
 ```
 
 Then show a terminal that runs Claude Code:
@@ -73,7 +73,7 @@ Do not run Claude Code's `/terminal-setup` in the host. Claude Code treats the s
 
 With its default setting, Claude Code rings the bell only when the Terminal.app profile of the user has the audible bell off. To read that profile, it runs `osascript`, which sends an Apple event to Terminal.app in the name of the host app. In a measurement with Claude Code 2.1.323 and a host that had no grant to control Terminal, macOS showed the prompt "“TerminalKitExample” wants access to control “Terminal”." 6 to 9 seconds after a permission request, and about one minute after the end of an answer. It showed the same prompt with and without the hardened runtime, with no Apple events entitlement and no `NSAppleEventsUsageDescription`. When nobody answers, the prompt closes after two minutes, and Claude Code rings no bell. A second prompt waits until the first one closes, and a prompt stays after the host quits. To get the bell for a permission request and for a finished task in each case, start it with `claude --settings '{"preferredNotifChannel":"terminal_bell"}'`. The bell comes some seconds after the request, and one minute after the end of the task.
 
-`programStatus` gives the status that a program reports: idle, working, blocked, or done. It is the status of the main agent, and the reports of its background tasks and subagents do not change it. Claude Code 2.1.295 or later reports it with no setup. When it waits for a permission, the state is blocked, the kind is `permission`, and the message names the request, such as the file to write. Then Claude Code puts no status glyph in front of the title. The status is nil when the program clears it or when the session ends. A program that is killed with `SIGKILL` cannot clear it, so its last status and its title stay until another program reports.
+`programStatus` gives the status that a program reports: idle, working, blocked, done, or error. Claude Code reports error when a request to the API fails. It is the status of the main agent, and the reports of its background tasks and subagents do not change it. Claude Code 2.1.295 or later reports it with no setup. When it waits for a permission, the state is blocked, the kind is `permission`, and the message names the request, such as the file to write. Then Claude Code puts no status glyph in front of the title. The status is nil when the program clears it or when the session ends. A program that is killed with `SIGKILL` cannot clear it, so its last status and its title stay until another program reports.
 
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 

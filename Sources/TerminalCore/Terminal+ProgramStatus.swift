@@ -7,6 +7,7 @@ extension Terminal {
             case working
             case done
             case blocked
+            case error
         }
 
         package var state: State

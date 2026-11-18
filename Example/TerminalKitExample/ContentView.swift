@@ -41,6 +41,8 @@ struct ContentView: View {
             Text("Blocked")
         case .done:
             Text("Done")
+        case .error:
+            Text("Error")
         case nil:
             Text(verbatim: session.currentDirectoryURL?.path(percentEncoded: false) ?? "")
         }
