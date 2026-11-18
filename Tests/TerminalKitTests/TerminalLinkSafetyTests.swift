@@ -111,6 +111,17 @@ struct TerminalLinkSafetyTests {
         }
     }
 
+    @Test func opensTheFileThatASymbolicLinkPointsTo() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let text = directory.appending(path: "notes.txt")
+        try Data("text".utf8).write(to: text)
+        let link = directory.appending(path: "notes")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: text)
+        #expect(TerminalContentView.action(for: link) == .open(text.resolvingSymlinksInPath()))
+    }
+
     @Test(arguments: [
         "webloc", "fileloc", "inetloc", "vncloc", "ftploc", "url", "mobileconfig", "prefpane", "saver", "term",
         "configprofile", "ipa", "tcl", "inputplugin", "cin", "provisionprofile",
@@ -134,7 +145,7 @@ struct TerminalLinkSafetyTests {
         let host = String(decoding: name.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self)
         for location in ["\(host)\(path)", "localhost\(path)", path] {
             let url = try #require(URL(string: "file://\(location)"))
-            #expect(TerminalContentView.action(for: url) == .open(url))
+            #expect(TerminalContentView.action(for: url) == .open(file.resolvingSymlinksInPath()))
         }
         for location in ["server.example.com\(path)", "%FF\(path)"] {
             #expect(TerminalContentView.action(for: try #require(URL(string: "file://\(location)"))) == nil)
