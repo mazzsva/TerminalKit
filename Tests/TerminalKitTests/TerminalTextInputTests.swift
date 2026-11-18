@@ -100,6 +100,19 @@ struct TerminalTextInputTests {
         #expect(await session.linesAfterExit().contains("ed  95  9c  1b  0d  78"))
     }
 
+    @Test func leavesTheEscapeKeyToTheAccentMenu() async throws {
+        let session = TerminalSession(running: "stty raw -echo; echo ready; head -c 3 | od -An -tx1")
+        let view = TerminalContentView(session: session)
+        object_setClass(view.inputContext, AccentMenuContext.self)
+        try session.start()
+        await session.waitForText("ready")
+        view.insertText("e", replacementRange: noRange)
+        view.keyDown(with: try keyDown("\u{1B}", keyCode: 53))
+        view.keyDown(with: try keyDown("x"))
+        view.keyDown(with: try keyDown("\r", keyCode: 36))
+        #expect(await session.linesAfterExit().contains("65  78  0d"))
+    }
+
     @Test func forgetsTheInsertedTextAfterAPaste() {
         let view = TerminalContentView(session: idleSession())
         view.insertText("e", replacementRange: noRange)
@@ -192,6 +205,12 @@ private final class UnmarkingPassingInputContext: NSTextInputContext {
             client.insertText("한", replacementRange: NSRange(location: NSNotFound, length: 0))
         }
         return super.handleEvent(event)
+    }
+}
+
+private final class AccentMenuContext: NSTextInputContext {
+    override func handleEvent(_ event: NSEvent) -> Bool {
+        event.keyCode == 53 || super.handleEvent(event)
     }
 }
 
