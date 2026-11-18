@@ -103,6 +103,19 @@ struct ProgramStatusTests {
         #expect(terminal.programStatus == .init(state: .blocked, kind: "permission"))
     }
 
+    @Test func reportsAFailedTurnUntilTheNextWork() {
+        var terminal = Terminal(columns: 20, rows: 5)
+        terminal.receive(
+            "\u{1B}]7501;state=idle:app=claude-code\u{7}\u{1B}]7501;state=working:app=claude-code\u{7}"
+                + "\u{1B}]7501;state=error:app=claude-code:msg=UmVxdWVzdCBmYWlsZWQ=\u{7}")
+        #expect(
+            terminal.programStatus
+                == .init(state: .error, application: "claude-code", kind: nil, message: "Request failed"))
+        terminal.receive("\u{1B}]7501;state=working:app=claude-code\u{7}")
+        terminal.receive("\u{1B}]7501;state=error:app=claude-code:id=7:msg=VGFzayBmYWlsZWQ=\u{7}")
+        #expect(terminal.programStatus == .init(state: .working, application: "claude-code"))
+    }
+
     @Test func keepsTheStatusAfterAReset() {
         var terminal = Terminal(columns: 20, rows: 5)
         terminal.receive("\u{1B}]7501;state=done:app=claude-code\u{7}\u{1B}c")

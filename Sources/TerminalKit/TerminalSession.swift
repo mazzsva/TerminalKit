@@ -22,6 +22,7 @@ public final class TerminalSession {
             case working
             case done
             case blocked
+            case error
         }
 
         public let state: State
@@ -319,6 +320,8 @@ extension TerminalSession.ProgramStatus {
             state = .done
         case .blocked:
             state = .blocked
+        case .error:
+            state = .error
         }
         application = status.application
         kind = status.kind
