@@ -59,6 +59,38 @@ extension TerminalContentView {
         context.restoreGState()
         return true
     }
+
+    private static let blockElements: [UInt32: (quadrants: Int, alpha: CGFloat)] = [
+        0x2580: (0b0011, 1), 0x2584: (0b1100, 1), 0x2588: (0b1111, 1), 0x258C: (0b0101, 1), 0x2590: (0b1010, 1),
+        0x2591: (0b1111, 0.25), 0x2592: (0b1111, 0.5), 0x2593: (0b1111, 0.75), 0x2596: (0b0100, 1),
+        0x2597: (0b1000, 1), 0x2598: (0b0001, 1), 0x2599: (0b1101, 1), 0x259A: (0b1001, 1), 0x259B: (0b0111, 1),
+        0x259C: (0b1011, 1), 0x259D: (0b0010, 1), 0x259E: (0b0110, 1), 0x259F: (0b1110, 1),
+    ]
+
+    func drawsBlockElement(_ character: String, in cell: CGRect, context: CGContext) -> Bool {
+        guard character.unicodeScalars.count == 1, let value = character.unicodeScalars.first?.value,
+            let (quadrants, alpha) = Self.blockElements[value]
+        else {
+            return false
+        }
+        let rects = (0 ..< 4).filter { quadrants >> $0 & 1 == 1 }
+            .map { quadrant in
+                backingAlignedRect(
+                    CGRect(
+                        x: quadrant.isMultiple(of: 2) ? cell.minX : cell.midX,
+                        y: quadrant < 2 ? cell.minY : cell.midY,
+                        width: cell.width / 2,
+                        height: cell.height / 2
+                    ),
+                    options: .alignAllEdgesNearest
+                )
+            }
+        context.saveGState()
+        context.setAlpha(alpha)
+        context.fill(rects)
+        context.restoreGState()
+        return true
+    }
 }
 
 final class GlyphCache {
