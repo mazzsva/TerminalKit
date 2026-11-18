@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import TerminalCore
 import Testing
 
@@ -12,6 +13,11 @@ struct TerminalJoinedCellTests {
             ("\u{915}\u{93E}\u{915}\u{93F}", [0, 2]),
             ("\u{915}\u{94D}\u{937}", [0]),
             ("\u{E01}\u{E33}", [0]),
+            (thumbWithSkinTone, [0]),
+            (family, [0]),
+            (keycap, [0]),
+            (flagOfEngland, [0]),
+            (family + thumbWithSkinTone, [0, 8]),
         ] as [(String, [Int])])
     func joinsTheCellsThatTerminalAppJoins(text: String, heads: [Int]) {
         let (line, graphemes) = cells(text)
@@ -21,8 +27,8 @@ struct TerminalJoinedCellTests {
 
     @Test(
         arguments: [
-            "\u{1F468}\u{200D}\u{1F469}", "\u{1F3F4}\u{E0067}", "a\u{1F3FD}", "\u{4E2D}\u{1F3FD}", "\u{1100}\u{1100}",
-            "a\u{903}", "e\u{301}\u{903}", "\u{1F600}\u{1F600}", "ab", "a\u{20E3}", "\u{4E2D}\u{20E3}",
+            "a\u{1F3FD}", "\u{4E2D}\u{1F3FD}", "\u{263A}\u{1F3FD}", "\u{1100}\u{1100}", "a\u{903}", "e\u{301}\u{903}",
+            "\u{1F600}\u{1F600}", "ab", "a\u{20E3}", "\u{4E2D}\u{20E3}", "a\u{200D}b", "1\u{903}",
         ])
     func keepsTheCellsThatTerminalAppKeepsApart(text: String) {
         let (line, graphemes) = cells(text)
@@ -137,6 +143,34 @@ struct TerminalJoinedCellTests {
         #expect(try image(of: shape, in: rect) != image(of: apart, in: rect))
     }
 
+    @Test(arguments: [(thumbWithSkinTone, 4), (family, 8), (keycap, 2), (flagOfEngland, 8)])
+    func drawsAnEmojiSequenceAsOneGlyphInItsFirstCells(sequence: String, width: Int) async throws {
+        let view = try await drawn(sequence)
+        view.palette.background = Color(.sRGB, red: 1, green: 1, blue: 1)
+        let string = StringView(frame: view.frame, text: sequence, font: view.font)
+        string.origin = CGPoint(x: TerminalContentView.padding, y: TerminalContentView.topPadding + view.font.ascender)
+        let cells = view.rect(row: 0, columns: 0 ..< width)
+        #expect(try image(of: view, in: cells) == image(of: string, in: cells))
+        if width > 3 {
+            let rest = view.rect(row: 0, columns: 3 ..< width)
+            string.text = ""
+            #expect(try image(of: view, in: rest) == image(of: string, in: rest))
+        }
+    }
+
+    @Test func drawsEachPartOfASequenceThatTheLastColumnCuts() async throws {
+        let cut = try await drawn("\\033[1;79H\(thumbWithSkinTone)")
+        let apart = try await drawn("\\033[1;79H\u{1F44D}\\r\\n\u{1F3FD}")
+        let blank = try await drawn("")
+        #expect(cut.session.terminal.screen[1][0].width == 2)
+        let rows = cut.rect(row: 0, columns: 0 ..< 80).union(cut.rect(row: 1, columns: 0 ..< 80))
+        for view in [cut, apart, blank] {
+            view.frame.size = CGSize(width: rows.maxX + TerminalContentView.padding, height: 100)
+        }
+        #expect(try image(of: cut, in: rows) == image(of: apart, in: rows))
+        #expect(try image(of: cut, in: rows) != image(of: blank, in: rows))
+    }
+
     private func focused(_ text: String) async throws -> (view: TerminalContentView, window: KeyWindow) {
         let session = TerminalSession(running: "printf '\(text)'")
         let view = TerminalContentView(session: session)
@@ -185,5 +219,43 @@ struct TerminalDirectionalControlTests {
         var terminal = Terminal(columns: 10, rows: 1)
         _ = terminal.receive(Array("a\u{FEFF}b".utf8))
         #expect(TerminalContentView.visualOrder(of: terminal.screen[0], graphemes: terminal.graphemes) == nil)
+    }
+}
+
+private let thumbWithSkinTone = "\u{1F44D}\u{1F3FD}"
+private let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+private let keycap = "1\u{FE0F}\u{20E3}"
+private let flagOfEngland = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}"
+
+private final class StringView: NSView {
+    var text: String
+    var origin = CGPoint.zero
+    private let font: NSFont
+
+    init(frame: CGRect, text: String, font: NSFont) {
+        self.text = text
+        self.font = font
+        super.init(frame: frame)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override var isFlipped: Bool {
+        true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1).setFill()
+        dirtyRect.fill()
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
+        context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
+        for run in GlyphCache().entry(for: text, font: font, index: 0, isMirrored: false).runs {
+            let positions = run.positions.map { CGPoint(x: origin.x + $0.x, y: $0.y - origin.y) }
+            CTFontDrawGlyphs(run.font, run.glyphs, positions, run.glyphs.count, context)
+        }
     }
 }
