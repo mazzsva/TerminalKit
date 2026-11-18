@@ -57,7 +57,7 @@ extension TerminalContentView {
             || values?.contentType?.conforms(to: .internetLocation) == true || values?.isApplication == true
             || values?.contentType?.conforms(to: .aliasFile) == true
             || !isDirectory.boolValue && FileManager.default.isExecutableFile(atPath: path)
-        return launches ? .reveal(url) : .open(url)
+        return launches ? .reveal(url) : .open(resolved)
     }
 
     func rows(ofLineAt row: Int, limit: Int, in terminal: Terminal) -> ClosedRange<Int> {

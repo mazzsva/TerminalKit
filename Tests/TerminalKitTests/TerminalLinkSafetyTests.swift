@@ -145,7 +145,7 @@ struct TerminalLinkSafetyTests {
         let host = String(decoding: name.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self)
         for location in ["\(host)\(path)", "localhost\(path)", path] {
             let url = try #require(URL(string: "file://\(location)"))
-            #expect(TerminalContentView.action(for: url) == .open(url))
+            #expect(TerminalContentView.action(for: url) == .open(file.resolvingSymlinksInPath()))
         }
         for location in ["server.example.com\(path)", "%FF\(path)"] {
             #expect(TerminalContentView.action(for: try #require(URL(string: "file://\(location)"))) == nil)
