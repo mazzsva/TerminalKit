@@ -77,15 +77,15 @@ With its default setting, Claude Code rings the bell only when the Terminal.app 
 
 As in Terminal, hold Fn to select text while a program such as Claude Code uses the mouse.
 
-A held letter key with accents, such as E, shows the accent menu of macOS and does not repeat, as in a text view. For a key that repeats as in Terminal, register `ApplePressAndHoldEnabled` as `false` in the `UserDefaults` of the host app, as the example app does. The accent menu was not tested.
+A held letter key with accents, such as E, shows the accent menu of macOS and does not repeat, as in a text view. For a key that repeats as in Terminal, register `ApplePressAndHoldEnabled` as `false` in the `UserDefaults` of the host app, as the example app does. In a test with the real keyboard and press and hold on, a held E showed the accent menu, a number key put the accented letter in place of the `e`, and Escape closed the menu.
 
-macOS gives microphone access to the host app, not to the program in the terminal. For voice input in a program such as Claude Code, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement, as the example app has. Voice input was not tested.
+macOS gives microphone access to the host app, not to the program in the terminal. For voice input in a program such as Claude Code, add `NSMicrophoneUsageDescription` to the host's Info.plist, and with the hardened runtime, the `com.apple.security.device.audio-input` entitlement, as the example app has. Voice input was not tested, because the rules of the project forbid a start of voice input.
 
 The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalView` with the user's login shell. Build it with the `TerminalKitExample` scheme.
 
 ## Engineering decisions
 
-**A fixed list of programs.** The measure of done is that the programs above work at least as well as in Terminal.app. The emulator acts on a control function when Terminal.app acts on it, and a listed program sends it or the macOS terminfo entry of `xterm-256color` holds it. It also acts on some small control functions, such as REP, IND, and NEL, only because Terminal.app acts on them. A behavior that Terminal.app does not have stays only when a removal test proved that it is needed. Two stay. Synchronized output (mode 2026) stays, because without it the view can draw a frame that a program did not complete. The status that a program reports (OSC 7501) stays with no removal test, because the host app needs it. The Powerline arrows U+E0B0 to U+E0B3, which the view draws as shapes, are not such a behavior, because Terminal.app draws them itself. Terminal.app also draws the symbols U+E0A0 to U+E0A3, and the view shows a "?" box for them. The known limits name each control function that Terminal.app acts on and TerminalKit ignores, and each one that a host app must know. Shift-Return sends `ESC CR`, as Terminal.app did in a measurement with a profile that has "Use Option as Meta key" on, and makes a new line in Claude Code with no setup.
+**A fixed list of programs.** The measure of done is that the programs above work at least as well as in Terminal.app. The emulator acts on a control function when Terminal.app acts on it, and a listed program sends it or the macOS terminfo entry of `xterm-256color` holds it. It also acts on some small control functions, such as REP, IND, and NEL, only because Terminal.app acts on them. A behavior that Terminal.app does not have stays only when a removal test proved that it is needed. Two stay. Synchronized output (mode 2026) stays, because without it the view can draw a frame that a program did not complete. The status that a program reports (OSC 7501) stays with no removal test, because the host app needs it. The Powerline arrows U+E0B0 to U+E0B3, which the view draws as shapes, are not such a behavior, because Terminal.app draws them itself. Terminal.app also draws the symbols U+E0A0 to U+E0A3, and the view draws them too. The known limits name each control function that Terminal.app acts on and TerminalKit ignores, and each one that a host app must know. Shift-Return sends `ESC CR`, as Terminal.app did in a measurement with a profile that has "Use Option as Meta key" on, and makes a new line in Claude Code with no setup.
 
 **Written from scratch.** The whole library, from the escape sequence parser and the pseudo terminal to the view, is fewer than 7,000 lines of Swift and C on POSIX and AppKit APIs.
 
@@ -95,7 +95,7 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 
 **The right size from the first frame.** When the host calls `start()` after it makes the view, as in the example, the process waits until the view has its size, so a full-screen program never draws its first frame at the wrong width and then redraws.
 
-**Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts. Input methods and dictation were not tested.
+**Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts. A dead key was tested with the real keyboard: Option-E shows the accent as marked text, and E then gives `é`. No input method was tested, because the Mac of the tests had none on, and dictation was not tested, because it starts voice input, which the rules of the project forbid.
 
 **Never touches the shell.** There are no shell integration scripts and no changes to startup files. The user's own shell starts through `/usr/bin/login`. Programs see `TERM_PROGRAM=Apple_Terminal`, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file. The library also sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1`, so Claude Code uses synchronized output.
 
@@ -111,6 +111,7 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
   - The color queries OSC 4, OSC 5, and OSC 13 to 19, OSC 10 and OSC 11 that set a color, and OSC 104, 110, and 111 that reset a color.
   - The window reports `CSI 11t`, `CSI 13t`, `CSI 14t`, and `CSI 18t`, and DECREQTPARM (`CSI x`).
   - DECOM, DECALN, mode 47, and LNM.
+  - An OSC with an empty name, which sets the title.
 - Terminal.app does not have these either, but a host app for agent tools must know them:
   - OSC 8 marked links. A Command-click opens printed links only.
   - OSC 9 and OSC 777, the notification requests of programs. A host gets no notification event from a program. The signals are the bell, through `bellCount`, and the status that a program reports, through `programStatus`.
