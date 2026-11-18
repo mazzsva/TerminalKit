@@ -226,6 +226,7 @@ struct ProgramSessionTests {
         configuration.environment["DISABLE_AUTOUPDATER"] = "1"
         configuration.environment["IS_DEMO"] = "1"
         configuration.environment["TZ"] = "UTC"
+        configuration.environment["NO_COLOR"] = nil
         try await session.start(configuration)
         try await session.wait(timeout: .seconds(30)) {
             $0.lines.contains("  Yes, I trust this folder") || $0.isReady
