@@ -97,7 +97,7 @@ The example app in `Example/TerminalKitExample.xcodeproj` shows one `TerminalVie
 
 **Native AppKit behavior.** Input methods, dictation, the find bar, Services, and VoiceOver use the same AppKit APIs as a text view, and Find uses the standard menu actions, so the host app keeps its shortcuts. A dead key was tested with the real keyboard: Option-E shows the accent as marked text, and E then gives `é`. No input method was tested, because the Mac of the tests had none on, and dictation was not tested, because it starts voice input, which the rules of the project forbid.
 
-**Never touches the shell.** There are no shell integration scripts and no changes to startup files. The user's own shell starts through `/usr/bin/login`. Programs see `TERM_PROGRAM=Apple_Terminal`, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file. The library also sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1`, so Claude Code uses synchronized output.
+**Never touches the shell.** There are no shell integration scripts and no changes to startup files. The user's own shell starts through `/usr/bin/login`. Programs see `TERM_PROGRAM=Apple_Terminal`, and the library leaves out `TERM_SESSION_ID`, so the shell history stays in its usual file. The library also sets `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1` when the environment does not hold that variable, so Claude Code uses synchronized output.
 
 ## Known limits
 
