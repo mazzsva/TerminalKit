@@ -439,12 +439,12 @@ final class TerminalContentView: NSView {
         hidePointer()
         scrollToBottom()
         switch input {
-        case .bytes(let bytes):
+        case .bytes(let bytes) where insertedText.isEmpty || !modifiers.isEmpty:
             insertedText = ""
             session.send(bytes)
         case .nothing, .scroll:
             break
-        case .text:
+        case .text, .bytes:
             keyDownEvent = event
             interpretKeyEvents([event])
             keyDownEvent = nil
