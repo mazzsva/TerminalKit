@@ -69,6 +69,17 @@ extension TerminalContentView {
     }
 
     private static func joins(_ text: String, width: Int, _ next: String, width nextWidth: Int) -> Bool {
-        text.unicodeScalars.first?.isASCII == false && width == 1 && nextWidth == 1 && (text + next).count == 1
+        guard let first = text.unicodeScalars.first, let following = next.unicodeScalars.first,
+            (text + next).count == 1
+        else {
+            return false
+        }
+        if following.properties.isEmojiModifier {
+            return first.properties.isEmojiModifierBase
+        }
+        let isSequencePart =
+            following == "\u{200D}" || following == "\u{20E3}" || ("\u{E0020}" ... "\u{E007F}").contains(following)
+            || text.unicodeScalars.last == "\u{200D}"
+        return first.properties.isEmoji && isSequencePart || !first.isASCII && width == 1 && nextWidth == 1
     }
 }
