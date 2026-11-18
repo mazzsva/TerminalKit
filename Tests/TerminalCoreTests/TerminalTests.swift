@@ -676,6 +676,21 @@ struct TerminalTests {
         #expect(terminal.screen[0].isWrapped)
     }
 
+    @Test(arguments: [(81, 1), (79, 2)])
+    func keepsNoBlankCellOfAResizeBeforeAPendingWrap(columns: Int, row: Int) {
+        var terminal = Terminal(columns: 80, rows: 24)
+        let text = String(String(repeating: "0123456789", count: 8).prefix(79)) + "Z"
+        terminal.receive(text)
+        terminal.resize(columns: columns, rows: 24)
+        terminal.receive("Q")
+        var line = terminal.screen[...row].flatMap { $0.filter(\.isText) }.map(terminal.character(of:)).joined()
+        while line.last == " " {
+            line.removeLast()
+        }
+        #expect(line == text + "Q")
+        #expect(terminal.cursor == Terminal.Position(row: row, column: 1))
+    }
+
     @Test func movesACursorPastTheTextToTheNextRow() {
         var terminal = Terminal(columns: 10, rows: 3)
         terminal.receive("ab\r\ncd\u{1B}[1;5H")
