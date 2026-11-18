@@ -722,6 +722,148 @@ struct TerminalContentViewTests {
         #expect(ink(y: view.cellSize.height / 2) > 0.15)
     }
 
+    @Test(arguments: [1, 2])
+    func drawsFullBlocksWithoutASeam(scale: Int) async throws {
+        let pixels = try await cellPixels(running: "██\\r\\n█", scale: scale)
+        for (row, column) in [(0, 0), (0, 1), (1, 0)] {
+            let gaps = pixels.points(row: row, column: column).filter { !isClose($0.color, to: pixels.foreground) }
+            #expect(gaps.isEmpty, "\(gaps.count) pixels without ink in row \(row), column \(column)")
+        }
+    }
+
+    @Test(arguments: [1, 2])
+    func drawsShadesWithoutASeamBetweenRows(scale: Int) async throws {
+        let pixels = try await cellPixels(running: "░ ▒ ▓\\r\\n░ ▒ ▓", scale: scale)
+        for column in [0, 2, 4] {
+            let gaps = (pixels.points(row: 0, column: column) + pixels.points(row: 1, column: column))
+                .filter { isClose($0.color, to: pixels.background) }
+            #expect(gaps.isEmpty, "\(gaps.count) pixels of the background in column \(column)")
+        }
+    }
+
+    @Test(arguments: [1, 2])
+    func drawsAFullBlockWithoutASeamToACellOfItsColor(scale: Int) async throws {
+        let fill = "\\033[48;2;215;119;87m \\033[49m"
+        let pixels = try await cellPixels(
+            running: "\\033[2C\(fill)\\r\\n \(fill)\\033[38;2;215;119;87m█\(fill)\\r\\n\\033[2C\(fill)", scale: scale)
+        for (row, column) in [(1, 2), (1, 1), (1, 3), (0, 2), (2, 2)] {
+            let gaps = pixels.points(row: row, column: column).filter { isClose($0.color, to: pixels.background) }
+            #expect(gaps.isEmpty, "\(gaps.count) pixels of the background in row \(row), column \(column)")
+        }
+    }
+
+    @Test(arguments: [1, 2])
+    func drawsEachHalfAndQuadrantBlockOnItsPartsOfTheCell(scale: Int) async throws {
+        let blocks: [(block: Character, quadrants: Set<Int>)] = [
+            ("▀", [0, 1]), ("▄", [2, 3]), ("▌", [0, 2]), ("▐", [1, 3]), ("▘", [0]), ("▝", [1]), ("▖", [2]),
+            ("▗", [3]), ("▛", [0, 1, 2]), ("▜", [0, 1, 3]), ("▙", [0, 2, 3]), ("▟", [1, 2, 3]), ("▚", [0, 3]),
+            ("▞", [1, 2]),
+        ]
+        let pixels = try await cellPixels(running: "\\n" + blocks.map { "  \($0.block)" }.joined(), scale: scale)
+        for (index, (block, quadrants)) in blocks.enumerated() {
+            var (missing, extra, outside) = (0, 0, 0)
+            var ink: [(x: Int, y: Int)] = []
+            for y in -15 * scale ..< 30 * scale {
+                for x in -7 * scale ..< 14 * scale {
+                    let color = pixels.color(row: 1, column: 2 + 3 * index, x: x, y: y)
+                    let hasInk = !isClose(color, to: pixels.background)
+                    if hasInk {
+                        ink.append((x, y))
+                    }
+                    guard (0 ..< 7 * scale).contains(x), (0 ..< 15 * scale).contains(y) else {
+                        outside += hasInk ? 1 : 0
+                        continue
+                    }
+                    let parts = Set(pixels.quadrants(x: x, y: y).map(quadrants.contains))
+                    if parts == [true], !isClose(color, to: pixels.foreground) {
+                        missing += 1
+                    } else if parts == [false], hasInk {
+                        extra += 1
+                    }
+                }
+            }
+            let (columns, rows) = (ink.map(\.x), ink.map(\.y))
+            #expect(
+                missing == 0 && extra == 0 && outside == 0,
+                """
+                \(block) at scale \(scale): \(missing) pixels of its parts without ink, \(extra) pixels of ink \
+                outside its parts, \(outside) pixels of ink in a neighbor cell, ink in x \(columns.min() ?? 0) to \
+                \(columns.max() ?? 0) and y \(rows.min() ?? 0) to \(rows.max() ?? 0) of a cell of \(7 * scale) by \
+                \(15 * scale)
+                """)
+        }
+    }
+
+    @Test(arguments: [1, 2])
+    func drawsTheClaudeCodeStartPictureWithoutASeam(scale: Int) async throws {
+        let rows = [
+            "\\033[38;2;215;119;87m▗\\033[48;2;215;119;87m\\033[38;2;0;0;0m ▗   ▖ \\033[49m\\033[38;2;215;119;87m▖",
+            "\\033[12G\\033[39m\\033[1mClaude\\033[19GCode\\033[24G\\033[22m\\033[38;2;153;153;153mv2.1.323\\033[39m",
+            "\\r\\r\\n\\033[2G\\033[48;2;215;119;87m       \\033[12G\\033[49m\\033[38;2;153;153;153mHaiku\\033[18G5.5",
+            "\\033[22G·\\033[24GClaude\\033[31G   \\033[39m\\r\\r\\n\\033[2G\\033[38;2;215;119;87m▘▘\\033[7G▝▝",
+        ]
+        let pixels = try await cellPixels(running: rows.joined(), scale: scale)
+        let shape = [
+            ["...#"] + Array(repeating: "####", count: 7) + ["..#."],
+            ["...."] + Array(repeating: "####", count: 7) + ["...."],
+            ["....", "#...", "#...", "....", "....", "....", ".#..", ".#..", "...."],
+        ]
+        for (row, cells) in shape.enumerated() {
+            for (column, quadrants) in cells.map(Array.init).enumerated() {
+                let gaps = pixels.points(row: row, column: column)
+                    .filter { point in
+                        Set(pixels.quadrants(x: point.x, y: point.y).map { quadrants[$0] }) == ["#"]
+                            && isClose(point.color, to: pixels.background)
+                    }
+                #expect(gaps.isEmpty, "\(gaps.count) pixels of the background in row \(row), column \(column)")
+            }
+        }
+    }
+
+    @Test(arguments: [1, 2])
+    func drawsAHalfBlockInInverseOverTheSelection(scale: Int) async throws {
+        let pixels = try await cellPixels(
+            running: "\\033[7m▀\\033[m ",
+            scale: scale,
+            selection: TerminalContentView.Selection(anchor: .init(line: 0, column: 0), head: .init(line: 0, column: 2))
+        )
+        let reference = FillView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
+        reference.fills = [(reference.bounds, NSColor(TerminalPalette.standard.background).withAlphaComponent(1))]
+        let window = ScaledWindow(contentView: reference)
+        let ink = try representation(of: try #require(window.contentView)).colorAt(x: 0, y: 0)
+        let selection = pixels.color(row: 0, column: 1, x: 3 * scale, y: 7 * scale)
+        let gaps = pixels.points(row: 0, column: 0)
+            .filter { point in
+                let parts = Set(pixels.quadrants(x: point.x, y: point.y).map { $0 < 2 })
+                return parts.count == 1 && !isClose(point.color, to: parts == [true] ? ink : selection)
+            }
+        #expect(!isClose(selection, to: pixels.foreground))
+        #expect(gaps.isEmpty, "\(gaps.count) wrong pixels")
+    }
+
+    @Test(arguments: [1, 2])
+    func drawsBoxLinesWithoutAGapAtTheCellEdge(scale: Int) async throws {
+        let pixels = try await cellPixels(running: "──\\r\\n\\r\\n╭─╮\\r\\n│ │\\r\\n╰─╯", scale: scale)
+        let background = try #require(pixels.background?.usingColorSpace(.sRGB))
+        func ink(row: Int, column: Int, x: Int? = nil, y: Int? = nil) -> CGFloat {
+            pixels.points(row: row, column: column)
+                .filter { $0.x == x ?? $0.x && $0.y == y ?? $0.y }
+                .compactMap { $0.color?.usingColorSpace(.sRGB) }
+                .map { abs($0.brightnessComponent - background.brightnessComponent) }
+                .max() ?? 0
+        }
+        let line = ink(row: 0, column: 0, x: 3 * scale)
+        #expect(line > 0.15)
+        for (row, column) in [(0, 0), (2, 0), (2, 1), (4, 0), (4, 1)] {
+            let edges = [ink(row: row, column: column, x: 7 * scale - 1), ink(row: row, column: column + 1, x: 0)]
+            #expect(edges.allSatisfy { $0 >= line * 0.9 }, "─ in \(row), \(column): \(edges), \(line)")
+        }
+        for (row, column) in [(2, 0), (2, 2), (3, 0), (3, 2)] {
+            let edges = [ink(row: row, column: column, y: 15 * scale - 1), ink(row: row + 1, column: column, y: 0)]
+            #expect(edges.allSatisfy { $0 >= line * 0.9 }, "│ in \(row), \(column): \(edges), \(line)")
+        }
+    }
+
     @Test(arguments: [1, 2] as [CGFloat], [0, 0.25] as [CGFloat])
     func drawsTruecolorCellsAsOneFillPerCell(scale: CGFloat, offset: CGFloat) async throws {
         let colors: [[Int]] = (0 ..< 48).map { index in [37, 91, 53, 29, 67, 13].map { index * $0 % 256 } }
@@ -1524,6 +1666,51 @@ private func drawnView(running script: String) async throws -> TerminalContentVi
     try session.start()
     await session.waitForExit()
     return view
+}
+
+@MainActor
+private func cellPixels(
+    running script: String,
+    scale: Int,
+    selection: TerminalContentView.Selection? = nil
+) async throws -> CellPixels {
+    let view = try await drawnView(running: "printf '\\033[?25l\(script)'")
+    view.frame.size.width = 320
+    let window = ScaledKeyWindow(contentView: view)
+    window.scale = CGFloat(scale)
+    view.selection = selection
+    return CellPixels(representation: try representation(of: view), scale: scale)
+}
+
+private struct CellPixels {
+    let representation: NSBitmapImageRep
+    let scale: Int
+
+    var foreground: NSColor {
+        NSColor(TerminalPalette.standard.foreground)
+    }
+
+    var background: NSColor? {
+        representation.colorAt(x: 0, y: 0)
+    }
+
+    func color(row: Int, column: Int, x: Int, y: Int) -> NSColor? {
+        representation.colorAt(x: (10 + 7 * column) * scale + x, y: (7 + 15 * row) * scale + y)
+    }
+
+    func points(row: Int, column: Int) -> [(x: Int, y: Int, color: NSColor?)] {
+        (0 ..< 15 * scale)
+            .flatMap { y in
+                (0 ..< 7 * scale).map { x in (x, y, color(row: row, column: column, x: x, y: y)) }
+            }
+    }
+
+    func quadrants(x: Int, y: Int) -> [Int] {
+        func halves(of pixel: Int, in size: Int) -> [Int] {
+            2 * pixel + 2 <= size * scale ? [0] : 2 * pixel >= size * scale ? [1] : [0, 1]
+        }
+        return halves(of: y, in: 15).flatMap { row in halves(of: x, in: 7).map { 2 * row + $0 } }
+    }
 }
 
 @MainActor
