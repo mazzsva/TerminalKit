@@ -439,7 +439,8 @@ final class TerminalContentView: NSView {
         hidePointer()
         scrollToBottom()
         switch input {
-        case .bytes(let bytes) where insertedText.isEmpty:
+        case .bytes(let bytes) where insertedText.isEmpty || !modifiers.isEmpty:
+            insertedText = ""
             session.send(bytes)
         case .nothing, .scroll:
             break
