@@ -629,6 +629,14 @@ struct TerminalScrollKeyTests {
             #expect(output.topLine == line)
         }
     }
+
+    @Test(.enabled(if: isInXCTest)) func showsAFoundLineAtOnceWhileAKeyIsHandled() throws {
+        let output = OutputWindow()
+        try output.post(NSPageUpFunctionKey) {
+            let rect = output.showFoundText("line 20")
+            #expect(output.visibleRect.contains(rect))
+        }
+    }
 }
 
 @MainActor
@@ -703,6 +711,17 @@ private final class OutputWindow {
 
     var topLine: Int {
         session.terminal.removedScrollbackCount + Int(((top - TerminalContentView.topPadding) / rowHeight).rounded())
+    }
+
+    var visibleRect: CGRect {
+        scrollView.contentView.bounds
+    }
+
+    func showFoundText(_ text: String) -> CGRect {
+        let terminalView = scrollView.terminalView
+        let range = (terminalView.string as NSString).range(of: text)
+        terminalView.scrollRangeToVisible(range)
+        return terminalView.characterRects(for: range)[0]
     }
 
     func receiveSavedLineLimit() {

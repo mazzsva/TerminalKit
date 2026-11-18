@@ -41,7 +41,7 @@ extension TerminalContentView: NSTextFinderClient {
         let height = clipView.bounds.height - insets.top - insets.bottom - Self.topPadding - Self.bottomPadding
         let row = Int((rect.minY - Self.topPadding) / cellSize.height)
         let top = row - Int(height / cellSize.height) / 2
-        scroll(CGPoint(x: 0, y: CGFloat(top) * cellSize.height - insets.top))
+        scrollClipView(to: CGFloat(top) * cellSize.height - insets.top)
     }
 
     func rects(forCharacterRange range: NSRange) -> [NSValue]? {
