@@ -662,6 +662,24 @@ struct TerminalWheelTests {
         }
         #expect(output.top == top)
     }
+
+    @Test(arguments: [16, 4, -16] as [Int32])
+    func movesByThePointsOfATrackpadInTheSavedLines(points: Int32) async throws {
+        let output = OutputWindow()
+        try output.press(NSPageUpFunctionKey)
+        let start = output.top
+        for _ in 0 ..< 5 where output.top == start {
+            try output.turnWheel(points: points)
+            for _ in 0 ..< 50 where output.top == start {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        let top = start - CGFloat(points)
+        for _ in 0 ..< 50 where output.top != top {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(output.top == top)
+    }
 }
 
 @MainActor
@@ -707,6 +725,10 @@ private final class OutputWindow {
 
     func turnWheel(lines: Int32) throws {
         scrollView.terminalView.scrollWheel(with: try scrollWheelEvent(lines: lines))
+    }
+
+    func turnWheel(points: Int32) throws {
+        scrollView.terminalView.scrollWheel(with: try scrollWheelEvent(x: 0, y: points))
     }
 
     var topLine: Int {
