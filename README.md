@@ -22,7 +22,7 @@ TerminalKit is a terminal view for Mac apps. In it, the zsh login shell, vim, le
   `TEST_RUNNER_TERMINALKIT_CLAUDE_SESSION=1 xcodebuild test -scheme TerminalKit -destination 'platform=macOS' -only-testing:TerminalKitTests/ProgramSessionTests`
 - **Speed:** `TERMINALKIT_SPEED=1 swift test -c release -Xswiftc -enable-testing --filter SpeedTests` outputs 100 MB of text and resizes the view with 100,000 saved lines. It opens a Terminal.app window to compare the output time live.
 - **Coverage:** `TERMINALKIT_CLAUDE_SESSION=1 Scripts/unused-functions.sh` reports each function in `Sources` that the program sessions, the view tests, and the bad input run do not use. `Scripts/unused-functions.txt` lists the expected ones, with a reason for each.
-- **CI:** GitHub Actions lints, builds the example app, and runs the full suite on every pull request that is ready for review.
+- **CI:** GitHub Actions lints with `swift format --strict`, builds the package and the example app with no warnings, and runs the full suite on each ready pull request, each merge to main, and every Monday.
 - **Accessibility:** VoiceOver reads the terminal as a text area and gets a notification when the output changes.
 
 ## Usage example
