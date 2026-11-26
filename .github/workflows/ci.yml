@@ -19,7 +19,7 @@ concurrency:
 jobs:
   xcode:
     name: Xcode
-    uses: mazzsva/.github/.github/workflows/xcode.yml@v1.0.0
+    uses: mazzsva/.github/.github/workflows/xcode.yml@v1.0.1
     with:
       scheme: TerminalKit
       platform: macOS
